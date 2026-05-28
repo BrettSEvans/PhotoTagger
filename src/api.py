@@ -31,24 +31,46 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/search", methods=["GET"])
     def search():
         """
-        Search for photos by jersey number.
+        Search for photos by jersey number with optional filters.
 
         Query params:
-        - jersey: Jersey number to search for (required)
+        - jersey: Jersey number (required)
+        - min_confidence: Minimum OCR confidence (0-1, optional, default 0)
+        - team: Team name for roster lookup (optional)
+        - year: Team year for roster lookup (optional)
 
         Returns:
-            JSON with matching photos
+            JSON with matching photos and player names (if roster provided)
         """
         jersey = request.args.get("jersey", "").strip()
+        min_confidence = float(request.args.get("min_confidence", "0.0"))
+        team = request.args.get("team", "").strip()
+        year = request.args.get("year", "").strip()
 
         if not jersey:
             return jsonify({"error": "jersey parameter required"}), 400
 
-        results = db.get_photo_by_jersey(jersey)
+        # Get raw results
+        all_results = db.get_photo_by_jersey(jersey)
+
+        # Filter by confidence
+        results = [r for r in all_results if r["confidence"] >= min_confidence]
+
+        # Add player names if roster available
+        if team and year:
+            try:
+                year_int = int(year)
+                for result in results:
+                    if hasattr(app, 'roster_manager'):
+                        player_name = app.roster_manager.get_player_name(team, year_int, jersey)
+                        result["player_name"] = player_name
+            except (ValueError, AttributeError):
+                pass
 
         return jsonify({
             "jersey": jersey,
             "count": len(results),
+            "min_confidence": min_confidence,
             "results": results,
         }), 200
 
@@ -113,6 +135,29 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             "total_photos": len(all_photos),
             "db_path": db.db_path,
         }), 200
+
+    # Get face data endpoint
+    @app.route("/api/faces/<int:photo_id>", methods=["GET"])
+    def get_faces(photo_id):
+        """Get all detected faces for a photo."""
+        try:
+            faces = db.get_faces_by_photo(photo_id)
+            return jsonify({
+                "photo_id": photo_id,
+                "face_count": len(faces),
+                "faces": [
+                    {
+                        "id": f["id"],
+                        "bbox": f["bbox"],
+                        "confidence": f["confidence"],
+                        "embedding_dim": len(f["embedding"])
+                    }
+                    for f in faces
+                ]
+            }), 200
+        except Exception as e:
+            logger.error(f"Error getting faces for photo {photo_id}: {e}")
+            return jsonify({"error": str(e)}), 500
 
     return app
 
