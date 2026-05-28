@@ -25,8 +25,9 @@ export const GalleryPage: React.FC = () => {
     try {
       const result = await photoTaggerClient.getPhotos(1, 20);
       setPhotos(result.photos);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load photos';
+    } catch (error) {
+      console.error('Failed to load photos:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load photos';
       setError(errorMessage);
       setPhotos([]);
     } finally {
