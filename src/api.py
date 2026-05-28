@@ -171,6 +171,12 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             page = int(request.args.get("page", "1"))
             per_page = int(request.args.get("per_page", "20"))
 
+            # Validate pagination parameters
+            if page < 1 or per_page < 1:
+                return jsonify({"error": "page and per_page must be >= 1"}), 400
+            if per_page > 100:
+                per_page = 100  # Cap maximum per_page to prevent abuse
+
             all_photos = db.get_all_photos()
 
             # Simple pagination
@@ -182,7 +188,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 "photos": [
                     {
                         "id": p.get("id"),
-                        "filename": p.get("file_path", "").split("/")[-1] if p.get("file_path") else "Unknown",
+                        "filename": os.path.basename(p.get("file_path", "")) if p.get("file_path") else "Unknown",
                         "path": p.get("file_path", ""),
                         "added_at": p.get("ingested_at", ""),
                     }

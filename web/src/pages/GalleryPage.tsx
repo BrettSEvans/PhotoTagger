@@ -52,6 +52,12 @@ export const GalleryPage: React.FC = () => {
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6">
             <p className="text-sm font-medium text-red-800">{error}</p>
+            <button
+              onClick={loadPhotos}
+              className="mt-3 bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors"
+            >
+              Retry
+            </button>
           </div>
         ) : photos.length === 0 ? (
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-12 text-center">
@@ -100,7 +106,12 @@ export const GalleryPage: React.FC = () => {
                     {photo.filename}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    {new Date(photo.added_at).toLocaleDateString()}
+                    {(() => {
+                      const date = new Date(photo.added_at);
+                      return date instanceof Date && !isNaN(date.getTime())
+                        ? date.toLocaleDateString()
+                        : 'Date unknown';
+                    })()}
                   </p>
                   <p className="mt-2 text-xs text-gray-400">
                     Path: {photo.path}
