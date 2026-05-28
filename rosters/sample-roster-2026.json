@@ -1,0 +1,18 @@
+{
+  "team_name": "Ultimate Club",
+  "team_year": 2026,
+  "jerseys": {
+    "1": "Alice Smith",
+    "2": "Bob Johnson",
+    "5": "Charlie Davis",
+    "14": "Diana Wilson",
+    "16": "Edward Brown",
+    "17": "Fiona Garcia",
+    "19": "George Lee",
+    "24": "Hannah White",
+    "29": "Isaac Martinez",
+    "31": "Julia Thompson",
+    "48": "Kevin Anderson",
+    "88": "Lauren Jackson"
+  }
+}
