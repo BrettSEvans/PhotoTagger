@@ -40,6 +40,35 @@ class Database:
             )
         """)
 
+        # Faces table: store detected faces and embeddings (Phase 2A)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS faces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                photo_id INTEGER NOT NULL,
+                embedding BLOB NOT NULL,
+                bbox_x0 INTEGER,
+                bbox_y0 INTEGER,
+                bbox_x1 INTEGER,
+                bbox_y1 INTEGER,
+                confidence REAL,
+                detected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (photo_id) REFERENCES photos(id) ON DELETE CASCADE
+            )
+        """)
+
+        # Rosters table: player name mapping (Phase 2A)
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS rosters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_name TEXT NOT NULL,
+                team_year INTEGER NOT NULL,
+                jersey_number TEXT NOT NULL,
+                player_name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(team_name, team_year, jersey_number)
+            )
+        """)
+
         self.conn.commit()
 
     def add_photo(self, file_path: str, file_hash: Optional[str] = None) -> int:
@@ -109,6 +138,69 @@ class Database:
         cursor = self.conn.cursor()
         cursor.execute("SELECT id FROM photos WHERE file_hash = ?", (file_hash,))
         return cursor.fetchone() is not None
+
+    def add_face(self, photo_id: int, embedding: List[float], bbox: List[int], confidence: float) -> int:
+        """
+        Add a detected face to the database.
+
+        Args:
+            photo_id: ID of the photo
+            embedding: 384-dim face embedding vector
+            bbox: [x0, y0, x1, y1] bounding box
+            confidence: Face detection confidence (0-1)
+
+        Returns:
+            Face ID
+        """
+        import json
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence))
+        self.conn.commit()
+        return cursor.lastrowid
+
+    def get_faces_by_photo(self, photo_id: int) -> List[Dict]:
+        """Get all faces detected in a photo."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence
+            FROM faces
+            WHERE photo_id = ?
+            ORDER BY confidence DESC
+        """, (photo_id,))
+
+        results = []
+        for row in cursor.fetchall():
+            import json
+            results.append({
+                "id": row[0],
+                "photo_id": row[1],
+                "embedding": json.loads(row[2]),
+                "bbox": [row[3], row[4], row[5], row[6]],
+                "confidence": row[7]
+            })
+        return results
+
+    def add_roster_entry(self, team_name: str, team_year: int, jersey_number: str, player_name: str):
+        """Add a player to the roster."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO rosters (team_name, team_year, jersey_number, player_name)
+            VALUES (?, ?, ?, ?)
+        """, (team_name, team_year, jersey_number, player_name))
+        self.conn.commit()
+
+    def get_player_name(self, team_name: str, team_year: int, jersey_number: str) -> Optional[str]:
+        """Look up player name by jersey."""
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT player_name FROM rosters
+            WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+        """, (team_name, team_year, jersey_number))
+        result = cursor.fetchone()
+        return result[0] if result else None
 
     def close(self):
         """Close database connection."""
