@@ -39,10 +39,11 @@ class PhotoCrawler:
             "errors": 0,
         }
 
-        # Walk the directory recursively
+        # Walk the directory recursively (case-insensitive)
         image_files = []
         for ext in self.SUPPORTED_FORMATS:
             image_files.extend(photo_dir.rglob(f"*{ext}"))
+            image_files.extend(photo_dir.rglob(f"*{ext.upper()}"))
 
         results["photos_found"] = len(image_files)
         logger.info(f"Found {results['photos_found']} image files in {photo_dir}")
