@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { Photo } from '../types/index';
+import photoTaggerClient from '../api/photoTaggerClient';
+import type { PhotoItem } from '../types/index';
 
 /**
  * GalleryPage - Photo gallery view for browsing all uploaded photos
@@ -8,7 +9,7 @@ import type { Photo } from '../types/index';
  * Note: Currently uses placeholder data. Will integrate with /api/photos endpoint in Task 7.
  */
 export const GalleryPage: React.FC = () => {
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -22,13 +23,8 @@ export const GalleryPage: React.FC = () => {
     setError(null);
 
     try {
-      // TODO: Replace with actual API call when /api/photos endpoint is available in Task 7
-      // const response = await photoTaggerClient.getPhotos();
-      // setPhotos(response.photos);
-
-      // Placeholder: simulate API call with timeout
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setPhotos([]);
+      const result = await photoTaggerClient.getPhotos(1, 20);
+      setPhotos(result.photos);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load photos';
       setError(errorMessage);
@@ -100,13 +96,13 @@ export const GalleryPage: React.FC = () => {
                 </div>
                 <div className="p-4">
                   <p className="text-sm font-medium text-gray-900 truncate">
-                    {photo.file_path.split('/').pop()}
+                    {photo.filename}
                   </p>
                   <p className="mt-1 text-xs text-gray-500">
-                    {new Date(photo.created_at).toLocaleDateString()}
+                    {new Date(photo.added_at).toLocaleDateString()}
                   </p>
                   <p className="mt-2 text-xs text-gray-400">
-                    Size: {(photo.file_size / 1024 / 1024).toFixed(2)} MB
+                    Path: {photo.path}
                   </p>
                 </div>
               </div>

@@ -163,6 +163,49 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.error(f"Error getting faces for photo {photo_id}: {e}")
             return jsonify({"error": str(e)}), 500
 
+    # Get all photos endpoint
+    @app.route("/api/photos", methods=["GET"])
+    def get_photos():
+        """Get all photos in database."""
+        try:
+            page = int(request.args.get("page", "1"))
+            per_page = int(request.args.get("per_page", "20"))
+
+            all_photos = db.get_all_photos()
+
+            # Simple pagination
+            start = (page - 1) * per_page
+            end = start + per_page
+            paginated = all_photos[start:end]
+
+            return jsonify({
+                "photos": [
+                    {
+                        "id": p.get("id"),
+                        "filename": p.get("file_path", "").split("/")[-1] if p.get("file_path") else "Unknown",
+                        "path": p.get("file_path", ""),
+                        "added_at": p.get("ingested_at", ""),
+                    }
+                    for p in paginated
+                ],
+                "total": len(all_photos),
+                "page": page,
+                "per_page": per_page,
+            }), 200
+        except Exception as e:
+            logger.error(f"Error getting photos: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return jsonify({"error": str(e)}), 500
+
+    # Add CORS support
+    @app.after_request
+    def after_request(response):
+        response.headers.add('Access-Control-Allow-Origin', '*')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        return response
+
     return app
 
 if __name__ == "__main__":

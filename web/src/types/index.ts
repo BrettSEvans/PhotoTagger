@@ -174,3 +174,23 @@ export interface SearchOptions {
   team?: string;
   year?: number;
 }
+
+/**
+ * PhotoItem - Photo data returned from /api/photos endpoint
+ */
+export interface PhotoItem {
+  id: number;
+  filename: string;
+  path: string;
+  added_at: string;
+}
+
+/**
+ * PhotosResponse - API response from photos endpoint (paginated)
+ */
+export interface PhotosResponse {
+  photos: PhotoItem[];
+  total: number;
+  page: number;
+  per_page: number;
+}

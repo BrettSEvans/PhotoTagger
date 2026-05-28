@@ -11,6 +11,7 @@ import {
   OCRProcessResponse,
   SearchResponse,
   FacesResponse,
+  PhotosResponse,
   APIError,
   SearchOptions,
 } from '../types/index';
@@ -148,6 +149,21 @@ class PhotoTaggerClient {
   async getFaces(photoId: number): Promise<FacesResponse> {
     const response = await this.client.get<FacesResponse>(`/api/faces/${photoId}`);
     return response.data;
+  }
+
+  /**
+   * Get all photos - Retrieve paginated list of all photos in database
+   * GET /api/photos
+   *
+   * @param page Page number (default: 1)
+   * @param perPage Number of photos per page (default: 20)
+   * @returns Paginated photos with metadata
+   */
+  async getPhotos(page = 1, perPage = 20): Promise<PhotosResponse> {
+    const response = await this.client.get<PhotosResponse>('/api/photos', {
+      params: { page, per_page: perPage }
+    })
+    return response.data
   }
 
   /**
