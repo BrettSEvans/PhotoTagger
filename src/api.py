@@ -17,6 +17,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     db.init_schema()
     app.db = db
 
+    # Initialize roster manager
+    from src.roster import RosterManager
+    app.roster_manager = RosterManager()
+
     # Initialize components
     crawler = PhotoCrawler(db)
     ocr_engine = OCREngine(db)
