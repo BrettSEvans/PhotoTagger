@@ -1,7 +1,9 @@
 import logging
 import re
+import time
 from typing import List, Optional, Dict
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import easyocr
 from src.db import Database
 
@@ -120,6 +122,128 @@ class OCREngine:
 
         logger.info(f"Batch processing complete: {results}")
         return results
+
+    def process_batch_parallel(self, photo_ids: List[int] = None, max_workers: int = None) -> Dict:
+        """
+        Process multiple photos in parallel using thread pool.
+
+        Args:
+            photo_ids: Optional list of photo IDs. If None, process all.
+            max_workers: Number of parallel workers. If None, use optimal from config.
+
+        Returns:
+            Dict with processing statistics
+        """
+        from src.config import get_optimal_worker_count
+
+        if max_workers is None:
+            max_workers = get_optimal_worker_count()
+
+        if photo_ids is None:
+            photos = self.db.get_all_photos()
+            photo_ids = [p["id"] for p in photos]
+
+        results = {
+            "photos_processed": 0,
+            "jerseys_found": 0,
+            "faces_detected": 0,
+            "errors": 0,
+            "start_time": time.time(),
+        }
+
+        if not photo_ids:
+            results["elapsed_time"] = time.time() - results["start_time"]
+            return results
+
+        logger.info(f"Starting parallel OCR with {max_workers} workers on {len(photo_ids)} photos")
+
+        # Use ThreadPoolExecutor for I/O-bound OCR
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            futures = {}
+            for photo_id in photo_ids:
+                photos = self.db.get_all_photos()
+                photo = next((p for p in photos if p["id"] == photo_id), None)
+
+                if photo:
+                    future = executor.submit(self._process_photo_with_faces, photo_id, photo["file_path"])
+                    futures[future] = photo_id
+
+            # Collect results as they complete
+            for future in as_completed(futures):
+                photo_id = futures[future]
+                try:
+                    result = future.result()
+                    if result:
+                        results["photos_processed"] += 1
+                        if result.get("primary_jersey"):
+                            results["jerseys_found"] += 1
+                        results["faces_detected"] += len(result.get("faces", []))
+                except Exception as e:
+                    logger.error(f"Error processing photo {photo_id}: {e}")
+                    results["errors"] += 1
+
+        results["elapsed_time"] = time.time() - results["start_time"]
+        logger.info(f"Parallel processing complete: {results}")
+        return results
+
+    def _process_photo_with_faces(self, photo_id: int, photo_path: str) -> Optional[Dict]:
+        """
+        Internal method: process photo with OCR and face detection.
+
+        Returns:
+            Dict with jersey, faces, and metadata
+        """
+        try:
+            from src.face_detector import FaceDetector
+            from pathlib import Path
+
+            path = Path(photo_path)
+            if not path.exists():
+                logger.error(f"Photo not found: {photo_path}")
+                return None
+
+            # Run OCR (jersey detection)
+            logger.info(f"OCR: {path.name}")
+            results = self.reader.readtext(photo_path)
+            raw_text = " ".join([text for (_, text, _) in results])
+            jerseys = self._extract_jerseys_from_text(raw_text)
+            primary_jersey = jerseys[0] if jerseys else None
+            ocr_confidence = sum([conf for (_, _, conf) in results]) / len(results) if results else 0.0
+
+            # Run face detection
+            logger.info(f"Faces: {path.name}")
+            detector = FaceDetector()
+            faces = detector.detect_faces(photo_path)
+
+            # Store OCR result
+            self.db.add_ocr_result(
+                photo_id=photo_id,
+                jersey_number=primary_jersey,
+                confidence=ocr_confidence,
+                raw_text=raw_text
+            )
+
+            # Store faces
+            for face in faces:
+                self.db.add_face(
+                    photo_id=photo_id,
+                    embedding=face['embedding'],
+                    bbox=face['bbox'],
+                    confidence=face['confidence']
+                )
+
+            return {
+                "photo_id": photo_id,
+                "jerseys_found": jerseys,
+                "primary_jersey": primary_jersey,
+                "faces": faces,
+                "ocr_confidence": ocr_confidence,
+            }
+
+        except Exception as e:
+            logger.error(f"Error processing photo {photo_path}: {e}")
+            return None
 
     @staticmethod
     def _extract_jerseys_from_text(text: str) -> List[str]:
