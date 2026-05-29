@@ -2,8 +2,6 @@ import React, { useState, useRef, useCallback } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import type { PlayerPhotoItem, RosterSearchResult } from '../types/index';
-import { bboxStyle } from '../utils/bboxUtils';
-import type { ImgDim } from '../utils/bboxUtils';
 
 interface ClusterWithAssignment {
   id: number;
@@ -21,12 +19,11 @@ export const SearchPage: React.FC = () => {
   const [selectedPlayer,  setSelectedPlayer]  = useState<RosterSearchResult | null>(null);
   const [cluster,         setCluster]         = useState<ClusterWithAssignment | null>(null);
   const [photos,          setPhotos]          = useState<PlayerPhotoItem[]>([]);
-  const [imgDims,         setImgDims]         = useState<Map<number, ImgDim>>(new Map());
   const [modalPhoto,      setModalPhoto]      = useState<PlayerPhotoItem | null>(null);
-  const [modalDim,        setModalDim]        = useState<ImgDim | null>(null);
   const [lens,            setLens]            = useState<{ photo: PlayerPhotoItem; x: number; y: number } | null>(null);
   const [isSearching,     setIsSearching]     = useState(false);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
+  const [removingFaces,   setRemovingFaces]   = useState<Set<number>>(new Set());
   const [error,           setError]           = useState<string | null>(null);
 
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -61,7 +58,6 @@ export const SearchPage: React.FC = () => {
     setQuery(player.player_name);
     setPhotos([]);
     setCluster(null);
-    setImgDims(new Map());
     setError(null);
     setIsLoadingPhotos(true);
 
@@ -75,7 +71,6 @@ export const SearchPage: React.FC = () => {
       let merged: PlayerPhotoItem[] = [];
 
       if (matched) {
-        // Face-tagged photos with face_id + face_bbox for bbox overlay
         const clusterData = await photoTaggerClient.getPlayerPhotos(matched.id);
         merged = clusterData.photos;
       }
@@ -108,15 +103,27 @@ export const SearchPage: React.FC = () => {
     }
   }, []);
 
-  // ── Image load → capture natural dims ───────────────────────────────────
-  const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {
-    const img = e.currentTarget;
-    setImgDims(prev => {
-      const next = new Map(prev);
-      next.set(photoId, { w: img.naturalWidth, h: img.naturalHeight });
-      return next;
-    });
-  }, []);
+  // ── Remove face assignment from selected player ─────────────────────────
+  const removeFromPlayer = useCallback(async (photo: PlayerPhotoItem) => {
+    if (photo.face_id === 0) return;
+
+    setRemovingFaces(prev => new Set(prev).add(photo.face_id));
+    setError(null);
+    try {
+      await photoTaggerClient.deassignFaces([photo.face_id]);
+      setPhotos(prev => prev.filter(p => p.face_id !== photo.face_id));
+      if (modalPhoto?.face_id === photo.face_id) setModalPhoto(null);
+      if (lens?.photo.face_id === photo.face_id) setLens(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove photo from player');
+    } finally {
+      setRemovingFaces(prev => {
+        const next = new Set(prev);
+        next.delete(photo.face_id);
+        return next;
+      });
+    }
+  }, [lens, modalPhoto]);
 
   const clearSearch = () => {
     setQuery('');
@@ -124,7 +131,7 @@ export const SearchPage: React.FC = () => {
     setSelectedPlayer(null);
     setPhotos([]);
     setCluster(null);
-    setImgDims(new Map());
+    setRemovingFaces(new Set());
     setError(null);
   };
 
@@ -260,8 +267,8 @@ export const SearchPage: React.FC = () => {
             <div className="p-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 gap-2">
               {photos.map(photo => {
                 const src = photoTaggerClient.getPhotoUrl(photo.id);
-                const dim = imgDims.get(photo.id);
                 const hasFace = photo.face_id !== 0;
+                const isRemoving = removingFaces.has(photo.face_id);
                 return (
                   <div
                     key={photo.id}
@@ -274,26 +281,12 @@ export const SearchPage: React.FC = () => {
                       src={src}
                       alt={photo.filename}
                       className="w-full h-full object-cover"
-                      onLoad={e => handleImgLoad(e, photo.id)}
                       onError={e => { e.currentTarget.style.display = 'none'; }}
                     />
 
-                    {/* Purple face bbox — 5px buffer, border sits outside the face */}
-                    {dim && hasFace && (
-                      <div
-                        className="absolute pointer-events-none"
-                        style={{
-                          ...bboxStyle(photo.face_bbox, dim, 7),
-                          border: '2px solid #A855F7',
-                          background: 'transparent',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                    )}
-
                     {/* Enlarge button */}
                     <button
-                      onClick={() => { setModalPhoto(photo); setModalDim(dim ?? null); }}
+                      onClick={() => setModalPhoto(photo)}
                       aria-label="View full size"
                       className="absolute top-1 right-1 w-5 h-5 rounded bg-white/80 border border-frame flex items-center justify-center hover:bg-white transition-colors"
                     >
@@ -302,12 +295,17 @@ export const SearchPage: React.FC = () => {
                       </svg>
                     </button>
 
-                    {/* Confidence badge */}
-                    <div className="absolute bottom-0 left-0 right-0 bg-foreground/60 px-1 py-0.5 text-center">
-                      <span className="font-jakarta text-white" style={{ fontSize: '9px' }}>
-                        {Math.round(photo.face_confidence * 100)}%
-                      </span>
-                    </div>
+                    {hasFace && (
+                      <button
+                        onClick={e => { e.stopPropagation(); removeFromPlayer(photo); }}
+                        disabled={isRemoving}
+                        aria-label={`Remove ${photo.filename} from ${selectedPlayer.player_name}`}
+                        title="Remove this photo from the current player"
+                        className="absolute bottom-1 left-1 right-1 min-h-6 rounded bg-white/90 border border-frame px-1.5 font-jakarta text-[10px] font-bold text-foreground hover:border-secondary hover:text-secondary disabled:opacity-60 transition-colors"
+                      >
+                        {isRemoving ? 'Removing…' : 'Remove'}
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -333,29 +331,15 @@ export const SearchPage: React.FC = () => {
 
       {/* ── Hover-zoom lens ──────────────────────────────────────────────────── */}
       {lens && !modalPhoto && (() => {
-        const dim = imgDims.get(lens.photo.id);
         const W = 300;
         const left = Math.min(lens.x + 24, window.innerWidth  - W - 16);
         const top  = Math.min(lens.y + 24, window.innerHeight - W - 48);
-        const hasFace = lens.photo.face_id !== 0;
         return (
           <div className="fixed z-40 pointer-events-none" style={{ left, top, width: W }}>
             <div className="relative inline-block rounded-xl overflow-hidden border-2 border-foreground shadow-pop-lg bg-white">
               <img src={photoTaggerClient.getPhotoUrl(lens.photo.id)} alt="" className="block" style={{ width: W }} />
-              {dim && hasFace && (
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    ...bboxStyle(lens.photo.face_bbox, dim, 8),
-                    border: '3px solid #A855F7',
-                    background: 'transparent',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              )}
-              <div className="absolute bottom-0 left-0 right-0 bg-foreground/80 px-2 py-1 flex items-center justify-between">
+              <div className="absolute bottom-0 left-0 right-0 bg-foreground/80 px-2 py-1">
                 <span className="font-jakarta text-white truncate" style={{ fontSize: '10px' }}>{lens.photo.filename}</span>
-                <span className="font-jakarta text-white flex-shrink-0 ml-2" style={{ fontSize: '10px' }}>{Math.round(lens.photo.face_confidence * 100)}%</span>
               </div>
             </div>
           </div>
@@ -383,27 +367,20 @@ export const SearchPage: React.FC = () => {
                 alt={modalPhoto.filename}
                 className="block max-w-[90vw] max-h-[85vh]"
                 style={{ display: 'block' }}
-                onLoad={e => {
-                  const img = e.currentTarget;
-                  setModalDim({ w: img.naturalWidth, h: img.naturalHeight });
-                }}
               />
-              {modalDim && modalPhoto.face_id !== 0 && (
-                <div
-                  className="absolute pointer-events-none"
-                  style={{
-                    ...bboxStyle(modalPhoto.face_bbox, modalDim, 8),
-                    border: '3px solid #A855F7',
-                    background: 'transparent',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              )}
             </div>
 
             <div className="mt-2 flex items-center justify-between px-1">
               <p className="font-jakarta text-white text-xs">{modalPhoto.filename}</p>
-              <p className="font-jakarta text-white/60 text-xs">{Math.round(modalPhoto.face_confidence * 100)}% confidence</p>
+              {modalPhoto.face_id !== 0 && (
+                <button
+                  onClick={() => removeFromPlayer(modalPhoto)}
+                  disabled={removingFaces.has(modalPhoto.face_id)}
+                  className="font-jakarta text-white text-xs border border-white/40 rounded-full px-3 py-1 hover:border-white hover:bg-white/10 disabled:opacity-60 transition-colors"
+                >
+                  {removingFaces.has(modalPhoto.face_id) ? 'Removing…' : 'Remove from player'}
+                </button>
+              )}
             </div>
           </div>
         </div>
