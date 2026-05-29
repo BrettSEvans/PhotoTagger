@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 11 complete. Added frontend behavior checks for job polling states and removal confirmation gates.
+Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is in place, but Chromium launch is blocked by this desktop sandbox.
 
 ## Completed
 
@@ -28,10 +28,12 @@ Phase: Step 11 complete. Added frontend behavior checks for job polling states a
 - [x] Step 10: Consolidated app shell so `main.tsx` mounts `App.tsx`.
 - [x] Step 15: Committed frontend job polling checkpoint.
 - [x] Step 11: Added frontend tests for job states and confirmation flows.
+- [x] Step 15: Committed frontend behavior test checkpoint.
+- [x] Step 12: Added Playwright smoke test for core navigation/workflow.
 
 ## In Progress
 
-- [ ] Step 12: Add Playwright smoke test for core navigation/workflow.
+- [ ] Step 13: Run full verification.
 
 ## Remaining
 
@@ -44,7 +46,7 @@ Phase: Step 11 complete. Added frontend behavior checks for job polling states a
 - [x] Step 9: Update processing pages to poll job status.
 - [x] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
 - [x] Step 11: Add frontend tests for job states and confirmation flows.
-- [ ] Step 12: Add Playwright smoke test for core navigation/workflow.
+- [x] Step 12: Add Playwright smoke test for core navigation/workflow.
 - [ ] Step 13: Run full verification.
 - [ ] Step 14: Update `CHANGELOG.md` with implementation commit ids.
 - [ ] Step 15: Commit in small increments.
@@ -65,11 +67,13 @@ Phase: Step 11 complete. Added frontend behavior checks for job polling states a
 - `npm run lint` passed after typed job polling updates.
 - `npm run build` passed after frontend job polling and app shell consolidation.
 - `npm run test:frontend` passed after adding frontend behavior checks for polling and confirmation flows.
+- `npm run build && PLAYWRIGHT_BROWSERS_PATH=0 npm run test:e2e` built successfully, then Playwright failed to launch Chromium in the desktop sandbox with `MachPortRendezvousServer ... Permission denied`.
 
 ## Known Issues
 
 - `AGENTS.md` is untracked and intentionally excluded from commits.
 - Backend process on port `5001` may need an external restart after backend changes.
+- Playwright Chromium launch is blocked in this desktop sandbox by macOS Mach port permissions; run `PLAYWRIGHT_BROWSERS_PATH=0 npm run test:e2e` from a normal local shell or CI.
 
 ## Commit Log
 
@@ -83,3 +87,4 @@ Phase: Step 11 complete. Added frontend behavior checks for job polling states a
 - `5fcd314` feat: poll processing jobs in frontend
 - `10a7c67` docs: record frontend jobs checkpoint
 - `b231117` test: add frontend behavior checks
+- `cf39cc3` docs: record frontend test checkpoint
