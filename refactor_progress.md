@@ -82,3 +82,4 @@ Phase: Step 11 complete. Added frontend behavior checks for job polling states a
 - `01dd9e4` docs: record face idempotency checkpoint
 - `5fcd314` feat: poll processing jobs in frontend
 - `10a7c67` docs: record frontend jobs checkpoint
+- `b231117` test: add frontend behavior checks
