@@ -112,6 +112,17 @@ export const ReviewPage: React.FC = () => {
   const selectAll   = () => setSelected(new Set(clusterPhotos.map(p => p.face_id)));
   const deselectAll = () => setSelected(new Set());
 
+  // ── Remove face from cluster permanently ────────────────────────────────
+  const handleRemoveFace = useCallback(async (faceId: number) => {
+    try {
+      await photoTaggerClient.deassignFaces([faceId]);
+      setClusterPhotos(prev => prev.filter(p => p.face_id !== faceId));
+      setSelected(prev => { const next = new Set(prev); next.delete(faceId); return next; });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to remove face');
+    }
+  }, []);
+
   // ── Image load → capture natural dims ───────────────────────────────────
   const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {
     const img = e.currentTarget;
@@ -366,9 +377,19 @@ export const ReviewPage: React.FC = () => {
                           </svg>
                         </button>
 
-                        {/* Confidence badge - bottom */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-foreground/60 px-1 py-0.5 text-center">
-                          <span className="font-jakarta text-white" style={{ fontSize: '9px' }}>
+                        {/* Confidence badge + remove button - bottom */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-foreground/60 px-1 py-0.5 flex items-center justify-between gap-1">
+                          <button
+                            onClick={e => { e.stopPropagation(); handleRemoveFace(photo.face_id); }}
+                            aria-label="Remove from cluster"
+                            title="Remove this face from the cluster"
+                            className="w-3.5 h-3.5 rounded-sm bg-secondary/90 flex items-center justify-center flex-shrink-0 hover:bg-secondary transition-colors"
+                          >
+                            <svg width="6" height="6" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 6 6">
+                              <path d="M1 1l4 4M5 1L1 5"/>
+                            </svg>
+                          </button>
+                          <span className="font-jakarta text-white flex-1 text-center" style={{ fontSize: '9px' }}>
                             {Math.round(photo.face_confidence * 100)}%
                           </span>
                         </div>
