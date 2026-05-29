@@ -10,6 +10,7 @@ export const RosterPage: React.FC = () => {
   const [isLoading, setIsLoading]   = useState(true);
   const [filterTeam, setFilterTeam] = useState('All Teams');
   const [error, setError]           = useState<string | null>(null);
+  const [faceUrls, setFaceUrls]     = useState<Map<number, string | null>>(new Map());
 
   // Inline entry form
   const [newName,   setNewName]   = useState('');
@@ -31,6 +32,30 @@ export const RosterPage: React.FC = () => {
     try {
       const data = await photoTaggerClient.getRoster();
       setEntries(data.entries);
+
+      // Fetch face thumbnails for each player
+      const urls = new Map<number, string | null>();
+      for (const entry of data.entries) {
+        try {
+          // Search for photos with this jersey number to find tagged faces
+          const searchResponse = await photoTaggerClient.search(entry.jersey_number);
+          if (searchResponse.results && searchResponse.results.length > 0) {
+            const firstResult = searchResponse.results[0];
+            const facesData = await photoTaggerClient.getFaces(firstResult.id);
+            if (facesData.faces && facesData.faces.length > 0) {
+              const faceUrl = photoTaggerClient.getFaceCropUrl(facesData.faces[0].id);
+              urls.set(entry.id, faceUrl);
+            } else {
+              urls.set(entry.id, null);
+            }
+          } else {
+            urls.set(entry.id, null);
+          }
+        } catch (e) {
+          urls.set(entry.id, null);
+        }
+      }
+      setFaceUrls(urls);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load roster');
     } finally {
@@ -311,37 +336,56 @@ export const RosterPage: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-frame bg-muted/40">
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-5 py-3 w-16">#</th>
+                <th className="text-center font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 w-16">Face</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3">Name</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 hidden sm:table-cell">Team</th>
                 <th className="w-12 px-3 py-3" />
               </tr>
             </thead>
             <tbody>
-              {filtered.map((entry, i) => (
-                <tr
-                  key={entry.id}
-                  className={`border-b border-frame/60 last:border-0 hover:bg-muted/20 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}
-                >
-                  <td className="px-5 py-3">
-                    <span className="inline-flex items-center justify-center w-9 h-9 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm">
-                      <span className="font-outfit font-extrabold text-white text-sm">#{entry.jersey_number}</span>
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 font-jakarta font-semibold text-foreground text-sm">{entry.player_name}</td>
-                  <td className="px-3 py-3 hidden sm:table-cell">
-                    <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded-full">{entry.team_name}</span>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <button
-                      onClick={() => handleDelete(entry.id)}
-                      className="font-jakarta text-xs text-muted-fg hover:text-secondary border border-frame rounded-full px-2 py-0.5 hover:border-secondary transition-colors"
-                      aria-label={`Remove ${entry.player_name}`}
-                    >
-                      Del
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {filtered.map((entry, i) => {
+                const faceUrl = faceUrls.get(entry.id);
+                return (
+                  <tr
+                    key={entry.id}
+                    className={`border-b border-frame/60 last:border-0 hover:bg-muted/20 transition-colors ${i % 2 === 0 ? '' : 'bg-muted/10'}`}
+                  >
+                    <td className="px-5 py-3">
+                      <span className="inline-flex items-center justify-center w-9 h-9 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm">
+                        <span className="font-outfit font-extrabold text-white text-sm">#{entry.jersey_number}</span>
+                      </span>
+                    </td>
+                    <td className="px-3 py-3">
+                      {faceUrl ? (
+                        <img
+                          src={faceUrl}
+                          alt={entry.player_name}
+                          className="w-10 h-10 rounded-lg border-2 border-foreground object-cover shadow-pop-sm"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-lg border-2 border-frame bg-muted flex items-center justify-center">
+                          <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                          </svg>
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-3 py-3 font-jakarta font-semibold text-foreground text-sm">{entry.player_name}</td>
+                    <td className="px-3 py-3 hidden sm:table-cell">
+                      <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded-full">{entry.team_name}</span>
+                    </td>
+                    <td className="px-3 py-3 text-right">
+                      <button
+                        onClick={() => handleDelete(entry.id)}
+                        className="font-jakarta text-xs text-muted-fg hover:text-secondary border border-frame rounded-full px-2 py-0.5 hover:border-secondary transition-colors"
+                        aria-label={`Remove ${entry.player_name}`}
+                      >
+                        Del
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
