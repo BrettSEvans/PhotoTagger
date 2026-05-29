@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from './LoadingSpinner';
+import type { CrawlResult } from '../types/index';
 
 interface PhotoUploadProps {
   onUploadSuccess?: () => void;
@@ -37,14 +38,28 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
     setMessage(null);
     try {
       const response = await photoTaggerClient.crawlPhotos(photoDir.trim());
-      if (response.success) {
-        const { added, skipped } = response.results;
-        setMessage({ type: 'success', text: `Added ${added} photos · ${skipped} duplicates skipped` });
-        setPhotoDir('');
-        onUploadSuccess?.();
-      } else {
-        setMessage({ type: 'error', text: 'Upload failed — please try again.' });
+      setMessage({ type: 'success', text: 'Import started. Scanning photos…' });
+      const job = await photoTaggerClient.pollJob<CrawlResult>(response.job_id, {
+        onUpdate: currentJob => {
+          if (currentJob.status === 'queued') {
+            setMessage({ type: 'success', text: 'Import queued…' });
+          } else if (currentJob.status === 'running') {
+            setMessage({ type: 'success', text: `Scanning photos… ${currentJob.progress}%` });
+          }
+        },
+      });
+
+      const result = job.result;
+      if (!result) {
+        throw new Error('Import finished without a result');
       }
+
+      setMessage({
+        type: 'success',
+        text: `Added ${result.photos_ingested} photos · ${result.duplicates_skipped} duplicates skipped`,
+      });
+      setPhotoDir('');
+      onUploadSuccess?.();
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to upload photos' });
     } finally {

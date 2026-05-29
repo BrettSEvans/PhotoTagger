@@ -89,15 +89,16 @@ export interface SearchResponse {
  * CrawlResult - Result of crawling a single photo directory
  */
 export interface CrawlResult {
-  added: number;
-  skipped: number;
-  failed: number;
+  photos_found: number;
+  photos_ingested: number;
+  duplicates_skipped: number;
+  errors: number;
 }
 
 /**
  * CrawlResponse - API response from crawl endpoint
  */
-export interface CrawlResponse {
+export interface LegacyCrawlResponse {
   success: boolean;
   results: CrawlResult;
 }
@@ -113,9 +114,51 @@ export interface OCRProcessingResult {
 /**
  * OCRProcessResponse - API response from process-ocr endpoint
  */
-export interface OCRProcessResponse {
+export interface LegacyOCRProcessResponse {
   success: boolean;
   results: OCRProcessingResult;
+}
+
+export type ProcessingJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface ProcessingJob<TResult = unknown> {
+  id: number;
+  type: string;
+  status: ProcessingJobStatus;
+  progress: number;
+  payload: Record<string, unknown>;
+  result: TResult | null;
+  error: string | null;
+  created_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+export interface JobSubmissionResponse<TResult = unknown> {
+  success: boolean;
+  job_id: number;
+  job: ProcessingJob<TResult>;
+}
+
+export interface JobStatusResponse<TResult = unknown> {
+  job: ProcessingJob<TResult>;
+}
+
+export type CrawlResponse = JobSubmissionResponse<CrawlResult>;
+export type OCRProcessResponse = JobSubmissionResponse<OCRProcessingResult>;
+
+export interface FaceDetectionResult {
+  photos_processed: number;
+  faces_detected: number;
+  photos_skipped_existing: number;
+  errors: number;
+}
+
+export interface ClusterPlayersResult {
+  clusters_created: number;
+  faces_clustered: number;
+  faces_total?: number;
+  error?: string;
 }
 
 /**

@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 7 complete. Face detection now skips photos that already have stored faces so reruns do not duplicate detections.
+Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `VITE_API_BASE_URL`, and mount the single `App.tsx` shell.
 
 ## Completed
 
@@ -22,10 +22,14 @@ Phase: Step 7 complete. Face detection now skips photos that already have stored
 - [x] Step 6: Added path and parameter validation hardening.
 - [x] Step 15: Committed validation hardening checkpoint.
 - [x] Step 7: Added face detection idempotency tests and implementation.
+- [x] Step 15: Committed face idempotency checkpoint.
+- [x] Step 8: Updated frontend API client for typed job polling and `VITE_API_BASE_URL`.
+- [x] Step 9: Updated processing pages to poll job status.
+- [x] Step 10: Consolidated app shell so `main.tsx` mounts `App.tsx`.
 
 ## In Progress
 
-- [ ] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
+- [ ] Step 11: Add frontend tests for job states and confirmation flows.
 
 ## Remaining
 
@@ -34,9 +38,9 @@ Phase: Step 7 complete. Face detection now skips photos that already have stored
 - [x] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
 - [x] Step 6: Add path and parameter validation hardening.
 - [x] Step 7: Add face detection idempotency tests and implementation.
-- [ ] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
-- [ ] Step 9: Update processing pages to poll job status.
-- [ ] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
+- [x] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
+- [x] Step 9: Update processing pages to poll job status.
+- [x] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
 - [ ] Step 11: Add frontend tests for job states and confirmation flows.
 - [ ] Step 12: Add Playwright smoke test for core navigation/workflow.
 - [ ] Step 13: Run full verification.
@@ -55,6 +59,9 @@ Phase: Step 7 complete. Face detection now skips photos that already have stored
 - `./venv/bin/pytest tests/test_jobs.py::test_detect_faces_endpoint_is_idempotent -q` failed as expected before implementation: rerunning face detection duplicated stored faces.
 - `./venv/bin/pytest tests/test_jobs.py::test_detect_faces_endpoint_is_idempotent -q` passed after skipping photos with existing face detections.
 - `./venv/bin/pytest tests/test_jobs.py tests/test_db_phase2.py tests/test_api_phase2.py -q` passed after Step 7 idempotency implementation.
+- `npm run lint` failed before all processing pages were updated: several components still expected synchronous processing results.
+- `npm run lint` passed after typed job polling updates.
+- `npm run build` passed after frontend job polling and app shell consolidation.
 
 ## Known Issues
 
@@ -69,3 +76,4 @@ Phase: Step 7 complete. Face detection now skips photos that already have stored
 - `ce78cea` feat: harden api validation
 - `3a2bc29` docs: record local hardening checkpoint
 - `ea5f2be` feat: make face detection idempotent
+- `01dd9e4` docs: record face idempotency checkpoint
