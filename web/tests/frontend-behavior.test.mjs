@@ -39,3 +39,12 @@ test('photo removal actions require confirmation before deassigning faces', () =
   assert.match(cleanup, /window\.confirm\(`Remove \$\{photo\?\.filename \?\? 'this photo'\} from \$\{clusterName\}\?`\)/);
   assert.match(cleanup, /if \(!confirmed\) return;[\s\S]*deassignFaces\(\[faceId\]\)/);
 });
+
+test('confirmed tags hide ambiguous duplicate photo and jersey matches', () => {
+  const upload = source('src/pages/UploadPage.tsx');
+
+  assert.match(upload, /confirmedPhotosForDisplay/);
+  assert.match(upload, /ambiguousConfirmedCount/);
+  assert.match(upload, /new Set\(group\.map\(photo => photo\.player_name\)\)/);
+  assert.match(upload, /Ambiguous auto-tags hidden/);
+});
