@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `VITE_API_BASE_URL`, and mount the single `App.tsx` shell.
+Phase: Step 11 complete. Added frontend behavior checks for job polling states and removal confirmation gates.
 
 ## Completed
 
@@ -26,10 +26,12 @@ Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `
 - [x] Step 8: Updated frontend API client for typed job polling and `VITE_API_BASE_URL`.
 - [x] Step 9: Updated processing pages to poll job status.
 - [x] Step 10: Consolidated app shell so `main.tsx` mounts `App.tsx`.
+- [x] Step 15: Committed frontend job polling checkpoint.
+- [x] Step 11: Added frontend tests for job states and confirmation flows.
 
 ## In Progress
 
-- [ ] Step 11: Add frontend tests for job states and confirmation flows.
+- [ ] Step 12: Add Playwright smoke test for core navigation/workflow.
 
 ## Remaining
 
@@ -41,7 +43,7 @@ Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `
 - [x] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
 - [x] Step 9: Update processing pages to poll job status.
 - [x] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
-- [ ] Step 11: Add frontend tests for job states and confirmation flows.
+- [x] Step 11: Add frontend tests for job states and confirmation flows.
 - [ ] Step 12: Add Playwright smoke test for core navigation/workflow.
 - [ ] Step 13: Run full verification.
 - [ ] Step 14: Update `CHANGELOG.md` with implementation commit ids.
@@ -62,6 +64,7 @@ Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `
 - `npm run lint` failed before all processing pages were updated: several components still expected synchronous processing results.
 - `npm run lint` passed after typed job polling updates.
 - `npm run build` passed after frontend job polling and app shell consolidation.
+- `npm run test:frontend` passed after adding frontend behavior checks for polling and confirmation flows.
 
 ## Known Issues
 
@@ -78,3 +81,4 @@ Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `
 - `ea5f2be` feat: make face detection idempotent
 - `01dd9e4` docs: record face idempotency checkpoint
 - `5fcd314` feat: poll processing jobs in frontend
+- `10a7c67` docs: record frontend jobs checkpoint

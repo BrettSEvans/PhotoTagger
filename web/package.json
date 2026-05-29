@@ -6,7 +6,8 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test:frontend": "node tests/frontend-behavior.test.mjs"
   },
   "dependencies": {
     "react": "^19.0.0",
