@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify, send_file, send_from_directory
 from src.db import Database
 from src.crawler import PhotoCrawler
 from src.ocr import OCREngine
+from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -442,6 +443,58 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             db.add_roster_entry(team, year, jersey, name)
             return jsonify({"success": True}), 201
         except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster/import", methods=["POST"])
+    def import_roster_file():
+        team = str(request.form.get("team_name", "Manual Entry")).strip() or "Manual Entry"
+        try:
+            year = int(request.form.get("team_year", 2026))
+        except (TypeError, ValueError):
+            return jsonify({"error": "team_year must be an integer"}), 400
+
+        duplicate_policy = str(request.form.get("duplicate_policy", "replace")).strip()
+        if duplicate_policy not in {"replace", "skip"}:
+            return jsonify({"error": "duplicate_policy must be 'replace' or 'skip'"}), 400
+
+        uploaded = request.files.get("file")
+        if not uploaded or not uploaded.filename:
+            return jsonify({"error": "file is required"}), 400
+
+        try:
+            rows = parse_roster_file(uploaded.filename, uploaded.read())
+            result = db.import_roster_entries(team, year, rows, duplicate_policy)
+            return jsonify(result), 200
+        except RosterImportError as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"roster file import error: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster/import-url", methods=["POST"])
+    def import_roster_url():
+        data = request.get_json() or {}
+        url = str(data.get("url", "")).strip()
+        team = str(data.get("team_name", "Manual Entry")).strip() or "Manual Entry"
+        duplicate_policy = str(data.get("duplicate_policy", "replace")).strip()
+
+        if not url:
+            return jsonify({"error": "url is required"}), 400
+        try:
+            year = int(data.get("team_year", 2026))
+        except (TypeError, ValueError):
+            return jsonify({"error": "team_year must be an integer"}), 400
+        if duplicate_policy not in {"replace", "skip"}:
+            return jsonify({"error": "duplicate_policy must be 'replace' or 'skip'"}), 400
+
+        try:
+            rows = RosterImporter.fetch_url(url)
+            result = db.import_roster_entries(team, year, rows, duplicate_policy)
+            return jsonify(result), 200
+        except RosterImportError as e:
+            return jsonify({"error": str(e)}), 400
+        except Exception as e:
+            logger.error(f"roster URL import error: {e}")
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/roster/<int:entry_id>", methods=["DELETE"])

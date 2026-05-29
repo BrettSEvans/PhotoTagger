@@ -18,6 +18,7 @@ import {
   APIError,
   SearchOptions,
   RosterResponse,
+  RosterImportResponse,
   RosterSearchResult,
   ProcessingSummary,
   TaggedPhoto,
@@ -269,6 +270,27 @@ class PhotoTaggerClient {
 
   async deleteRosterEntry(entryId: number): Promise<void> {
     await this.client.delete(`/api/roster/${entryId}`);
+  }
+
+  async importRosterFile(file: File, teamName: string, teamYear: number, duplicatePolicy: 'replace' | 'skip'): Promise<RosterImportResponse> {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('team_name', teamName);
+    form.append('team_year', String(teamYear));
+    form.append('duplicate_policy', duplicatePolicy);
+
+    const response = await this.client.post<RosterImportResponse>('/api/roster/import', form, { timeout: 120000 });
+    return response.data;
+  }
+
+  async importRosterUrl(url: string, teamName: string, teamYear: number, duplicatePolicy: 'replace' | 'skip'): Promise<RosterImportResponse> {
+    const response = await this.client.post<RosterImportResponse>('/api/roster/import-url', {
+      url,
+      team_name: teamName,
+      team_year: teamYear,
+      duplicate_policy: duplicatePolicy,
+    }, { timeout: 120000 });
+    return response.data;
   }
 
   async searchRoster(query: string): Promise<RosterSearchResult[]> {
