@@ -641,6 +641,47 @@ class Database:
                 for r in cursor.fetchall()
             ]
 
+    def get_roster_entry_by_id(self, entry_id: int) -> Optional[Dict]:
+        """Return one roster row by primary key."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                FROM rosters
+                WHERE id = ?
+            """, (entry_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "team_name": row[1],
+                "team_year": row[2],
+                "jersey_number": row[3],
+                "player_name": row[4],
+                "uniform_color": row[5],
+            }
+
+    def get_photos_by_face_ids(self, cluster_id: int, face_ids: List[int]) -> List[Dict]:
+        """Return photo paths for selected faces that currently belong to a cluster."""
+        if not face_ids:
+            return []
+        with self._lock:
+            cursor = self.conn.cursor()
+            placeholders = ",".join("?" for _ in face_ids)
+            cursor.execute(f"""
+                SELECT f.id as face_id, p.id as photo_id, p.file_path
+                FROM faces f
+                JOIN photos p ON p.id = f.photo_id
+                WHERE f.cluster_id = ?
+                  AND f.id IN ({placeholders})
+                ORDER BY f.id
+            """, [cluster_id, *face_ids])
+            return [
+                {"face_id": row[0], "photo_id": row[1], "file_path": row[2]}
+                for row in cursor.fetchall()
+            ]
+
     # ── Processing summary ───────────────────────────────────────────────────────
 
     def get_processing_summary(self) -> Dict:

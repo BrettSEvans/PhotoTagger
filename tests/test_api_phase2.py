@@ -1,6 +1,7 @@
 import pytest
 import json
 import io
+import xml.etree.ElementTree as ET
 from src.api import create_app
 from src.roster import RosterManager
 import tempfile
@@ -82,6 +83,87 @@ def test_player_photos_support_min_face_confidence_filter(client, app_with_roste
     data = json.loads(response.data)
     assert data["total"] == 1
     assert data["photos"][0]["face_id"] == high_face_id
+
+
+def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_with_roster, tmp_path):
+    """Review metadata export should write sidecars only for explicitly selected faces."""
+    db = app_with_roster.db
+    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.search_roster("Thomas")[0]
+    db.set_game_context([
+        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+    ])
+
+    selected_photo = tmp_path / "selected.jpg"
+    excluded_photo = tmp_path / "excluded.jpg"
+    selected_photo.write_bytes(b"selected")
+    excluded_photo.write_bytes(b"excluded")
+    selected_photo_id = db.add_photo(str(selected_photo))
+    excluded_photo_id = db.add_photo(str(excluded_photo))
+    selected_face_id = db.add_face(selected_photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    excluded_face_id = db.add_face(excluded_photo_id, [0.2] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=selected_face_id)
+    db.assign_face_to_cluster(selected_face_id, cluster_id)
+    db.assign_face_to_cluster(excluded_face_id, cluster_id)
+
+    response = client.post(
+        f"/api/players/{cluster_id}/assign",
+        json={
+            "player_name": "Thomas Shope",
+            "jersey_number": "12",
+            "roster_entry_id": roster_entry["id"],
+            "write_metadata": True,
+            "face_ids": [selected_face_id],
+        },
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["metadata"] == {
+        "requested": True,
+        "written": 1,
+        "skipped": 0,
+        "failed": 0,
+        "opponent_omitted": False,
+        "errors": [],
+    }
+    assert selected_photo.with_suffix(".xmp").exists()
+    assert not excluded_photo.with_suffix(".xmp").exists()
+
+    root = ET.parse(selected_photo.with_suffix(".xmp")).getroot()
+    assert root.find(".//{http://iptc.org/std/Iptc4xmpExt/2008-02-29/}Event").text == "Carleton CUT vs Pittsburgh En Sabah Nur (2026)"
+
+
+def test_assign_cluster_metadata_missing_photo_reports_failure(client, app_with_roster, tmp_path):
+    """Missing files should not block assignment, but they should be reported."""
+    db = app_with_roster.db
+    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.search_roster("Thomas")[0]
+    missing_photo = tmp_path / "missing.jpg"
+    missing_photo.write_bytes(b"temporary")
+    photo_id = db.add_photo(str(missing_photo))
+    missing_photo.unlink()
+    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.assign_face_to_cluster(face_id, cluster_id)
+
+    response = client.post(
+        f"/api/players/{cluster_id}/assign",
+        json={
+            "player_name": "Thomas Shope",
+            "jersey_number": "12",
+            "roster_entry_id": roster_entry["id"],
+            "write_metadata": True,
+            "face_ids": [face_id],
+        },
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["success"] is True
+    assert data["metadata"]["failed"] == 1
+    assert "Photo not found" in data["metadata"]["errors"][0]
 
 def test_search_returns_player_name(client, app_with_roster):
     """Test that search returns player names via roster lookup."""

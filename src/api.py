@@ -6,6 +6,7 @@ from src.crawler import PhotoCrawler
 from src.ocr import OCREngine
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
 from src.job_runner import LocalJobRunner
+from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -52,6 +53,55 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def is_allowed_photo_directory(photo_dir: str) -> bool:
         path_parts = os.path.abspath(photo_dir).split(os.sep)
         return ".git" not in path_parts
+
+    def write_assignment_metadata(cluster_id: int, roster_entry_id: int, face_ids: list[int]):
+        roster_entry = db.get_roster_entry_by_id(roster_entry_id)
+        if not roster_entry:
+            return {
+                "requested": True,
+                "written": 0,
+                "skipped": len(face_ids),
+                "failed": 0,
+                "opponent_omitted": True,
+                "errors": ["Roster entry not found"],
+            }
+
+        context = db.get_game_context()
+        opponents = [
+            team for team in context
+            if team["team_name"] != roster_entry["team_name"] or int(team["team_year"]) != int(roster_entry["team_year"])
+        ]
+        opponent_name = opponents[0]["team_name"] if len(opponents) == 1 else None
+        photo_rows = db.get_photos_by_face_ids(cluster_id, face_ids)
+        found_face_ids = {row["face_id"] for row in photo_rows}
+        missing_face_ids = [face_id for face_id in face_ids if face_id not in found_face_ids]
+        errors = [f"Face {face_id} is not assigned to cluster {cluster_id}" for face_id in missing_face_ids]
+        written = 0
+        failed = len(missing_face_ids)
+
+        metadata = PhotoMetadata(
+            player_name=roster_entry["player_name"],
+            team_name=roster_entry["team_name"],
+            team_year=int(roster_entry["team_year"]),
+            jersey_number=roster_entry["jersey_number"],
+            opponent_name=opponent_name,
+        )
+        for row in photo_rows:
+            result = write_xmp_sidecar(row["file_path"], metadata)
+            if result.written:
+                written += 1
+            else:
+                failed += 1
+                errors.append(result.error or f"Could not write metadata for face {row['face_id']}")
+
+        return {
+            "requested": True,
+            "written": written,
+            "skipped": 0,
+            "failed": failed,
+            "opponent_omitted": opponent_name is None,
+            "errors": errors,
+        }
 
     # Health check endpoint
     @app.route("/health", methods=["GET"])
@@ -659,13 +709,35 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         player_name   = str(data.get("player_name", "")).strip()
         jersey_number = str(data.get("jersey_number", "")).strip()
         roster_entry_id = data.get("roster_entry_id", None)
+        write_metadata = bool(data.get("write_metadata", False))
+        face_ids = [int(face_id) for face_id in data.get("face_ids", [])]
         if roster_entry_id is not None:
             roster_entry_id = int(roster_entry_id)
         if not player_name:
             return jsonify({"error": "player_name is required"}), 400
         try:
             db.assign_cluster_to_player(cluster_id, player_name, jersey_number, roster_entry_id)
-            return jsonify({"success": True}), 200
+            metadata_result = {
+                "requested": False,
+                "written": 0,
+                "skipped": 0,
+                "failed": 0,
+                "opponent_omitted": False,
+                "errors": [],
+            }
+            if write_metadata:
+                if roster_entry_id is None:
+                    metadata_result = {
+                        "requested": True,
+                        "written": 0,
+                        "skipped": len(face_ids),
+                        "failed": 0,
+                        "opponent_omitted": True,
+                        "errors": ["roster_entry_id is required to write metadata"],
+                    }
+                else:
+                    metadata_result = write_assignment_metadata(cluster_id, roster_entry_id, face_ids)
+            return jsonify({"success": True, "metadata": metadata_result}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

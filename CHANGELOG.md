@@ -2,6 +2,8 @@
 
 ## 2026-05-29
 
+- Added Review assignment XMP sidecar export for IPTC-compatible player, team, year, opponent, event, and keyword metadata.
+  - Commit: pending
 - Filtered the Review workspace so face-cluster photos below 60% face match confidence are not shown.
   - Commit: c19ef9d
 - Restored the Playful Geometric UI styling pipeline so Tailwind utilities compile into the app CSS again.

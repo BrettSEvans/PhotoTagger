@@ -332,6 +332,20 @@ export interface DeassignFacesResponse {
   deleted_cluster_ids: number[];
 }
 
+export interface MetadataWriteSummary {
+  requested: boolean;
+  written: number;
+  skipped: number;
+  failed: number;
+  opponent_omitted: boolean;
+  errors: string[];
+}
+
+export interface AssignClusterResponse {
+  success: boolean;
+  metadata: MetadataWriteSummary;
+}
+
 /**
  * RosterResponse - API response from /api/roster
  */
