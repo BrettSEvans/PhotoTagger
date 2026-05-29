@@ -39,6 +39,7 @@ export const ReviewPage: React.FC = () => {
   const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   const [error,         setError]         = useState<string | null>(null);
   const [isAssigning,   setIsAssigning]   = useState(false);
+  const [writeMetadata, setWriteMetadata] = useState(() => window.localStorage.getItem('phototagger.writeMetadata') === 'true');
 
   // ── Detect + group pipeline ──────────────────────────────────────────────
   const [isDetecting, setIsDetecting] = useState(false);
@@ -199,10 +200,17 @@ export const ReviewPage: React.FC = () => {
   // ── Assign selected photos ───────────────────────────────────────────────
   const handleAssign = async (result: RosterSearchResult) => {
     if (!selectedCluster) return;
+    const selectedFaceIds = Array.from(selected);
     const excluded = clusterPhotos.filter(p => !selected.has(p.face_id)).map(p => p.face_id);
     setIsAssigning(true);
     try {
-      await photoTaggerClient.assignCluster(selectedCluster.id, result.player_name, result.jersey_number, result.id);
+      const assignResult = await photoTaggerClient.assignCluster(
+        selectedCluster.id,
+        result.player_name,
+        result.jersey_number,
+        result.id,
+        { writeMetadata, faceIds: selectedFaceIds },
+      );
       if (excluded.length > 0) await photoTaggerClient.deassignFaces(excluded);
 
       const updated: ClusterWithAssignment = {
@@ -213,7 +221,11 @@ export const ReviewPage: React.FC = () => {
       };
       setSelectedCluster(updated);
       setClusters(prev => prev.map(c => c.id === selectedCluster.id ? updated : c));
-      setAssignSuccess(`${selected.size} photo${selected.size !== 1 ? 's' : ''} assigned to ${result.player_name} #${result.jersey_number}`);
+      const metadata = assignResult.metadata;
+      const metadataText = metadata.requested
+        ? ` · sidecars: ${metadata.written} written, ${metadata.skipped} skipped, ${metadata.failed} failed${metadata.opponent_omitted ? ' · opponent omitted' : ''}`
+        : '';
+      setAssignSuccess(`${selected.size} photo${selected.size !== 1 ? 's' : ''} assigned to ${result.player_name} #${result.jersey_number}${metadataText}`);
       setSearchQuery('');
       setSearchResults([]);
     } catch (e) {
@@ -229,6 +241,10 @@ export const ReviewPage: React.FC = () => {
   const unassigned = clusters.filter(c => !c.player_name);
   const assigned   = clusters.filter(c =>  c.player_name);
   const selectedCount = selected.size;
+  const handleWriteMetadataChange = (checked: boolean) => {
+    setWriteMetadata(checked);
+    window.localStorage.setItem('phototagger.writeMetadata', checked ? 'true' : 'false');
+  };
 
   return (
     <div className="w-full max-w-7xl mx-auto py-4 space-y-4">
@@ -462,6 +478,18 @@ export const ReviewPage: React.FC = () => {
                 )}
               </div>
               <div className="p-4 space-y-3">
+                <label className="flex items-center justify-between gap-3 rounded-xl border-2 border-frame bg-muted/20 px-3 py-2">
+                  <span>
+                    <span className="block font-jakarta text-xs font-bold text-foreground">Write XMP sidecar metadata</span>
+                    <span className="block font-jakarta text-[11px] text-muted-fg">Adds player, team, year, and opponent metadata to selected photos</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={writeMetadata}
+                    onChange={e => handleWriteMetadataChange(e.target.checked)}
+                    className="h-4 w-4 accent-accent"
+                  />
+                </label>
                 <div className="relative">
                   <input
                     ref={searchRef}

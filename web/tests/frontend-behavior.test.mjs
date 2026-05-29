@@ -66,3 +66,17 @@ test('review workspace excludes face matches below sixty percent confidence', ()
   assert.match(review, /MIN_REVIEW_FACE_CONFIDENCE\s*=\s*0\.6/);
   assert.match(review, /getPlayerPhotos\(cluster\.id,\s*\{ minFaceConfidence: MIN_REVIEW_FACE_CONFIDENCE \}\)/);
 });
+
+test('review assignments can write xmp sidecar metadata for selected photos', () => {
+  const client = source('src/api/photoTaggerClient.ts');
+  const review = source('src/pages/ReviewPage.tsx');
+  const types = source('src/types/index.ts');
+
+  assert.match(types, /AssignClusterResponse/);
+  assert.match(client, /write_metadata/);
+  assert.match(client, /face_ids/);
+  assert.match(review, /Write XMP sidecar metadata/);
+  assert.match(review, /writeMetadata/);
+  assert.match(review, /Array\.from\(selected\)/);
+  assert.match(review, /sidecar/);
+});
