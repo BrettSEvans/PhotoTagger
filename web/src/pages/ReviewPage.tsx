@@ -48,6 +48,13 @@ export const ReviewPage: React.FC = () => {
   const [error,         setError]         = useState<string | null>(null);
   const [isAssigning,   setIsAssigning]   = useState(false);
 
+  // ── Detect + group pipeline ──────────────────────────────────────────────
+  const [isDetecting, setIsDetecting] = useState(false);
+  const [detectMsg,   setDetectMsg]   = useState<string | null>(null);
+
+  // ── Hover-zoom lens (spec Scen B) ────────────────────────────────────────
+  const [lens, setLens] = useState<{ photo: PlayerPhotoItem; x: number; y: number } | null>(null);
+
   const searchRef   = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -62,6 +69,25 @@ export const ReviewPage: React.FC = () => {
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load clusters');
     } finally { setIsLoadingList(false); }
+  };
+
+  // ── Detect faces + group into clusters ───────────────────────────────────
+  const handleDetectAndGroup = async () => {
+    setIsDetecting(true);
+    setError(null);
+    try {
+      setDetectMsg('Detecting faces in photos…');
+      const det = await photoTaggerClient.detectFaces();
+      setDetectMsg('Grouping faces into players…');
+      const clu = await photoTaggerClient.clusterPlayers();
+      setDetectMsg(`Built ${clu.clusters_created} groups from ${det.faces_detected} faces`);
+      await loadClusters();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Detection failed');
+      setDetectMsg(null);
+    } finally {
+      setIsDetecting(false);
+    }
   };
 
   // ── Select cluster ───────────────────────────────────────────────────────
@@ -157,11 +183,32 @@ export const ReviewPage: React.FC = () => {
   return (
     <div className="w-full max-w-7xl mx-auto py-4 space-y-4">
       {/* Header */}
-      <div>
-        <h1 className="font-outfit text-4xl font-extrabold text-foreground">Cleanup Workspace</h1>
-        <p className="mt-2 font-jakarta text-muted-fg">
-          {unassigned.length} unassigned · {assigned.length} identified
-        </p>
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-outfit text-4xl font-extrabold text-foreground">Cleanup Workspace</h1>
+          <p className="mt-2 font-jakarta text-muted-fg">
+            {unassigned.length} unassigned · {assigned.length} identified
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          {detectMsg && (
+            <span role="status" className="font-jakarta text-xs text-muted-fg">{detectMsg}</span>
+          )}
+          <button
+            onClick={handleDetectAndGroup}
+            disabled={isDetecting}
+            className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-5 py-2.5 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+          >
+            {isDetecting ? (
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+            ) : (
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+              </svg>
+            )}
+            {isDetecting ? 'Working…' : 'Detect & Group Faces'}
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -178,18 +225,23 @@ export const ReviewPage: React.FC = () => {
         {/* LEFT: cluster list */}
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden">
           <div className="px-4 py-3 border-b-2 border-foreground bg-foreground">
-            <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Unassigned Stacks</p>
+            <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Face Clusters</p>
           </div>
 
           {isLoadingList ? (
             <div className="flex justify-center py-8"><LoadingSpinner message="Loading…" /></div>
           ) : clusters.length === 0 ? (
             <div className="p-6 text-center">
-              <p className="font-outfit font-bold text-foreground text-sm">No face clusters</p>
-              <p className="font-jakarta text-xs text-muted-fg mt-1">Run detection + grouping from the Players tab first</p>
+              <p className="font-outfit font-bold text-foreground text-sm">No face clusters yet</p>
+              <p className="font-jakarta text-xs text-muted-fg mt-1">Click <span className="font-bold text-foreground">Detect &amp; Group Faces</span> above to build clusters from your photos</p>
             </div>
           ) : (
             <div className="divide-y-2 divide-frame max-h-[70vh] overflow-y-auto">
+              {unassigned.length > 0 && (
+                <div className="px-4 py-2 bg-muted/40">
+                  <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg">Unassigned ({unassigned.length})</p>
+                </div>
+              )}
               {unassigned.map(c => (
                 <ClusterRow key={c.id} cluster={c} isSelected={selectedCluster?.id === c.id} onClick={selectCluster} />
               ))}
@@ -269,6 +321,9 @@ export const ReviewPage: React.FC = () => {
                     return (
                       <div
                         key={photo.id}
+                        onMouseEnter={e => setLens({ photo, x: e.clientX, y: e.clientY })}
+                        onMouseMove={e => setLens({ photo, x: e.clientX, y: e.clientY })}
+                        onMouseLeave={() => setLens(null)}
                         className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
                           isChecked ? 'border-accent shadow-pop-sm' : 'border-frame opacity-40'
                         }`}
@@ -405,6 +460,36 @@ export const ReviewPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* ── Hover-zoom lens (spec Scen B) ───────────────────────────────────── */}
+      {lens && !modalPhoto && (() => {
+        const dim = imgDims.get(lens.photo.id);
+        const W = 300;
+        const left = Math.min(lens.x + 24, window.innerWidth  - W - 16);
+        const top  = Math.min(lens.y + 24, window.innerHeight - W - 48);
+        return (
+          <div className="fixed z-40 pointer-events-none" style={{ left, top, width: W }}>
+            <div className="relative inline-block rounded-xl overflow-hidden border-2 border-foreground shadow-pop-lg bg-white">
+              <img src={photoTaggerClient.getPhotoUrl(lens.photo.id)} alt="" className="block" style={{ width: W }} />
+              {dim && (
+                <div
+                  className="absolute"
+                  style={{
+                    ...bboxStyle(lens.photo.face_bbox, dim),
+                    border: '3px solid #FBBF24',
+                    boxShadow: '0 0 0 2px rgba(0,0,0,0.5)',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-foreground/80 px-2 py-1 flex items-center justify-between">
+                <span className="font-jakarta text-white truncate" style={{ fontSize: '10px' }}>{lens.photo.filename}</span>
+                <span className="font-jakarta text-white flex-shrink-0 ml-2" style={{ fontSize: '10px' }}>{Math.round(lens.photo.face_confidence * 100)}%</span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Full-size modal ─────────────────────────────────────────────────── */}
       {modalPhoto && (
