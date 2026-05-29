@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import photoTaggerClient from '../api/photoTaggerClient';
-import type { PlayerCluster, PlayerPhotoItem } from '../types/index';
+import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem } from '../types/index';
 
 type ViewState = 'grid' | 'player-detail';
 
@@ -56,9 +56,26 @@ export const PlayersPage: React.FC = () => {
     setDetectResult(null);
     setError(null);
     try {
-      const result = await photoTaggerClient.detectFaces();
-      setDetectResult(`Detected ${result.faces_detected} faces in ${result.photos_processed} photos`);
-      setFaceCount(result.faces_detected);
+      const response = await photoTaggerClient.detectFaces();
+      setDetectResult('Face detection queued…');
+      const job = await photoTaggerClient.pollJob<FaceDetectionResult>(response.job_id, {
+        onUpdate: currentJob => {
+          if (currentJob.status === 'running') {
+            setDetectResult(`Detecting faces… ${currentJob.progress}%`);
+          }
+        },
+      });
+
+      const result = job.result;
+      if (!result) {
+        throw new Error('Face detection finished without a result');
+      }
+
+      const skipped = result.photos_skipped_existing > 0
+        ? ` · ${result.photos_skipped_existing} already processed`
+        : '';
+      setDetectResult(`Detected ${result.faces_detected} faces in ${result.photos_processed} photos${skipped}`);
+      await loadStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Face detection failed');
     } finally { setIsDetecting(false); }
@@ -68,7 +85,12 @@ export const PlayersPage: React.FC = () => {
     setIsClustering(true);
     setError(null);
     try {
-      const result = await photoTaggerClient.clusterPlayers();
+      const response = await photoTaggerClient.clusterPlayers();
+      const job = await photoTaggerClient.pollJob<ClusterPlayersResult>(response.job_id);
+      const result = job.result;
+      if (!result) {
+        throw new Error('Player grouping finished without a result');
+      }
       setClusterCount(result.clusters_created);
       await loadPlayers();
     } catch (err) {

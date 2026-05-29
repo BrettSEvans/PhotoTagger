@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { PlayerCluster, PlayerPhotoItem, RosterSearchResult } from '../types/index';
+import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem, RosterSearchResult } from '../types/index';
 import { bboxStyle } from '../utils/bboxUtils';
 import type { ImgDim } from '../utils/bboxUtils';
 
@@ -68,9 +68,29 @@ export const ReviewPage: React.FC = () => {
     try {
       setDetectMsg('Detecting faces in photos…');
       const det = await photoTaggerClient.detectFaces();
+      const detJob = await photoTaggerClient.pollJob<FaceDetectionResult>(det.job_id, {
+        onUpdate: job => {
+          if (job.status === 'running') setDetectMsg(`Detecting faces… ${job.progress}%`);
+        },
+      });
+      const detResult = detJob.result;
+      if (!detResult) {
+        throw new Error('Face detection finished without a result');
+      }
+
       setDetectMsg('Grouping faces into players…');
       const clu = await photoTaggerClient.clusterPlayers();
-      setDetectMsg(`Built ${clu.clusters_created} groups from ${det.faces_detected} faces`);
+      const cluJob = await photoTaggerClient.pollJob<ClusterPlayersResult>(clu.job_id, {
+        onUpdate: job => {
+          if (job.status === 'running') setDetectMsg(`Grouping faces… ${job.progress}%`);
+        },
+      });
+      const cluResult = cluJob.result;
+      if (!cluResult) {
+        throw new Error('Player grouping finished without a result');
+      }
+
+      setDetectMsg(`Built ${cluResult.clusters_created} groups from ${detResult.faces_detected} new faces`);
       await loadClusters();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Detection failed');

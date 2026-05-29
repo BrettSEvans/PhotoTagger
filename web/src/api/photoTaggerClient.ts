@@ -24,7 +24,15 @@ import {
   ProcessingSummary,
   TaggedPhoto,
   ReviewPhoto,
+  ProcessingJob,
+  JobStatusResponse,
+  JobSubmissionResponse,
+  FaceDetectionResult,
+  ClusterPlayersResult,
 } from '../types/index';
+
+const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5001';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
 
 /**
  * PhotoTaggerClient - Encapsulates all API communication
@@ -38,7 +46,7 @@ class PhotoTaggerClient {
    * Constructor
    * @param baseURL Base URL of the PhotoTagger API (default: http://127.0.0.1:5001)
    */
-  constructor(baseURL: string = 'http://127.0.0.1:5001') {
+  constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -135,6 +143,41 @@ class PhotoTaggerClient {
     return response.data;
   }
 
+  async getJob<TResult = unknown>(jobId: number): Promise<ProcessingJob<TResult>> {
+    const response = await this.client.get<JobStatusResponse<TResult>>(`/api/jobs/${jobId}`);
+    return response.data.job;
+  }
+
+  async pollJob<TResult = unknown>(
+    jobId: number,
+    options: {
+      intervalMs?: number;
+      timeoutMs?: number;
+      onUpdate?: (job: ProcessingJob<TResult>) => void;
+    } = {}
+  ): Promise<ProcessingJob<TResult>> {
+    const intervalMs = options.intervalMs ?? 1000;
+    const timeoutMs = options.timeoutMs ?? 600000;
+    const startedAt = Date.now();
+
+    while (Date.now() - startedAt <= timeoutMs) {
+      const job = await this.getJob<TResult>(jobId);
+      options.onUpdate?.(job);
+
+      if (job.status === 'succeeded') {
+        return job;
+      }
+
+      if (job.status === 'failed') {
+        throw new Error(job.error || 'Processing job failed');
+      }
+
+      await new Promise(resolve => window.setTimeout(resolve, intervalMs));
+    }
+
+    throw new Error('Processing job timed out');
+  }
+
   /**
    * Search photos - Find photos by jersey number with optional filters
    * GET /api/search
@@ -204,9 +247,9 @@ class PhotoTaggerClient {
    *
    * @param photoIds Optional list of specific photo IDs to process
    */
-  async detectFaces(photoIds?: number[]): Promise<{ success: boolean; photos_processed: number; faces_detected: number; errors: number }> {
+  async detectFaces(photoIds?: number[]): Promise<JobSubmissionResponse<FaceDetectionResult>> {
     const body = photoIds ? { photo_ids: photoIds } : {};
-    const response = await this.client.post('/api/detect-faces', body, { timeout: 600000 }); // 10 min
+    const response = await this.client.post<JobSubmissionResponse<FaceDetectionResult>>('/api/detect-faces', body);
     return response.data;
   }
 
@@ -216,8 +259,8 @@ class PhotoTaggerClient {
    *
    * @param threshold Cosine similarity threshold (default 0.40)
    */
-  async clusterPlayers(threshold = 0.40): Promise<{ success: boolean; clusters_created: number; faces_clustered: number }> {
-    const response = await this.client.post('/api/cluster-players', { threshold });
+  async clusterPlayers(threshold = 0.40): Promise<JobSubmissionResponse<ClusterPlayersResult>> {
+    const response = await this.client.post<JobSubmissionResponse<ClusterPlayersResult>>('/api/cluster-players', { threshold });
     return response.data;
   }
 

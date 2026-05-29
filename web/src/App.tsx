@@ -11,7 +11,7 @@ import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import './styles/globals.css'
 
-const BACKEND_URL = 'http://127.0.0.1:5001'
+const BACKEND_URL = photoTaggerClient.getBaseURL()
 
 type Page = 'upload' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
 
