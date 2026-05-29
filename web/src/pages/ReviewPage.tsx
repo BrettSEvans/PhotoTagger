@@ -2,23 +2,12 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import type { PlayerCluster, PlayerPhotoItem, RosterSearchResult } from '../types/index';
+import { bboxStyle } from '../utils/bboxUtils';
+import type { ImgDim } from '../utils/bboxUtils';
 
 interface ClusterWithAssignment extends PlayerCluster {
   player_name?: string;
   jersey_number?: string;
-}
-
-interface ImgDim { w: number; h: number }
-
-// Returns % positioning for a face bbox overlay, given the image's natural dimensions.
-// Works with object-cover (percentage maps through the scale uniformly).
-function bboxStyle(bbox: [number, number, number, number], dim: ImgDim) {
-  return {
-    left:   `${(bbox[0] / dim.w) * 100}%`,
-    top:    `${(bbox[1] / dim.h) * 100}%`,
-    width:  `${((bbox[2] - bbox[0]) / dim.w) * 100}%`,
-    height: `${((bbox[3] - bbox[1]) / dim.h) * 100}%`,
-  };
 }
 
 export const ReviewPage: React.FC = () => {

@@ -5,6 +5,7 @@ import photoTaggerClient from './api/photoTaggerClient'
 import { RosterPage } from './pages/RosterPage'
 import { UploadPage } from './pages/UploadPage'
 import { ReviewPage } from './pages/ReviewPage'
+import { SearchPage } from './pages/SearchPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -12,7 +13,7 @@ import './styles/globals.css'
 
 const BACKEND_URL = 'http://127.0.0.1:5001'
 
-type Screen = 'roster' | 'upload' | 'cleanup'
+type Screen = 'roster' | 'upload' | 'cleanup' | 'search'
 
 async function checkConnection(setIsConnected: (value: boolean) => void) {
   try {
@@ -124,6 +125,11 @@ function App() {
               isActive={currentScreen === 'cleanup'}
               onClick={() => setCurrentScreen('cleanup')}
             />
+            <NavButton
+              label="Search"
+              isActive={currentScreen === 'search'}
+              onClick={() => setCurrentScreen('search')}
+            />
           </div>
         </div>
       </nav>
@@ -134,6 +140,7 @@ function App() {
           {currentScreen === 'roster' && <RosterPage />}
           {currentScreen === 'upload' && <UploadPage onOpenWorkspace={() => setCurrentScreen('cleanup')} />}
           {currentScreen === 'cleanup' && <ReviewPage />}
+          {currentScreen === 'search' && <SearchPage />}
         </ErrorBoundary>
       </main>
 
