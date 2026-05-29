@@ -1,11 +1,9 @@
 import logging
 import os
+from pathlib import Path
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from src.db import Database
-from src.crawler import PhotoCrawler
-from src.ocr import OCREngine
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
-from src.job_runner import LocalJobRunner
 from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
 
 logging.basicConfig(level=logging.INFO)
@@ -14,6 +12,15 @@ logger = logging.getLogger(__name__)
 def should_enable_debug() -> bool:
     """Return whether Flask debug mode should be enabled for local development."""
     return os.environ.get("PHOTOTAGGER_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+
+def get_runtime_mode() -> str:
+    return os.environ.get("PHOTOTAGGER_MODE", "local-agent").strip() or "local-agent"
+
+def get_server_bind() -> tuple[str, int]:
+    """Return host and port for local development or Railway-style hosted runtime."""
+    port = int(os.environ.get("PORT", "5001"))
+    host = "0.0.0.0" if os.environ.get("PORT") or get_runtime_mode() == "cloud-ui" else "127.0.0.1"
+    return host, port
 
 def create_app(db_path: str = "photo_catalog.db") -> Flask:
     """Create and configure Flask app."""
@@ -28,10 +35,18 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     from src.roster import RosterManager
     app.roster_manager = RosterManager()
 
-    # Initialize components
-    app.crawler = PhotoCrawler(db)
-    app.ocr_engine = OCREngine(db)
-    app.job_runner = LocalJobRunner(db)
+    # Initialize local processing components only for the filesystem-capable agent.
+    if get_runtime_mode() == "cloud-ui":
+        app.crawler = None
+        app.ocr_engine = None
+        app.job_runner = None
+    else:
+        from src.crawler import PhotoCrawler
+        from src.ocr import OCREngine
+        from src.job_runner import LocalJobRunner
+        app.crawler = PhotoCrawler(db)
+        app.ocr_engine = OCREngine(db)
+        app.job_runner = LocalJobRunner(db)
 
     def enqueue_job(job_type: str, payload: dict, task):
         job_id = app.job_runner.submit(job_type, payload, task)
@@ -50,9 +65,46 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except (TypeError, ValueError):
             return None
 
+    def configured_photo_roots() -> list[Path]:
+        raw = os.environ.get("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", "").strip()
+        if not raw:
+            return []
+        parts = [part.strip() for chunk in raw.split(os.pathsep) for part in chunk.split(",")]
+        return [Path(part).expanduser().resolve() for part in parts if part]
+
+    def is_allowed_photo_path(photo_path: str) -> bool:
+        path = Path(photo_path).expanduser().resolve()
+        if ".git" in path.parts:
+            return False
+        roots = configured_photo_roots()
+        if not roots:
+            return True
+        return any(path == root or root in path.parents for root in roots)
+
     def is_allowed_photo_directory(photo_dir: str) -> bool:
-        path_parts = os.path.abspath(photo_dir).split(os.sep)
-        return ".git" not in path_parts
+        return is_allowed_photo_path(photo_dir)
+
+    def valid_agent_token() -> bool:
+        expected = os.environ.get("PHOTOTAGGER_AGENT_TOKEN", "")
+        if not expected:
+            return True
+        provided = request.headers.get("X-PhotoTagger-Agent-Token", "")
+        auth = request.headers.get("Authorization", "")
+        if auth.startswith("Bearer "):
+            provided = auth.removeprefix("Bearer ").strip()
+        if not provided:
+            provided = request.args.get("agent_token", "")
+        return provided == expected
+
+    @app.before_request
+    def require_local_agent_token():
+        if request.method == "OPTIONS":
+            return None
+        if request.path in {"/health", "/api/app-config"}:
+            return None
+        if os.environ.get("PHOTOTAGGER_AGENT_TOKEN") and request.path.startswith("/api/") and not valid_agent_token():
+            return jsonify({"error": "local agent token required"}), 401
+        return None
 
     def write_assignment_metadata(cluster_id: int, roster_entry_id: int, face_ids: list[int]):
         roster_entry = db.get_roster_entry_by_id(roster_entry_id)
@@ -87,6 +139,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             opponent_name=opponent_name,
         )
         for row in photo_rows:
+            if not is_allowed_photo_path(row["file_path"]):
+                failed += 1
+                errors.append(f"Photo path is outside allowed photo roots: {row['file_path']}")
+                continue
             result = write_xmp_sidecar(row["file_path"], metadata)
             if result.written:
                 written += 1
@@ -107,7 +163,15 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/health", methods=["GET"])
     def health():
         """Health check endpoint."""
-        return jsonify({"status": "ok"}), 200
+        return jsonify({"status": "ok", "mode": get_runtime_mode()}), 200
+
+    @app.route("/api/app-config", methods=["GET"])
+    def app_config():
+        return jsonify({
+            "mode": get_runtime_mode(),
+            "local_agent_default_url": "http://127.0.0.1:5001",
+            "requires_agent_token": bool(os.environ.get("PHOTOTAGGER_AGENT_TOKEN")),
+        }), 200
 
     # Search photos by jersey number
     @app.route("/api/search", methods=["GET"])
@@ -336,6 +400,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             file_path = photo.get("file_path", "")
             if not file_path or not os.path.exists(file_path):
                 return jsonify({"error": "File not found on disk"}), 404
+            if not is_allowed_photo_path(file_path):
+                return jsonify({"error": "Image path is outside allowed photo roots"}), 403
 
             directory = os.path.dirname(os.path.abspath(file_path))
             filename = os.path.basename(file_path)
@@ -494,6 +560,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             file_path = photo.get("file_path", "")
             if not file_path or not os.path.exists(file_path):
                 return jsonify({"error": "Image file not found"}), 404
+            if not is_allowed_photo_path(file_path):
+                return jsonify({"error": "Photo path is outside allowed photo roots"}), 403
 
             img = cv2.imread(file_path)
             if img is None:
@@ -756,11 +824,25 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.error(f"detection-status error: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/", defaults={"asset_path": ""}, methods=["GET"])
+    @app.route("/<path:asset_path>", methods=["GET"])
+    def serve_cloud_ui(asset_path: str):
+        """Serve the built React app when deployed as a Railway cloud UI."""
+        if get_runtime_mode() != "cloud-ui":
+            return jsonify({"error": "cloud UI is not enabled"}), 404
+        dist = Path(__file__).resolve().parents[1] / "web" / "dist"
+        if asset_path and (dist / asset_path).is_file():
+            return send_from_directory(dist, asset_path)
+        index = dist / "index.html"
+        if index.is_file():
+            return send_from_directory(dist, "index.html")
+        return jsonify({"error": "web build not found. Run npm run build in web/ before serving cloud-ui."}), 500
+
     # Add CORS support
     @app.after_request
     def after_request(response):
         response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-PhotoTagger-Agent-Token')
         response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
 
@@ -769,5 +851,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 if __name__ == "__main__":
     app = create_app()
     debug = should_enable_debug()
-    logger.info("Starting PhotoTagger API on http://localhost:5001")
-    app.run(debug=debug, port=5001, host='127.0.0.1', use_reloader=False)
+    host, port = get_server_bind()
+    logger.info(f"Starting PhotoTagger API on http://{host}:{port}")
+    app.run(debug=debug, port=port, host=host, use_reloader=False)

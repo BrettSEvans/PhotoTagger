@@ -80,3 +80,15 @@ test('review assignments can write xmp sidecar metadata for selected photos', ()
   assert.match(review, /Array\.from\(selected\)/);
   assert.match(review, /sidecar/);
 });
+
+test('frontend supports a configurable protected local agent', () => {
+  const client = source('src/api/photoTaggerClient.ts');
+  const app = source('src/App.tsx');
+
+  assert.match(client, /phototagger\.localAgentUrl/);
+  assert.match(client, /phototagger\.agentToken/);
+  assert.match(client, /X-PhotoTagger-Agent-Token/);
+  assert.match(client, /setLocalAgentSettings/);
+  assert.match(app, /Local Agent/);
+  assert.match(app, /Local agent disconnected/);
+});
