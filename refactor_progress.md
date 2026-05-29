@@ -77,3 +77,4 @@ Phase: Step 10 complete. Frontend processing controls now poll local jobs, use `
 - `3a2bc29` docs: record local hardening checkpoint
 - `ea5f2be` feat: make face detection idempotent
 - `01dd9e4` docs: record face idempotency checkpoint
+- `5fcd314` feat: poll processing jobs in frontend
