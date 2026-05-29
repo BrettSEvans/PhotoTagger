@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { test } from 'node:test';
 import { resolve } from 'node:path';
 
@@ -47,4 +47,13 @@ test('confirmed tags hide ambiguous duplicate photo and jersey matches', () => {
   assert.match(upload, /ambiguousConfirmedCount/);
   assert.match(upload, /new Set\(group\.map\(photo => photo\.player_name\)\)/);
   assert.match(upload, /Ambiguous auto-tags hidden/);
+});
+
+test('tailwind css pipeline is configured for the geometric design system', () => {
+  const configPath = resolve(root, 'postcss.config.js');
+
+  assert.equal(existsSync(configPath), true);
+  const config = source('postcss.config.js');
+  assert.match(config, /tailwindcss/);
+  assert.match(config, /autoprefixer/);
 });

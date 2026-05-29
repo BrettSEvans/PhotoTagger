@@ -2,6 +2,8 @@
 
 ## 2026-05-29
 
+- Restored the Playful Geometric UI styling pipeline so Tailwind utilities compile into the app CSS again.
+  - Commit: pending
 - Hid ambiguous duplicate confirmed cards in the Upload UI when the same photo and jersey are returned with multiple player names.
   - Commit: c2dd21b
 - Added active game context and team uniform colors so duplicate jersey numbers across teams are not auto-confirmed without a matching uniform color.
