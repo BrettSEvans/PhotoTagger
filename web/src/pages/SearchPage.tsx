@@ -278,12 +278,12 @@ export const SearchPage: React.FC = () => {
                       onError={e => { e.currentTarget.style.display = 'none'; }}
                     />
 
-                    {/* Purple face bbox — border sits 6px outside the face */}
+                    {/* Purple face bbox — 5px buffer, border sits outside the face */}
                     {dim && hasFace && (
                       <div
                         className="absolute pointer-events-none"
                         style={{
-                          ...bboxStyle(photo.face_bbox, dim, 8),
+                          ...bboxStyle(photo.face_bbox, dim, 7),
                           border: '2px solid #A855F7',
                           background: 'transparent',
                           boxSizing: 'border-box',
@@ -346,7 +346,7 @@ export const SearchPage: React.FC = () => {
                 <div
                   className="absolute pointer-events-none"
                   style={{
-                    ...bboxStyle(lens.photo.face_bbox, dim, 9),
+                    ...bboxStyle(lens.photo.face_bbox, dim, 8),
                     border: '3px solid #A855F7',
                     background: 'transparent',
                     boxSizing: 'border-box',
@@ -392,7 +392,7 @@ export const SearchPage: React.FC = () => {
                 <div
                   className="absolute pointer-events-none"
                   style={{
-                    ...bboxStyle(modalPhoto.face_bbox, modalDim, 9),
+                    ...bboxStyle(modalPhoto.face_bbox, modalDim, 8),
                     border: '3px solid #A855F7',
                     background: 'transparent',
                     boxSizing: 'border-box',

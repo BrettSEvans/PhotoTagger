@@ -325,14 +325,14 @@ export const ReviewPage: React.FC = () => {
                           onError={e => { e.currentTarget.style.display = 'none'; }}
                         />
 
-                        {/* Face bounding box overlay */}
+                        {/* Purple face bbox — 5px buffer, border sits outside the face */}
                         {dim && (
                           <div
                             className="absolute pointer-events-none"
                             style={{
-                              ...bboxStyle(photo.face_bbox, dim),
-                              border: '2px solid #FBBF24',
-                              boxShadow: '0 0 0 1px rgba(0,0,0,0.4)',
+                              ...bboxStyle(photo.face_bbox, dim, 7),
+                              border: '2px solid #A855F7',
+                              background: 'transparent',
                               boxSizing: 'border-box',
                             }}
                           />
@@ -462,11 +462,11 @@ export const ReviewPage: React.FC = () => {
               <img src={photoTaggerClient.getPhotoUrl(lens.photo.id)} alt="" className="block" style={{ width: W }} />
               {dim && (
                 <div
-                  className="absolute"
+                  className="absolute pointer-events-none"
                   style={{
-                    ...bboxStyle(lens.photo.face_bbox, dim),
-                    border: '3px solid #FBBF24',
-                    boxShadow: '0 0 0 2px rgba(0,0,0,0.5)',
+                    ...bboxStyle(lens.photo.face_bbox, dim, 8),
+                    border: '3px solid #A855F7',
+                    background: 'transparent',
                     boxSizing: 'border-box',
                   }}
                 />
@@ -514,9 +514,9 @@ export const ReviewPage: React.FC = () => {
                 <div
                   className="absolute pointer-events-none"
                   style={{
-                    ...bboxStyle(modalPhoto.face_bbox, modalDim),
-                    border: '3px solid #FBBF24',
-                    boxShadow: '0 0 0 2px rgba(0,0,0,0.5), inset 0 0 0 1px rgba(251,191,36,0.3)',
+                    ...bboxStyle(modalPhoto.face_bbox, modalDim, 8),
+                    border: '3px solid #A855F7',
+                    background: 'transparent',
                     boxSizing: 'border-box',
                   }}
                 />
