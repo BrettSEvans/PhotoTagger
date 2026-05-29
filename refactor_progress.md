@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 4 complete. Job persistence and status endpoint implemented.
+Phase: Step 5 complete. Long-running endpoints now return local processing jobs.
 
 ## Completed
 
@@ -16,10 +16,12 @@ Phase: Step 4 complete. Job persistence and status endpoint implemented.
 - [x] Step 2: Created `refactor_progress.md` with the implementation checklist.
 - [x] Step 3: Added backend TDD tests for job persistence and `GET /api/jobs/<id>`.
 - [x] Step 4: Implemented `processing_jobs` table, DB helpers, and `GET /api/jobs/<id>`.
+- [x] Step 15: Committed job persistence checkpoint.
+- [x] Step 5: Converted crawl, OCR, face detection, and clustering endpoints to return `job_id`.
 
 ## In Progress
 
-- [ ] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
+- [x] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
 
 ## Remaining
 
@@ -41,6 +43,8 @@ Phase: Step 4 complete. Job persistence and status endpoint implemented.
 
 - `./venv/bin/pytest tests/test_jobs.py -q` failed as expected before implementation: no jobs table, DB methods, or endpoint.
 - `./venv/bin/pytest tests/test_jobs.py -q` passed after job persistence/status implementation.
+- `./venv/bin/pytest tests/test_jobs.py -q` failed as expected before endpoint conversion: long-running endpoints still return synchronous `200` responses.
+- `./venv/bin/pytest tests/test_jobs.py tests/test_api.py tests/test_api_phase2.py -q` passed after endpoint conversion and API test updates.
 
 ## Known Issues
 
@@ -50,3 +54,4 @@ Phase: Step 4 complete. Job persistence and status endpoint implemented.
 ## Commit Log
 
 - `808927c` docs: track local hardening progress
+- `81a5024` feat: add local processing jobs

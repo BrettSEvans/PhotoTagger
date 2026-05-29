@@ -5,6 +5,7 @@ from src.db import Database
 from src.crawler import PhotoCrawler
 from src.ocr import OCREngine
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
+from src.job_runner import LocalJobRunner
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,8 +24,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     app.roster_manager = RosterManager()
 
     # Initialize components
-    crawler = PhotoCrawler(db)
-    ocr_engine = OCREngine(db)
+    app.crawler = PhotoCrawler(db)
+    app.ocr_engine = OCREngine(db)
+    app.job_runner = LocalJobRunner(db)
+
+    def enqueue_job(job_type: str, payload: dict, task):
+        job_id = app.job_runner.submit(job_type, payload, task)
+        job = db.get_processing_job(job_id)
+        return jsonify({"success": True, "job_id": job_id, "job": job}), 202
 
     # Health check endpoint
     @app.route("/health", methods=["GET"])
@@ -97,11 +104,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"error": f"Directory not found: {photo_dir}"}), 404
 
         try:
-            results = crawler.crawl(photo_dir)
-            return jsonify({
-                "success": True,
-                "results": results,
-            }), 200
+            return enqueue_job("crawl", {"photo_dir": photo_dir}, lambda: app.crawler.crawl(photo_dir))
         except Exception as e:
             logger.error(f"Crawl error: {e}")
             return jsonify({"error": str(e)}), 500
@@ -121,11 +124,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         photo_ids = data.get("photo_ids", None)
 
         try:
-            results = ocr_engine.process_batch(photo_ids)
-            return jsonify({
-                "success": True,
-                "results": results,
-            }), 200
+            return enqueue_job("process_ocr", {"photo_ids": photo_ids}, lambda: app.ocr_engine.process_batch(photo_ids))
         except Exception as e:
             logger.error(f"OCR error: {e}")
             return jsonify({"error": str(e)}), 500
@@ -278,41 +277,43 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         photo_ids = data.get("photo_ids", None)
 
         try:
-            detector = FaceDetector()
-            photos = db.get_all_photos()
+            def run_detection():
+                detector = FaceDetector()
+                photos = db.get_all_photos()
 
-            if photo_ids:
-                photos = [p for p in photos if p["id"] in set(photo_ids)]
+                if photo_ids:
+                    photos = [p for p in photos if p["id"] in set(photo_ids)]
 
-            total_faces = 0
-            errors = 0
+                total_faces = 0
+                errors = 0
 
-            for photo in photos:
-                photo_id = photo["id"]
-                file_path = photo.get("file_path", "")
-                if not file_path or not os.path.exists(file_path):
-                    continue
-                try:
-                    faces = detector.detect_faces(file_path)
-                    for face in faces:
-                        emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]
-                        db.add_face(
-                            photo_id=photo_id,
-                            embedding=emb_list,
-                            bbox=face["bbox"],
-                            confidence=face["confidence"],
-                        )
-                    total_faces += len(faces)
-                except Exception as e:
-                    logger.error(f"Face detection error on photo {photo_id}: {e}")
-                    errors += 1
+                for photo in photos:
+                    photo_id = photo["id"]
+                    file_path = photo.get("file_path", "")
+                    if not file_path or not os.path.exists(file_path):
+                        continue
+                    try:
+                        faces = detector.detect_faces(file_path)
+                        for face in faces:
+                            emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]
+                            db.add_face(
+                                photo_id=photo_id,
+                                embedding=emb_list,
+                                bbox=face["bbox"],
+                                confidence=face["confidence"],
+                            )
+                        total_faces += len(faces)
+                    except Exception as e:
+                        logger.error(f"Face detection error on photo {photo_id}: {e}")
+                        errors += 1
 
-            return jsonify({
-                "success": True,
-                "photos_processed": len(photos),
-                "faces_detected": total_faces,
-                "errors": errors,
-            }), 200
+                return {
+                    "photos_processed": len(photos),
+                    "faces_detected": total_faces,
+                    "errors": errors,
+                }
+
+            return enqueue_job("detect_faces", {"photo_ids": photo_ids}, run_detection)
 
         except Exception as e:
             logger.error(f"detect-faces error: {e}")
@@ -328,9 +329,11 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         threshold = float(data.get("threshold", 0.40))
 
         try:
-            clusterer = FaceClusterer(db, similarity_threshold=threshold)
-            result = clusterer.run()
-            return jsonify({"success": True, **result}), 200
+            def run_clustering():
+                clusterer = FaceClusterer(db, similarity_threshold=threshold)
+                return clusterer.run()
+
+            return enqueue_job("cluster_players", {"threshold": threshold}, run_clustering)
         except Exception as e:
             logger.error(f"cluster-players error: {e}")
             return jsonify({"error": str(e)}), 500
