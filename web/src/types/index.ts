@@ -297,7 +297,18 @@ export interface RosterEntry {
   team_year: number;
   jersey_number: string;
   player_name: string;
+  uniform_color?: string | null;
   thumbnail_face_id?: number | null;
+}
+
+export interface GameContextTeam {
+  team_name: string;
+  team_year: number;
+  uniform_color: string;
+}
+
+export interface GameContextResponse {
+  teams: GameContextTeam[];
 }
 
 /**
@@ -337,6 +348,7 @@ export interface RosterSearchResult {
   team_name: string;
   jersey_number: string;
   player_name: string;
+  uniform_color?: string | null;
 }
 
 /**
@@ -356,6 +368,8 @@ export interface TaggedPhoto {
   file_path: string;
   jersey_number: string;
   player_name: string;
+  team_name?: string;
+  uniform_color?: string | null;
   confidence: number;
 }
 
@@ -366,7 +380,9 @@ export interface ReviewPhoto {
   id: number;
   file_path: string;
   jersey_number: string;
+  uniform_color?: string | null;
   confidence: number;
+  roster_candidates?: RosterSearchResult[];
 }
 
 /**

@@ -10,7 +10,7 @@ class Database:
     def __init__(self, db_path: str = "photo_catalog.db"):
         """Initialize database connection."""
         self.db_path = db_path
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Return rows as dicts
 
@@ -36,6 +36,7 @@ class Database:
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 photo_id INTEGER NOT NULL,
                 jersey_number TEXT,
+                uniform_color TEXT,
                 confidence REAL,
                 raw_text TEXT,
                 processed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -67,8 +68,19 @@ class Database:
                 team_year INTEGER NOT NULL,
                 jersey_number TEXT NOT NULL,
                 player_name TEXT NOT NULL,
+                uniform_color TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(team_name, team_year, jersey_number)
+            )
+        """)
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS game_context_teams (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_name TEXT NOT NULL,
+                team_year INTEGER NOT NULL,
+                uniform_color TEXT NOT NULL,
+                position INTEGER NOT NULL DEFAULT 0
             )
         """)
 
@@ -103,6 +115,16 @@ class Database:
             cursor.execute("ALTER TABLE faces ADD COLUMN cluster_id INTEGER REFERENCES player_clusters(id)")
         except Exception:
             pass  # Column already exists
+
+        try:
+            cursor.execute("ALTER TABLE ocr_results ADD COLUMN uniform_color TEXT")
+        except Exception:
+            pass
+
+        try:
+            cursor.execute("ALTER TABLE rosters ADD COLUMN uniform_color TEXT")
+        except Exception:
+            pass
 
         # Add player_name / jersey_number to player_clusters if not present
         try:
@@ -144,14 +166,20 @@ class Database:
 
         return cursor.lastrowid
 
-    def add_ocr_result(self, photo_id: int, jersey_number: Optional[str],
-                      confidence: float, raw_text: str):
+    def add_ocr_result(
+        self,
+        photo_id: int,
+        jersey_number: Optional[str],
+        confidence: float,
+        raw_text: str,
+        uniform_color: Optional[str] = None,
+    ):
         """Add OCR extraction results for a photo."""
         cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT INTO ocr_results (photo_id, jersey_number, confidence, raw_text)
-            VALUES (?, ?, ?, ?)
-        """, (photo_id, jersey_number, confidence, raw_text))
+            INSERT INTO ocr_results (photo_id, jersey_number, uniform_color, confidence, raw_text)
+            VALUES (?, ?, ?, ?, ?)
+        """, (photo_id, jersey_number, uniform_color, confidence, raw_text))
         self.conn.commit()
 
     def get_photo_by_jersey(self, jersey_number: str) -> List[Dict]:
@@ -322,14 +350,52 @@ class Database:
             cursor.execute("SELECT 1 FROM faces WHERE photo_id = ? LIMIT 1", (photo_id,))
             return cursor.fetchone() is not None
 
-    def add_roster_entry(self, team_name: str, team_year: int, jersey_number: str, player_name: str):
+    def add_roster_entry(
+        self,
+        team_name: str,
+        team_year: int,
+        jersey_number: str,
+        player_name: str,
+        uniform_color: Optional[str] = None,
+    ):
         """Add a player to the roster."""
         cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT OR REPLACE INTO rosters (team_name, team_year, jersey_number, player_name)
-            VALUES (?, ?, ?, ?)
-        """, (team_name, team_year, jersey_number, player_name))
+            INSERT OR REPLACE INTO rosters (team_name, team_year, jersey_number, player_name, uniform_color)
+            VALUES (?, ?, ?, ?, ?)
+        """, (team_name, team_year, jersey_number, player_name, uniform_color))
         self.conn.commit()
+
+    def set_game_context(self, teams: List[Dict]):
+        """Replace the active game context with teams and their uniform colors."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM game_context_teams")
+            for position, team in enumerate(teams):
+                team_name = str(team.get("team_name", "")).strip()
+                team_year = int(team.get("team_year", 2026))
+                uniform_color = str(team.get("uniform_color", "")).strip().lower()
+                if not team_name or not uniform_color:
+                    continue
+                cursor.execute("""
+                    INSERT INTO game_context_teams (team_name, team_year, uniform_color, position)
+                    VALUES (?, ?, ?, ?)
+                """, (team_name, team_year, uniform_color, position))
+            self.conn.commit()
+
+    def get_game_context(self) -> List[Dict]:
+        """Return the active game context teams in display order."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT team_name, team_year, uniform_color
+                FROM game_context_teams
+                ORDER BY position, id
+            """)
+            return [
+                {"team_name": row[0], "team_year": row[1], "uniform_color": row[2]}
+                for row in cursor.fetchall()
+            ]
 
     def roster_entry_exists(self, team_name: str, team_year: int, jersey_number: str) -> bool:
         """Return whether a roster entry already exists for team/year/jersey."""
@@ -347,6 +413,7 @@ class Database:
         team_year: int,
         rows: List[Dict],
         duplicate_policy: str = "replace",
+        uniform_color: Optional[str] = None,
     ) -> Dict:
         """Import roster rows with replace or skip duplicate handling."""
         if duplicate_policy not in {"replace", "skip"}:
@@ -370,7 +437,7 @@ class Database:
                 continue
 
             try:
-                self.add_roster_entry(team_name, team_year, jersey, name)
+                self.add_roster_entry(team_name, team_year, jersey, name, uniform_color=uniform_color)
                 imported += 1
             except Exception as exc:
                 failed += 1
@@ -525,7 +592,7 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT r.id, r.team_name, r.team_year, r.jersey_number, r.player_name,
+                SELECT r.id, r.team_name, r.team_year, r.jersey_number, r.player_name, r.uniform_color,
                        (
                          SELECT pc.thumbnail_face_id
                          FROM player_clusters pc
@@ -545,7 +612,7 @@ class Database:
             """)
             return [
                 {"id": r[0], "team_name": r[1], "team_year": r[2],
-                 "jersey_number": r[3], "player_name": r[4], "thumbnail_face_id": r[5]}
+                 "jersey_number": r[3], "player_name": r[4], "uniform_color": r[5], "thumbnail_face_id": r[6]}
                 for r in cursor.fetchall()
             ]
 
@@ -562,14 +629,14 @@ class Database:
             cursor = self.conn.cursor()
             pattern = f"%{query}%"
             cursor.execute("""
-                SELECT id, team_name, jersey_number, player_name
+                SELECT id, team_name, jersey_number, player_name, uniform_color
                 FROM rosters
                 WHERE player_name LIKE ? OR jersey_number LIKE ?
                 ORDER BY CAST(jersey_number AS INTEGER)
                 LIMIT 10
             """, (pattern, pattern))
             return [
-                {"id": r[0], "team_name": r[1], "jersey_number": r[2], "player_name": r[3]}
+                {"id": r[0], "team_name": r[1], "jersey_number": r[2], "player_name": r[3], "uniform_color": r[4]}
                 for r in cursor.fetchall()
             ]
 
@@ -582,60 +649,148 @@ class Database:
             cursor.execute("SELECT COUNT(*) FROM photos")
             total = cursor.fetchone()[0]
 
-            cursor.execute("""
-                SELECT COUNT(DISTINCT o.photo_id)
-                FROM ocr_results o
-                INNER JOIN rosters r ON r.jersey_number = o.jersey_number
-                WHERE o.jersey_number IS NOT NULL
-            """)
-            tagged = cursor.fetchone()[0]
-
-            cursor.execute("""
-                SELECT COUNT(DISTINCT o.photo_id)
-                FROM ocr_results o
-                LEFT JOIN rosters r ON r.jersey_number = o.jersey_number
-                WHERE o.jersey_number IS NOT NULL AND r.id IS NULL
-            """)
-            needs_review = cursor.fetchone()[0]
+            tagged = 0
+            needs_review = 0
+            for row in self._get_latest_ocr_rows(cursor):
+                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                if len(matches) == 1:
+                    tagged += 1
+                else:
+                    needs_review += 1
 
             return {"total_photos": total, "tagged": tagged, "needs_review": needs_review}
 
     def get_confirmed_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
-        """Photos where OCR jersey matched a roster player."""
+        """Photos where OCR jersey and game context resolve to one roster player."""
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT DISTINCT p.id, p.file_path, o.jersey_number, r.player_name, o.confidence
-                FROM photos p
-                JOIN ocr_results o ON o.photo_id = p.id
-                JOIN rosters r ON r.jersey_number = o.jersey_number
-                WHERE o.jersey_number IS NOT NULL
-                ORDER BY o.confidence DESC
-                LIMIT ? OFFSET ?
-            """, (limit, offset))
-            return [
-                {"id": r[0], "file_path": r[1], "jersey_number": r[2],
-                 "player_name": r[3], "confidence": r[4]}
-                for r in cursor.fetchall()
-            ]
+            confirmed = []
+            for row in self._get_latest_ocr_rows(cursor):
+                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                if len(matches) == 1:
+                    match = matches[0]
+                    confirmed.append({
+                        "id": row["id"],
+                        "file_path": row["file_path"],
+                        "jersey_number": row["jersey_number"],
+                        "player_name": match["player_name"],
+                        "team_name": match["team_name"],
+                        "uniform_color": match["uniform_color"],
+                        "confidence": row["confidence"],
+                    })
+            return confirmed[offset:offset + limit]
 
     def get_review_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
-        """Photos where OCR found a jersey but it didn't match any roster entry."""
+        """Photos where OCR found a jersey but roster context is missing or ambiguous."""
         with self._lock:
             cursor = self.conn.cursor()
+            review = []
+            for row in self._get_latest_ocr_rows(cursor):
+                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                if len(matches) != 1:
+                    review.append({
+                        "id": row["id"],
+                        "file_path": row["file_path"],
+                        "jersey_number": row["jersey_number"],
+                        "uniform_color": row.get("uniform_color"),
+                        "confidence": row["confidence"],
+                        "roster_candidates": matches,
+                    })
+            return review[offset:offset + limit]
+
+    def _get_latest_ocr_rows(self, cursor) -> List[Dict]:
+        """Return latest non-empty OCR row per photo, ordered by confidence."""
+        cursor.execute("""
+            SELECT p.id, p.file_path, o.jersey_number, o.uniform_color, o.confidence, o.raw_text
+            FROM photos p
+            JOIN ocr_results o ON o.photo_id = p.id
+            WHERE o.jersey_number IS NOT NULL
+              AND o.id = (
+                  SELECT MAX(o2.id)
+                  FROM ocr_results o2
+                  WHERE o2.photo_id = p.id
+                    AND o2.jersey_number IS NOT NULL
+              )
+            ORDER BY o.confidence DESC
+        """)
+        return [dict(row) for row in cursor.fetchall()]
+
+    def resolve_roster_candidates(self, jersey_number: str, uniform_color: Optional[str] = None) -> List[Dict]:
+        """Resolve roster candidates for a jersey within active game context and optional uniform color."""
+        cursor = self.conn.cursor()
+        context = self.get_game_context()
+
+        if context:
+            candidates = []
+            for team in context:
+                cursor.execute("""
+                    SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                    FROM rosters
+                    WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+                """, (team["team_name"], team["team_year"], str(jersey_number)))
+                for row in cursor.fetchall():
+                    roster_color = team.get("uniform_color") or row[5]
+                    candidates.append({
+                        "id": row[0],
+                        "team_name": row[1],
+                        "team_year": row[2],
+                        "jersey_number": row[3],
+                        "player_name": row[4],
+                        "uniform_color": roster_color,
+                    })
+        else:
             cursor.execute("""
-                SELECT DISTINCT p.id, p.file_path, o.jersey_number, o.confidence
-                FROM photos p
-                JOIN ocr_results o ON o.photo_id = p.id
-                LEFT JOIN rosters r ON r.jersey_number = o.jersey_number
-                WHERE o.jersey_number IS NOT NULL AND r.id IS NULL
-                ORDER BY o.confidence DESC
-                LIMIT ? OFFSET ?
-            """, (limit, offset))
-            return [
-                {"id": r[0], "file_path": r[1], "jersey_number": r[2], "confidence": r[3]}
-                for r in cursor.fetchall()
+                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                FROM rosters
+                WHERE jersey_number = ?
+            """, (str(jersey_number),))
+            candidates = [
+                {
+                    "id": row[0],
+                    "team_name": row[1],
+                    "team_year": row[2],
+                    "jersey_number": row[3],
+                    "player_name": row[4],
+                    "uniform_color": row[5],
+                }
+                for row in cursor.fetchall()
             ]
+
+        if not uniform_color:
+            return candidates
+
+        matched = []
+        for candidate in candidates:
+            score = self._color_match_score(uniform_color, candidate.get("uniform_color"))
+            if score > 0:
+                matched.append({**candidate, "match_score": score})
+        return matched
+
+    @staticmethod
+    def _color_match_score(detected: Optional[str], roster: Optional[str]) -> float:
+        """Score whether two uniform color labels are compatible."""
+        if not detected or not roster:
+            return 0.0
+
+        detected = detected.lower().strip()
+        roster = roster.lower().strip()
+        if detected == roster:
+            return 1.0
+
+        color_families = {
+            "red": {"red", "crimson", "dark red", "maroon", "burgundy"},
+            "white": {"white", "light gray", "off-white", "cream"},
+            "blue": {"blue", "navy", "royal blue", "dark blue"},
+            "black": {"black", "dark gray", "charcoal"},
+            "yellow": {"yellow", "gold", "orange-yellow"},
+            "green": {"green", "dark green", "forest green"},
+        }
+
+        detected_family = next((family for family, colors in color_families.items() if detected in colors), None)
+        roster_family = next((family for family, colors in color_families.items() if roster in colors), None)
+        if detected_family and detected_family == roster_family:
+            return 0.9
+        return 0.0
 
     def deassign_faces(self, face_ids: List[int]):
         """Remove specific faces from their cluster and refresh affected cluster stats."""

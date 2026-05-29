@@ -95,6 +95,30 @@ def test_rosters_table_exists(test_db):
     assert cursor.fetchone() is not None
 
 
+def test_roster_entries_store_uniform_color(test_db):
+    """Roster rows should keep team uniform color for game-context matching."""
+    test_db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+
+    entry = test_db.search_roster("Thomas Shope")[0]
+
+    assert entry["uniform_color"] == "red"
+
+
+def test_game_context_round_trip(test_db):
+    """A photo set should keep the active matchup and each team's uniform color."""
+    test_db.set_game_context([
+        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+    ])
+
+    context = test_db.get_game_context()
+
+    assert context == [
+        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+    ]
+
+
 def test_player_clusters_has_roster_entry_id(test_db):
     """Clusters should keep a stable roster-player link independent of jersey text."""
     cursor = test_db.conn.cursor()
@@ -136,3 +160,43 @@ def test_get_player_name_not_found(test_db):
     """Test lookup when player not found."""
     name = test_db.get_player_name("Unknown Team", 2026, "99")
     assert name is None
+
+
+def test_duplicate_jersey_without_uniform_color_requires_review(test_db, tmp_path):
+    """Same-number players on active teams must not be auto-confirmed without uniform color."""
+    test_db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    test_db.add_roster_entry("Pittsburgh En Sabah Nur", 2026, "12", "Ezra Biedler Schenk", uniform_color="white")
+    test_db.set_game_context([
+        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+    ])
+    photo_file = tmp_path / "number12.jpg"
+    photo_file.write_bytes(b"fake jpg")
+    photo_id = test_db.add_photo(str(photo_file))
+    test_db.add_ocr_result(photo_id, "12", 0.95, "12")
+
+    assert test_db.get_processing_summary() == {"total_photos": 1, "tagged": 0, "needs_review": 1}
+    assert test_db.get_confirmed_photos() == []
+    review = test_db.get_review_photos()
+    assert review[0]["jersey_number"] == "12"
+    assert {c["player_name"] for c in review[0]["roster_candidates"]} == {"Thomas Shope", "Ezra Biedler Schenk"}
+
+
+def test_duplicate_jersey_with_matching_uniform_color_confirms_player(test_db, tmp_path):
+    """Uniform color should resolve same-number players in the active game context."""
+    test_db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    test_db.add_roster_entry("Pittsburgh En Sabah Nur", 2026, "12", "Ezra Biedler Schenk", uniform_color="white")
+    test_db.set_game_context([
+        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+    ])
+    photo_file = tmp_path / "red12.jpg"
+    photo_file.write_bytes(b"fake jpg")
+    photo_id = test_db.add_photo(str(photo_file))
+    test_db.add_ocr_result(photo_id, "12", 0.95, "12", uniform_color="red")
+
+    assert test_db.get_processing_summary() == {"total_photos": 1, "tagged": 1, "needs_review": 0}
+    confirmed = test_db.get_confirmed_photos()
+    assert confirmed[0]["player_name"] == "Thomas Shope"
+    assert confirmed[0]["team_name"] == "Carleton CUT"
+    assert confirmed[0]["uniform_color"] == "red"

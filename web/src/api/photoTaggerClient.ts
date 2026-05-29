@@ -29,6 +29,8 @@ import {
   JobSubmissionResponse,
   FaceDetectionResult,
   ClusterPlayersResult,
+  GameContextResponse,
+  GameContextTeam,
 } from '../types/index';
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5001';
@@ -303,12 +305,29 @@ class PhotoTaggerClient {
     return response.data;
   }
 
-  async addRosterEntry(jerseyNumber: string, playerName: string, teamName = 'Manual Entry', teamYear = 2026): Promise<void> {
+  async getGameContext(): Promise<GameContextResponse> {
+    const response = await this.client.get<GameContextResponse>('/api/game-context');
+    return response.data;
+  }
+
+  async setGameContext(teams: GameContextTeam[]): Promise<GameContextResponse> {
+    const response = await this.client.put<GameContextResponse>('/api/game-context', { teams });
+    return response.data;
+  }
+
+  async addRosterEntry(
+    jerseyNumber: string,
+    playerName: string,
+    teamName = 'Manual Entry',
+    teamYear = 2026,
+    uniformColor?: string,
+  ): Promise<void> {
     await this.client.post('/api/roster', {
       jersey_number: jerseyNumber,
       player_name: playerName,
       team_name: teamName,
       team_year: teamYear,
+      uniform_color: uniformColor,
     });
   }
 
@@ -316,23 +335,37 @@ class PhotoTaggerClient {
     await this.client.delete(`/api/roster/${entryId}`);
   }
 
-  async importRosterFile(file: File, teamName: string, teamYear: number, duplicatePolicy: 'replace' | 'skip'): Promise<RosterImportResponse> {
+  async importRosterFile(
+    file: File,
+    teamName: string,
+    teamYear: number,
+    duplicatePolicy: 'replace' | 'skip',
+    uniformColor?: string,
+  ): Promise<RosterImportResponse> {
     const form = new FormData();
     form.append('file', file);
     form.append('team_name', teamName);
     form.append('team_year', String(teamYear));
     form.append('duplicate_policy', duplicatePolicy);
+    if (uniformColor) form.append('uniform_color', uniformColor);
 
     const response = await this.client.post<RosterImportResponse>('/api/roster/import', form, { timeout: 120000 });
     return response.data;
   }
 
-  async importRosterUrl(url: string, teamName: string, teamYear: number, duplicatePolicy: 'replace' | 'skip'): Promise<RosterImportResponse> {
+  async importRosterUrl(
+    url: string,
+    teamName: string,
+    teamYear: number,
+    duplicatePolicy: 'replace' | 'skip',
+    uniformColor?: string,
+  ): Promise<RosterImportResponse> {
     const response = await this.client.post<RosterImportResponse>('/api/roster/import-url', {
       url,
       team_name: teamName,
       team_year: teamYear,
       duplicate_policy: duplicatePolicy,
+      uniform_color: uniformColor,
     }, { timeout: 120000 });
     return response.data;
   }
