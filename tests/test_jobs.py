@@ -144,6 +144,34 @@ def test_detect_faces_endpoint_returns_job(monkeypatch, tmp_path):
     assert job["result"]["faces_detected"] == 1
 
 
+def test_detect_faces_endpoint_is_idempotent(monkeypatch, tmp_path):
+    app = create_app(db_path=":memory:")
+    app.config["TESTING"] = True
+    client = app.test_client()
+    photo_file = tmp_path / "one.jpg"
+    photo_file.write_bytes(b"one")
+    photo_id = app.db.add_photo(str(photo_file))
+
+    class FakeDetector:
+        def detect_faces(self, _file_path):
+            return [{"embedding": [0.1] * 384, "bbox": [1, 2, 3, 4], "confidence": 0.9}]
+
+    monkeypatch.setattr("src.face_detector.FaceDetector", lambda: FakeDetector())
+
+    first_response = client.post("/api/detect-faces", json={"photo_ids": [photo_id]})
+    first_job = wait_for_job(app.db, json.loads(first_response.data)["job_id"])
+    assert first_job["status"] == "succeeded"
+    assert first_job["result"]["faces_detected"] == 1
+
+    second_response = client.post("/api/detect-faces", json={"photo_ids": [photo_id]})
+    second_job = wait_for_job(app.db, json.loads(second_response.data)["job_id"])
+
+    assert second_job["status"] == "succeeded"
+    assert second_job["result"]["faces_detected"] == 0
+    assert second_job["result"]["photos_skipped_existing"] == 1
+    assert len(app.db.get_faces_by_photo(photo_id)) == 1
+
+
 def test_cluster_players_endpoint_returns_job():
     app = create_app(db_path=":memory:")
     app.config["TESTING"] = True
