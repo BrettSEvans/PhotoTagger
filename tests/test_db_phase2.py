@@ -94,12 +94,43 @@ def test_rosters_table_exists(test_db):
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='rosters'")
     assert cursor.fetchone() is not None
 
+
+def test_player_clusters_has_roster_entry_id(test_db):
+    """Clusters should keep a stable roster-player link independent of jersey text."""
+    cursor = test_db.conn.cursor()
+    cursor.execute("PRAGMA table_info(player_clusters)")
+    columns = {row[1] for row in cursor.fetchall()}
+    assert "roster_entry_id" in columns
+
 def test_add_roster_entry(test_db):
     """Test adding roster entry."""
     test_db.add_roster_entry("Test Team", 2026, "16", "Test Player")
 
     name = test_db.get_player_name("Test Team", 2026, "16")
     assert name == "Test Player"
+
+
+def test_roster_thumbnail_uses_roster_entry_id_when_jersey_changes(test_db, tmp_path):
+    """Roster setup face should populate from cleanup assignment even if jersey changes."""
+    test_db.add_roster_entry("Test Team", 2026, "22", "Test Player")
+    roster_entry = test_db.search_roster("Test Player")[0]
+
+    photo_file = tmp_path / "test.jpg"
+    photo_file.write_bytes(b"fake jpg")
+    photo_id = test_db.add_photo(str(photo_file))
+    face_id = test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.95)
+    cluster_id = test_db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    test_db.assign_face_to_cluster(face_id, cluster_id)
+    test_db.assign_cluster_to_player(
+        cluster_id,
+        "Test Player",
+        "16",
+        roster_entry_id=roster_entry["id"],
+    )
+
+    entries = test_db.get_all_roster_entries()
+    assert entries[0]["jersey_number"] == "22"
+    assert entries[0]["thumbnail_face_id"] == face_id
 
 def test_get_player_name_not_found(test_db):
     """Test lookup when player not found."""

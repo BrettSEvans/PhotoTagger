@@ -11,6 +11,7 @@ interface ClusterWithAssignment {
   created_at: string;
   player_name?: string;
   jersey_number?: string;
+  roster_entry_id?: number | null;
 }
 
 export const SearchPage: React.FC = () => {
@@ -62,10 +63,13 @@ export const SearchPage: React.FC = () => {
     setIsLoadingPhotos(true);
 
     try {
-      // Find the cluster assigned to this player's jersey number
+      // Prefer the stable roster entry link; fall back to older clusters by name/jersey.
       const playersData = await photoTaggerClient.getPlayers();
       const allClusters = playersData.players as ClusterWithAssignment[];
-      const matched = allClusters.find(c => c.jersey_number === player.jersey_number) ?? null;
+      const matched = allClusters.find(c => c.roster_entry_id === player.id)
+        ?? allClusters.find(c => c.player_name === player.player_name)
+        ?? allClusters.find(c => c.jersey_number === player.jersey_number)
+        ?? null;
       setCluster(matched);
 
       let merged: PlayerPhotoItem[] = [];

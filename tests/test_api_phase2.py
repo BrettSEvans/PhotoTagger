@@ -217,6 +217,32 @@ def test_roster_response_includes_assigned_thumbnail_face(client, app_with_roste
     assert match["thumbnail_face_id"] == face_id
 
 
+def test_assign_cluster_accepts_roster_entry_id_for_stable_roster_face(client, app_with_roster, tmp_path):
+    db = app_with_roster.db
+    db.add_roster_entry("Carleton CUT", 2026, "22", "Will Troop")
+    roster_entry = db.search_roster("Will Troop")[0]
+    photo_file = tmp_path / "test.jpg"
+    photo_file.write_bytes(b"fake jpg")
+    photo_id = db.add_photo(str(photo_file))
+    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
+    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.assign_face_to_cluster(face_id, cluster_id)
+
+    response = client.post(
+        f"/api/players/{cluster_id}/assign",
+        json={
+            "player_name": "Will Troop",
+            "jersey_number": "16",
+            "roster_entry_id": roster_entry["id"],
+        },
+    )
+
+    assert response.status_code == 200
+    entries = json.loads(client.get("/api/roster").data)["entries"]
+    match = next(e for e in entries if e["id"] == roster_entry["id"])
+    assert match["thumbnail_face_id"] == face_id
+
+
 def test_deassign_faces_response_includes_deleted_cluster(client, app_with_roster, tmp_path):
     db = app_with_roster.db
     photo_file = tmp_path / "test.jpg"

@@ -204,6 +204,7 @@ export interface PlayerCluster {
   photo_count: number;
   thumbnail_face_id: number | null;
   created_at: string;
+  roster_entry_id?: number | null;
 }
 
 /**

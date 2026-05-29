@@ -322,8 +322,12 @@ class PhotoTaggerClient {
     return response.data.photos;
   }
 
-  async assignCluster(clusterId: number, playerName: string, jerseyNumber: string): Promise<void> {
-    await this.client.post(`/api/players/${clusterId}/assign`, { player_name: playerName, jersey_number: jerseyNumber });
+  async assignCluster(clusterId: number, playerName: string, jerseyNumber: string, rosterEntryId?: number): Promise<void> {
+    await this.client.post(`/api/players/${clusterId}/assign`, {
+      player_name: playerName,
+      jersey_number: jerseyNumber,
+      roster_entry_id: rosterEntryId,
+    });
   }
 
   async deassignFaces(faceIds: number[]): Promise<DeassignFacesResponse> {

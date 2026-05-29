@@ -97,6 +97,10 @@ class Database:
             cursor.execute("ALTER TABLE player_clusters ADD COLUMN jersey_number TEXT")
         except Exception:
             pass
+        try:
+            cursor.execute("ALTER TABLE player_clusters ADD COLUMN roster_entry_id INTEGER REFERENCES rosters(id)")
+        except Exception:
+            pass
 
         self.conn.commit()
 
@@ -368,7 +372,7 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
-                       player_name, jersey_number
+                       player_name, jersey_number, roster_entry_id
                 FROM player_clusters
                 ORDER BY photo_count DESC
             """)
@@ -381,6 +385,7 @@ class Database:
                     "created_at": row[4],
                     "player_name": row[5],
                     "jersey_number": row[6],
+                    "roster_entry_id": row[7],
                 }
                 for row in cursor.fetchall()
             ]
@@ -427,8 +432,13 @@ class Database:
                        (
                          SELECT pc.thumbnail_face_id
                          FROM player_clusters pc
-                         WHERE pc.jersey_number = r.jersey_number
-                           AND pc.player_name = r.player_name
+                         WHERE (
+                            pc.roster_entry_id = r.id
+                            OR (
+                              pc.roster_entry_id IS NULL
+                              AND pc.player_name = r.player_name
+                            )
+                         )
                            AND pc.thumbnail_face_id IS NOT NULL
                          ORDER BY pc.photo_count DESC, pc.face_count DESC, pc.id
                          LIMIT 1
@@ -582,14 +592,20 @@ class Database:
                 "deleted_cluster_ids": deleted_cluster_ids,
             }
 
-    def assign_cluster_to_player(self, cluster_id: int, player_name: str, jersey_number: str):
-        """Attach a player name and jersey to a face cluster."""
+    def assign_cluster_to_player(
+        self,
+        cluster_id: int,
+        player_name: str,
+        jersey_number: str,
+        roster_entry_id: Optional[int] = None,
+    ):
+        """Attach a roster player identity to a face cluster."""
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                UPDATE player_clusters SET player_name = ?, jersey_number = ?
+                UPDATE player_clusters SET player_name = ?, jersey_number = ?, roster_entry_id = ?
                 WHERE id = ?
-            """, (player_name, jersey_number, cluster_id))
+            """, (player_name, jersey_number, roster_entry_id, cluster_id))
             self.conn.commit()
 
     def close(self):

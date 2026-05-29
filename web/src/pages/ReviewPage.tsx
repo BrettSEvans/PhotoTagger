@@ -8,6 +8,7 @@ import type { ImgDim } from '../utils/bboxUtils';
 interface ClusterWithAssignment extends PlayerCluster {
   player_name?: string;
   jersey_number?: string;
+  roster_entry_id?: number | null;
 }
 
 export const ReviewPage: React.FC = () => {
@@ -179,13 +180,14 @@ export const ReviewPage: React.FC = () => {
     const excluded = clusterPhotos.filter(p => !selected.has(p.face_id)).map(p => p.face_id);
     setIsAssigning(true);
     try {
-      await photoTaggerClient.assignCluster(selectedCluster.id, result.player_name, result.jersey_number);
+      await photoTaggerClient.assignCluster(selectedCluster.id, result.player_name, result.jersey_number, result.id);
       if (excluded.length > 0) await photoTaggerClient.deassignFaces(excluded);
 
       const updated: ClusterWithAssignment = {
         ...selectedCluster,
         player_name: result.player_name,
         jersey_number: result.jersey_number,
+        roster_entry_id: result.id,
       };
       setSelectedCluster(updated);
       setClusters(prev => prev.map(c => c.id === selectedCluster.id ? updated : c));
