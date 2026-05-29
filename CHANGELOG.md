@@ -3,7 +3,7 @@
 ## 2026-05-29
 
 - Hid ambiguous duplicate confirmed cards in the Upload UI when the same photo and jersey are returned with multiple player names.
-  - Commit: pending
+  - Commit: c2dd21b
 - Added active game context and team uniform colors so duplicate jersey numbers across teams are not auto-confirmed without a matching uniform color.
   - Commit: eb7a12e
 - Made Flask backend debug mode opt-in so `python -m src.api` starts cleanly on port `5001` in restricted local environments.
