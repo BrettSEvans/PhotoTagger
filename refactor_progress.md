@@ -8,21 +8,23 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 2 complete. Progress tracker created.
+Phase: Step 4 complete. Job persistence and status endpoint implemented.
 
 ## Completed
 
 - [x] Step 1: Created annotated Git tag `stable-before-local-hardening` at `3ebc94b`.
 - [x] Step 2: Created `refactor_progress.md` with the implementation checklist.
+- [x] Step 3: Added backend TDD tests for job persistence and `GET /api/jobs/<id>`.
+- [x] Step 4: Implemented `processing_jobs` table, DB helpers, and `GET /api/jobs/<id>`.
 
 ## In Progress
 
-- [ ] Step 3: Add backend TDD tests for job persistence and `GET /api/jobs/<id>`.
+- [ ] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
 
 ## Remaining
 
-- [ ] Step 3: Add backend TDD tests for job persistence and `GET /api/jobs/<id>`.
-- [ ] Step 4: Implement `processing_jobs` table and local job service.
+- [x] Step 3: Add backend TDD tests for job persistence and `GET /api/jobs/<id>`.
+- [x] Step 4: Implement `processing_jobs` table and local job service.
 - [ ] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
 - [ ] Step 6: Add path and parameter validation hardening.
 - [ ] Step 7: Add face detection idempotency tests and implementation.
@@ -37,7 +39,8 @@ Phase: Step 2 complete. Progress tracker created.
 
 ## Verification Log
 
-- Not run yet for this refactor.
+- `./venv/bin/pytest tests/test_jobs.py -q` failed as expected before implementation: no jobs table, DB methods, or endpoint.
+- `./venv/bin/pytest tests/test_jobs.py -q` passed after job persistence/status implementation.
 
 ## Known Issues
 
@@ -46,4 +49,4 @@ Phase: Step 2 complete. Progress tracker created.
 
 ## Commit Log
 
-- Pending.
+- `808927c` docs: track local hardening progress
