@@ -483,6 +483,43 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/game-context", methods=["GET"])
+    def get_game_context():
+        try:
+            teams = db.get_game_context()
+            return jsonify({"teams": teams}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/game-context", methods=["PUT"])
+    def set_game_context():
+        data = request.get_json() or {}
+        teams = data.get("teams", [])
+        if not isinstance(teams, list):
+            return jsonify({"error": "teams must be a list"}), 400
+
+        normalized = []
+        for idx, team in enumerate(teams, start=1):
+            team_name = str(team.get("team_name", "")).strip() if isinstance(team, dict) else ""
+            uniform_color = str(team.get("uniform_color", "")).strip().lower() if isinstance(team, dict) else ""
+            try:
+                team_year = int(team.get("team_year", 2026)) if isinstance(team, dict) else 2026
+            except (TypeError, ValueError):
+                return jsonify({"error": f"teams[{idx}].team_year must be an integer"}), 400
+            if not team_name or not uniform_color:
+                return jsonify({"error": f"teams[{idx}] requires team_name and uniform_color"}), 400
+            normalized.append({
+                "team_name": team_name,
+                "team_year": team_year,
+                "uniform_color": uniform_color,
+            })
+
+        try:
+            db.set_game_context(normalized)
+            return jsonify({"success": True, "teams": db.get_game_context()}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/roster", methods=["POST"])
     def add_roster():
         data = request.get_json() or {}
@@ -490,10 +527,11 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         name   = str(data.get("player_name", "")).strip()
         team   = str(data.get("team_name", "Manual Entry")).strip()
         year   = int(data.get("team_year", 2026))
+        uniform_color = str(data.get("uniform_color", "")).strip().lower() or None
         if not jersey or not name:
             return jsonify({"error": "jersey_number and player_name are required"}), 400
         try:
-            db.add_roster_entry(team, year, jersey, name)
+            db.add_roster_entry(team, year, jersey, name, uniform_color=uniform_color)
             return jsonify({"success": True}), 201
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -501,6 +539,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/roster/import", methods=["POST"])
     def import_roster_file():
         team = str(request.form.get("team_name", "Manual Entry")).strip() or "Manual Entry"
+        uniform_color = str(request.form.get("uniform_color", "")).strip().lower() or None
         try:
             year = int(request.form.get("team_year", 2026))
         except (TypeError, ValueError):
@@ -516,7 +555,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         try:
             rows = parse_roster_file(uploaded.filename, uploaded.read())
-            result = db.import_roster_entries(team, year, rows, duplicate_policy)
+            result = db.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
             return jsonify(result), 200
         except RosterImportError as e:
             return jsonify({"error": str(e)}), 400
@@ -529,6 +568,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         data = request.get_json() or {}
         url = str(data.get("url", "")).strip()
         team = str(data.get("team_name", "Manual Entry")).strip() or "Manual Entry"
+        uniform_color = str(data.get("uniform_color", "")).strip().lower() or None
         duplicate_policy = str(data.get("duplicate_policy", "replace")).strip()
 
         if not url:
@@ -542,7 +582,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         try:
             rows = RosterImporter.fetch_url(url)
-            result = db.import_roster_entries(team, year, rows, duplicate_policy)
+            result = db.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
             return jsonify(result), 200
         except RosterImportError as e:
             return jsonify({"error": str(e)}), 400
@@ -645,7 +685,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def after_request(response):
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
         return response
 
     return app

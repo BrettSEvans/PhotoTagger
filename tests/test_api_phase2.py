@@ -217,6 +217,24 @@ def test_roster_response_includes_assigned_thumbnail_face(client, app_with_roste
     assert match["thumbnail_face_id"] == face_id
 
 
+def test_game_context_api_round_trip(client):
+    response = client.put("/api/game-context", json={
+        "teams": [
+            {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
+            {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
+        ]
+    })
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["teams"][0]["team_name"] == "Carleton CUT"
+    assert data["teams"][1]["uniform_color"] == "white"
+
+    get_response = client.get("/api/game-context")
+    assert get_response.status_code == 200
+    assert json.loads(get_response.data)["teams"] == data["teams"]
+
+
 def test_assign_cluster_accepts_roster_entry_id_for_stable_roster_face(client, app_with_roster, tmp_path):
     db = app_with_roster.db
     db.add_roster_entry("Carleton CUT", 2026, "22", "Will Troop")

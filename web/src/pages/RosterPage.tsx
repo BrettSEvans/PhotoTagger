@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { RosterEntry } from '../types/index';
+import type { GameContextTeam, RosterEntry } from '../types/index';
 
 const TEAMS = ['All Teams', 'Carleton CUT', 'Pittsburgh En Sabah Nur', 'Manual Entry'];
 
@@ -15,8 +15,12 @@ export const RosterPage: React.FC = () => {
   const [newName,   setNewName]   = useState('');
   const [newJersey, setNewJersey] = useState('');
   const [newTeam,   setNewTeam]   = useState('Manual Entry');
+  const [teamColor, setTeamColor] = useState('');
   const [isSaving,  setIsSaving]  = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  const [gameContext, setGameContext] = useState<GameContextTeam[]>([]);
+  const [contextMsg, setContextMsg] = useState<string | null>(null);
 
   // Bulk import state
   const [isDragging, setIsDragging] = useState(false);
@@ -27,7 +31,10 @@ export const RosterPage: React.FC = () => {
   const [duplicatePolicy, setDuplicatePolicy] = useState<'replace' | 'skip'>('replace');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { loadRoster(); }, []);
+  useEffect(() => {
+    loadRoster();
+    loadGameContext();
+  }, []);
 
   const loadRoster = async () => {
     setIsLoading(true);
@@ -41,6 +48,21 @@ export const RosterPage: React.FC = () => {
     }
   };
 
+  const loadGameContext = async () => {
+    try {
+      const data = await photoTaggerClient.getGameContext();
+      setGameContext(data.teams.length > 0 ? data.teams : [
+        { team_name: 'Carleton CUT', team_year: 2026, uniform_color: 'red' },
+        { team_name: 'Pittsburgh En Sabah Nur', team_year: 2026, uniform_color: 'white' },
+      ]);
+    } catch {
+      setGameContext([
+        { team_name: 'Carleton CUT', team_year: 2026, uniform_color: 'red' },
+        { team_name: 'Pittsburgh En Sabah Nur', team_year: 2026, uniform_color: 'white' },
+      ]);
+    }
+  };
+
   // ── Inline entry ──────────────────────────────────────────────────────────
 
   const handleAddRow = async (e?: React.FormEvent) => {
@@ -48,7 +70,7 @@ export const RosterPage: React.FC = () => {
     if (!newName.trim() || !newJersey.trim()) return;
     setIsSaving(true);
     try {
-      await photoTaggerClient.addRosterEntry(newJersey.trim(), newName.trim(), newTeam);
+      await photoTaggerClient.addRosterEntry(newJersey.trim(), newName.trim(), newTeam, teamYear, teamColor.trim() || undefined);
       setNewName('');
       setNewJersey('');
       await loadRoster();
@@ -73,6 +95,41 @@ export const RosterPage: React.FC = () => {
     }
   };
 
+  const updateContextTeam = (index: number, patch: Partial<GameContextTeam>) => {
+    setGameContext(prev => {
+      const next = [...prev];
+      const current = next[index] ?? {
+        team_name: '',
+        team_year: 2026,
+        uniform_color: '',
+      };
+      next[index] = {
+        ...current,
+        ...patch,
+      };
+      return next;
+    });
+  };
+
+  const saveGameContext = async () => {
+    setContextMsg(null);
+    try {
+      const teams = gameContext
+        .map(team => ({
+          team_name: team.team_name.trim(),
+          team_year: Number(team.team_year) || 2026,
+          uniform_color: team.uniform_color.trim().toLowerCase(),
+        }))
+        .filter(team => team.team_name && team.uniform_color);
+      const data = await photoTaggerClient.setGameContext(teams);
+      setGameContext(data.teams);
+      setContextMsg('Game context saved');
+      await loadRoster();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save game context');
+    }
+  };
+
   // ── Bulk import ───────────────────────────────────────────────────────────
 
   const formatImportMessage = (result: { imported: number; skipped: number; failed: number; errors?: string[] }) => {
@@ -87,7 +144,7 @@ export const RosterPage: React.FC = () => {
     setImportMsg(null);
     setIsParsing(true);
     try {
-      const result = await photoTaggerClient.importRosterFile(file, newTeam, teamYear, duplicatePolicy);
+      const result = await photoTaggerClient.importRosterFile(file, newTeam, teamYear, duplicatePolicy, teamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
@@ -102,7 +159,7 @@ export const RosterPage: React.FC = () => {
     setImportMsg(null);
     setIsParsing(true);
     try {
-      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), newTeam, teamYear, duplicatePolicy);
+      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), newTeam, teamYear, duplicatePolicy, teamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
@@ -135,11 +192,13 @@ export const RosterPage: React.FC = () => {
     importFile(file);
   };
 
+  const rosterTeams = Array.from(new Set([...TEAMS.slice(1), ...entries.map(e => e.team_name)])).filter(Boolean);
+
   const filtered = filterTeam === 'All Teams'
     ? entries
     : entries.filter(e => e.team_name === filterTeam);
 
-  const teamGroups = TEAMS.slice(1).filter(t => entries.some(e => e.team_name === t));
+  const teamGroups = rosterTeams.filter(t => entries.some(e => e.team_name === t));
 
   return (
     <div className="w-full max-w-6xl mx-auto py-4 space-y-6">
@@ -159,6 +218,50 @@ export const RosterPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="md:col-span-2 bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-outfit text-lg font-bold text-foreground">Game Context</h2>
+              <p className="font-jakarta text-xs text-muted-fg">Set the current matchup and uniform colors before evaluating photos</p>
+            </div>
+            <button
+              type="button"
+              onClick={saveGameContext}
+              className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+            >
+              Save Context
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {[0, 1].map(index => (
+              <div key={index} className="grid grid-cols-[1fr_88px_110px] gap-2">
+                <select
+                  value={gameContext[index]?.team_name ?? ''}
+                  onChange={e => updateContextTeam(index, { team_name: e.target.value })}
+                  className="geo-input min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                >
+                  <option value="">Select team</option>
+                  {rosterTeams.map(team => <option key={team}>{team}</option>)}
+                </select>
+                <input
+                  type="number"
+                  value={gameContext[index]?.team_year ?? 2026}
+                  onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 2026 })}
+                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+                <input
+                  type="text"
+                  value={gameContext[index]?.uniform_color ?? ''}
+                  onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
+                  placeholder={index === 0 ? 'red' : 'white'}
+                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                />
+              </div>
+            ))}
+          </div>
+          {contextMsg && <p className="font-jakarta text-xs font-semibold text-foreground">{contextMsg}</p>}
+        </div>
+
         {/* ── Left: Bulk Import Zone ───────────────────────────────────────── */}
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
@@ -239,9 +342,7 @@ export const RosterPage: React.FC = () => {
                 onChange={e => setNewTeam(e.target.value)}
                 className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground appearance-none cursor-pointer"
               >
-                <option>Manual Entry</option>
-                <option>Carleton CUT</option>
-                <option>Pittsburgh En Sabah Nur</option>
+                {rosterTeams.map(team => <option key={team}>{team}</option>)}
               </select>
             </div>
             <div>
@@ -256,6 +357,20 @@ export const RosterPage: React.FC = () => {
                 className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="teamColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+              Team uniform color
+            </label>
+            <input
+              id="teamColor"
+              type="text"
+              value={teamColor}
+              onChange={e => setTeamColor(e.target.value)}
+              placeholder="red, white, blue…"
+              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+            />
           </div>
 
           <div>
@@ -373,6 +488,7 @@ export const RosterPage: React.FC = () => {
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 w-16">Face</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3">Name</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 hidden sm:table-cell">Team</th>
+                <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 hidden md:table-cell">Color</th>
                 <th className="w-12 px-3 py-3" />
               </tr>
             </thead>
@@ -405,6 +521,9 @@ export const RosterPage: React.FC = () => {
                   <td className="px-3 py-3 font-jakarta font-semibold text-foreground text-sm">{entry.player_name}</td>
                   <td className="px-3 py-3 hidden sm:table-cell">
                     <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded-full">{entry.team_name}</span>
+                  </td>
+                  <td className="px-3 py-3 hidden md:table-cell">
+                    <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded-full">{entry.uniform_color || '—'}</span>
                   </td>
                   <td className="px-3 py-3 text-right">
                     <button

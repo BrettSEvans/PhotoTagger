@@ -2,6 +2,8 @@
 
 ## 2026-05-29
 
+- Added active game context and team uniform colors so duplicate jersey numbers across teams are not auto-confirmed without a matching uniform color.
+  - Commit: pending
 - Made Flask backend debug mode opt-in so `python -m src.api` starts cleanly on port `5001` in restricted local environments.
   - Commit: 46f3c9e
 - Started the local-hardening refactor with a stable baseline tag, resumable local processing jobs, job-returning processing endpoints, and stricter API validation for numeric inputs and crawl paths.
