@@ -79,7 +79,7 @@ class FaceDetector:
                     'embedding': embedding,
                     'bbox': bbox,
                     'confidence': float(confidence),
-                    'age': int(face.age) if hasattr(face, 'age') else None,
+                    'age': int(face.age) if hasattr(face, 'age') and face.age is not None else None,
                     'gender': face.gender if hasattr(face, 'gender') else None,
                 }
                 results.append(result)

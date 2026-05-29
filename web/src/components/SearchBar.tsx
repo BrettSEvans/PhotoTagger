@@ -5,32 +5,25 @@ interface SearchBarProps {
   isLoading?: boolean;
 }
 
-/**
- * SearchBar - Jersey number search form with confidence threshold
- * Allows users to search for photos with specific jersey numbers
- */
-export const SearchBar: React.FC<SearchBarProps> = ({
-  onSearch,
-  isLoading = false,
-}) => {
+export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, isLoading = false }) => {
   const [jersey, setJersey] = useState('');
-  const [minConfidence, setMinConfidence] = useState(0.7);
+  const [minConfidence, setMinConfidence] = useState(0.05);
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    if (jersey.trim()) {
-      await onSearch(jersey.trim(), minConfidence);
-    }
+    if (jersey.trim()) await onSearch(jersey.trim(), minConfidence);
   };
 
   return (
     <form
       onSubmit={handleSubmit}
-      className="w-full bg-white border border-gray-200 rounded-lg shadow-sm p-4"
+      className="w-full bg-white border-2 border-foreground rounded-2xl shadow-pop p-5 relative"
     >
+      <div aria-hidden="true" className="absolute -top-3 -right-3 w-7 h-7 bg-secondary rounded-full border-2 border-foreground" />
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <div>
-          <label htmlFor="jersey" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="jersey" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
             Jersey Number
           </label>
           <input
@@ -40,12 +33,12 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             onChange={(e) => setJersey(e.target.value)}
             placeholder="e.g., 23"
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+            className="geo-input w-full px-4 py-2.5 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg disabled:bg-muted"
           />
         </div>
 
         <div>
-          <label htmlFor="confidence" className="block text-sm font-medium text-gray-700 mb-1">
+          <label htmlFor="confidence" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
             Min Confidence
           </label>
           <select
@@ -53,29 +46,27 @@ export const SearchBar: React.FC<SearchBarProps> = ({
             value={minConfidence}
             onChange={(e) => setMinConfidence(parseFloat(e.target.value))}
             disabled={isLoading}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+            className="geo-input w-full px-4 py-2.5 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground disabled:bg-muted appearance-none cursor-pointer"
           >
-            <option value={0.5}>50%</option>
-            <option value={0.6}>60%</option>
-            <option value={0.7}>70%</option>
-            <option value={0.8}>80%</option>
-            <option value={0.9}>90%</option>
+            <option value={0.05}>Any (5%+)</option>
+            <option value={0.3}>Low (30%+)</option>
+            <option value={0.5}>Medium (50%+)</option>
+            <option value={0.7}>High (70%+)</option>
+            <option value={0.9}>Very High (90%+)</option>
           </select>
         </div>
 
         <button
           type="submit"
           disabled={isLoading || !jersey.trim()}
-          className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium rounded-md transition-colors"
+          className="btn-candy bg-accent text-white font-jakarta font-bold px-6 py-2.5 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
         >
           {isLoading ? (
             <span className="flex items-center justify-center gap-2">
               <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              Searching...
+              Searching…
             </span>
-          ) : (
-            'Search'
-          )}
+          ) : 'Search →'}
         </button>
       </div>
     </form>

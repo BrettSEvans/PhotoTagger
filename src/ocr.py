@@ -28,6 +28,44 @@ class OCREngine:
         logger.info(f"Initializing EasyOCR reader for languages: {self.languages}")
         self.reader = easyocr.Reader(self.languages, gpu=False)
 
+    @staticmethod
+    def _preprocess_for_ocr(photo_path: str):
+        """
+        Load and preprocess image for jersey number OCR.
+
+        Steps:
+          1. Load with OpenCV
+          2. Upscale 4x (small thumbnails need this to read jersey digits)
+          3. Convert to grayscale
+          4. CLAHE contrast enhancement
+          5. Unsharp mask sharpening
+
+        Returns numpy array ready for EasyOCR, or None on failure.
+        """
+        import cv2
+        import numpy as np
+
+        img = cv2.imread(photo_path)
+        if img is None:
+            return None
+
+        # 4x upscale — jersey digits on 576×384px are ~8-12px tall; need ≥32px for OCR
+        scale = 4
+        big = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_LANCZOS4)
+
+        # Grayscale
+        gray = cv2.cvtColor(big, cv2.COLOR_BGR2GRAY)
+
+        # CLAHE — boost local contrast without blowing out highlights
+        clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(4, 4))
+        enhanced = clahe.apply(gray)
+
+        # Unsharp mask sharpening
+        blurred = cv2.GaussianBlur(enhanced, (0, 0), 2)
+        sharpened = cv2.addWeighted(enhanced, 1.5, blurred, -0.5, 0)
+
+        return sharpened
+
     def process_photo(self, photo_id: int, photo_path: str) -> Optional[Dict]:
         """
         Run OCR on a photo and extract jersey numbers.
@@ -45,9 +83,15 @@ class OCREngine:
                 logger.error(f"Photo not found: {photo_path}")
                 return None
 
-            # Run OCR
+            # Preprocess: 4x upscale + CLAHE + sharpen for small thumbnails
             logger.info(f"Processing photo: {photo_path}")
-            results = self.reader.readtext(photo_path)
+            preprocessed = self._preprocess_for_ocr(photo_path)
+            if preprocessed is None:
+                logger.error(f"Failed to preprocess image: {photo_path}")
+                return None
+
+            # Run OCR — digits only, no paragraph merging
+            results = self.reader.readtext(preprocessed, allowlist='0123456789', paragraph=False)
 
             # Combine all detected text
             raw_text = " ".join([text for (_, text, _) in results])
@@ -203,9 +247,13 @@ class OCREngine:
                 logger.error(f"Photo not found: {photo_path}")
                 return None
 
-            # Run OCR (jersey detection)
+            # Run OCR (jersey detection) — 4x upscale + CLAHE + sharpen
             logger.info(f"OCR: {path.name}")
-            results = self.reader.readtext(photo_path)
+            preprocessed = self._preprocess_for_ocr(photo_path)
+            if preprocessed is not None:
+                results = self.reader.readtext(preprocessed, allowlist='0123456789', paragraph=False)
+            else:
+                results = self.reader.readtext(photo_path)
             raw_text = " ".join([text for (_, text, _) in results])
             jerseys = self._extract_jerseys_from_text(raw_text)
             primary_jersey = jerseys[0] if jerseys else None

@@ -12,6 +12,9 @@ import {
   SearchResponse,
   FacesResponse,
   PhotosResponse,
+  PlayersResponse,
+  PlayerPhotosResponse,
+  DetectionStatus,
   APIError,
   SearchOptions,
 } from '../types/index';
@@ -26,9 +29,9 @@ class PhotoTaggerClient {
 
   /**
    * Constructor
-   * @param baseURL Base URL of the PhotoTagger API (default: http://localhost:5000)
+   * @param baseURL Base URL of the PhotoTagger API (default: http://127.0.0.1:5001)
    */
-  constructor(baseURL: string = 'http://localhost:5000') {
+  constructor(baseURL: string = 'http://127.0.0.1:5001') {
     this.baseURL = baseURL;
     this.client = axios.create({
       baseURL: this.baseURL,
@@ -83,6 +86,19 @@ class PhotoTaggerClient {
   async getInfo(): Promise<InfoResponse> {
     const response = await this.client.get<InfoResponse>('/api/info');
     return response.data;
+  }
+
+  /**
+   * Open native OS directory picker dialog
+   * POST /api/pick-directory
+   *
+   * @returns Selected directory path, or null if cancelled
+   */
+  async pickDirectory(): Promise<string | null> {
+    const response = await this.client.post<{ path: string | null; cancelled: boolean }>(
+      '/api/pick-directory'
+    );
+    return response.data.path;
   }
 
   /**
@@ -164,6 +180,70 @@ class PhotoTaggerClient {
       params: { page, per_page: perPage }
     })
     return response.data
+  }
+
+  /**
+   * Get detection status - face and cluster counts
+   * GET /api/detection-status
+   */
+  async getDetectionStatus(): Promise<DetectionStatus> {
+    const response = await this.client.get<DetectionStatus>('/api/detection-status');
+    return response.data;
+  }
+
+  /**
+   * Run face detection on all photos
+   * POST /api/detect-faces
+   *
+   * @param photoIds Optional list of specific photo IDs to process
+   */
+  async detectFaces(photoIds?: number[]): Promise<{ success: boolean; photos_processed: number; faces_detected: number; errors: number }> {
+    const body = photoIds ? { photo_ids: photoIds } : {};
+    const response = await this.client.post('/api/detect-faces', body, { timeout: 600000 }); // 10 min
+    return response.data;
+  }
+
+  /**
+   * Cluster detected faces into player identities
+   * POST /api/cluster-players
+   *
+   * @param threshold Cosine similarity threshold (default 0.40)
+   */
+  async clusterPlayers(threshold = 0.40): Promise<{ success: boolean; clusters_created: number; faces_clustered: number }> {
+    const response = await this.client.post('/api/cluster-players', { threshold });
+    return response.data;
+  }
+
+  /**
+   * Get all player clusters
+   * GET /api/players
+   */
+  async getPlayers(): Promise<PlayersResponse> {
+    const response = await this.client.get<PlayersResponse>('/api/players');
+    return response.data;
+  }
+
+  /**
+   * Get all photos for a specific player cluster
+   * GET /api/players/:id/photos
+   */
+  async getPlayerPhotos(clusterId: number): Promise<PlayerPhotosResponse> {
+    const response = await this.client.get<PlayerPhotosResponse>(`/api/players/${clusterId}/photos`);
+    return response.data;
+  }
+
+  /**
+   * Get the URL for a cropped face thumbnail
+   */
+  getFaceCropUrl(faceId: number): string {
+    return `${this.baseURL}/api/face-crop/${faceId}`;
+  }
+
+  /**
+   * Get the URL for a full photo
+   */
+  getPhotoUrl(photoId: number): string {
+    return `${this.baseURL}/api/image/${photoId}`;
   }
 
   /**

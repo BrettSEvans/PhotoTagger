@@ -10,7 +10,7 @@ class PhotoCrawler:
     """Walk a directory tree and ingest photos into the database."""
 
     # Supported image extensions
-    SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".gif", ".bmp"}
+    SUPPORTED_FORMATS = {".jpg", ".jpeg", ".png", ".tiff", ".tif", ".heic", ".webp"}
 
     def __init__(self, db: Database):
         """Initialize crawler with a database connection."""

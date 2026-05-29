@@ -194,3 +194,52 @@ export interface PhotosResponse {
   page: number;
   per_page: number;
 }
+
+/**
+ * PlayerCluster - A grouped face identity (one "player")
+ */
+export interface PlayerCluster {
+  id: number;
+  face_count: number;
+  photo_count: number;
+  thumbnail_face_id: number | null;
+  created_at: string;
+}
+
+/**
+ * PlayersResponse - API response from /api/players
+ */
+export interface PlayersResponse {
+  players: PlayerCluster[];
+  total: number;
+}
+
+/**
+ * PlayerPhotoItem - One photo containing a specific player
+ */
+export interface PlayerPhotoItem {
+  id: number;
+  filename: string;
+  path: string;
+  added_at: string;
+  face_id: number;
+  face_bbox: [number, number, number, number];
+  face_confidence: number;
+}
+
+/**
+ * PlayerPhotosResponse - API response from /api/players/:id/photos
+ */
+export interface PlayerPhotosResponse {
+  cluster_id: number;
+  photos: PlayerPhotoItem[];
+  total: number;
+}
+
+/**
+ * DetectionStatus - Face detection and clustering counts
+ */
+export interface DetectionStatus {
+  face_count: number;
+  cluster_count: number;
+}

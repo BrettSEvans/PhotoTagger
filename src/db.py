@@ -1,5 +1,6 @@
 import sqlite3
 import hashlib
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Optional, List, Dict
@@ -8,6 +9,7 @@ class Database:
     def __init__(self, db_path: str = "photo_catalog.db"):
         """Initialize database connection."""
         self.db_path = db_path
+        self._lock = threading.Lock()
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.conn.row_factory = sqlite3.Row  # Return rows as dicts
 
@@ -69,6 +71,23 @@ class Database:
             )
         """)
 
+        # Player clusters table: grouped face identities
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS player_clusters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                face_count INTEGER DEFAULT 0,
+                photo_count INTEGER DEFAULT 0,
+                thumbnail_face_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Add cluster_id column to faces if it doesn't exist yet
+        try:
+            cursor.execute("ALTER TABLE faces ADD COLUMN cluster_id INTEGER REFERENCES player_clusters(id)")
+        except Exception:
+            pass  # Column already exists
+
         self.conn.commit()
 
     def add_photo(self, file_path: str, file_hash: Optional[str] = None) -> int:
@@ -120,9 +139,18 @@ class Database:
 
     def get_all_photos(self) -> List[Dict]:
         """Get all photos in the database."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT * FROM photos")
-        return [dict(row) for row in cursor.fetchall()]
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM photos")
+            return [dict(row) for row in cursor.fetchall()]
+
+    def get_photo_by_id(self, photo_id: int) -> Optional[Dict]:
+        """Get a single photo by its ID."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT * FROM photos WHERE id = ?", (photo_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
 
     def get_photo_ocr(self, photo_id: int) -> Optional[Dict]:
         """Get OCR results for a specific photo."""
@@ -201,6 +229,126 @@ class Database:
         """, (team_name, team_year, jersey_number))
         result = cursor.fetchone()
         return result[0] if result else None
+
+    def get_all_faces(self) -> List[Dict]:
+        """Get all faces with their embeddings (for clustering)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id
+                FROM faces
+                ORDER BY id
+            """)
+            results = []
+            for row in cursor.fetchall():
+                import json
+                results.append({
+                    "id": row[0],
+                    "photo_id": row[1],
+                    "embedding": json.loads(row[2]),
+                    "bbox": [row[3], row[4], row[5], row[6]],
+                    "confidence": row[7],
+                    "cluster_id": row[8],
+                })
+            return results
+
+    def get_face_by_id(self, face_id: int) -> Optional[Dict]:
+        """Get a single face by its ID."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id
+                FROM faces WHERE id = ?
+            """, (face_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            import json
+            return {
+                "id": row[0],
+                "photo_id": row[1],
+                "embedding": json.loads(row[2]),
+                "bbox": [row[3], row[4], row[5], row[6]],
+                "confidence": row[7],
+                "cluster_id": row[8],
+            }
+
+    def clear_clusters(self):
+        """Remove all cluster assignments (reset before re-clustering)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE faces SET cluster_id = NULL")
+            cursor.execute("DELETE FROM player_clusters")
+            self.conn.commit()
+
+    def add_player_cluster(self, face_count: int, photo_count: int, thumbnail_face_id: Optional[int]) -> int:
+        """Insert a player cluster and return its ID."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO player_clusters (face_count, photo_count, thumbnail_face_id)
+                VALUES (?, ?, ?)
+            """, (face_count, photo_count, thumbnail_face_id))
+            self.conn.commit()
+            return cursor.lastrowid
+
+    def assign_face_to_cluster(self, face_id: int, cluster_id: int):
+        """Set the cluster_id on a face row."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("UPDATE faces SET cluster_id = ? WHERE id = ?", (cluster_id, face_id))
+            self.conn.commit()
+
+    def get_all_player_clusters(self) -> List[Dict]:
+        """Get all player clusters with stats."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, face_count, photo_count, thumbnail_face_id, created_at
+                FROM player_clusters
+                ORDER BY photo_count DESC
+            """)
+            return [
+                {
+                    "id": row[0],
+                    "face_count": row[1],
+                    "photo_count": row[2],
+                    "thumbnail_face_id": row[3],
+                    "created_at": row[4],
+                }
+                for row in cursor.fetchall()
+            ]
+
+    def get_photos_by_cluster(self, cluster_id: int) -> List[Dict]:
+        """Get all photos that contain a face in this cluster."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT p.id, p.file_path, p.ingested_at,
+                       f.id as face_id, f.bbox_x0, f.bbox_y0, f.bbox_x1, f.bbox_y1, f.confidence
+                FROM photos p
+                JOIN faces f ON f.photo_id = p.id
+                WHERE f.cluster_id = ?
+                ORDER BY p.id
+            """, (cluster_id,))
+            return [
+                {
+                    "id": row[0],
+                    "file_path": row[1],
+                    "added_at": row[2],
+                    "face_id": row[3],
+                    "face_bbox": [row[4], row[5], row[6], row[7]],
+                    "face_confidence": row[8],
+                }
+                for row in cursor.fetchall()
+            ]
+
+    def get_face_count(self) -> int:
+        """Return total number of detected faces."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM faces")
+            return cursor.fetchone()[0]
 
     def close(self):
         """Close database connection."""

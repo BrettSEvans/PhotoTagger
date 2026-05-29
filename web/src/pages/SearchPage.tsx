@@ -1,42 +1,24 @@
 import React, { useState } from 'react';
-import { IdentifiedPlayer, SearchOptions } from '../types';
+import type { SearchOptions } from '../types';
 import { SearchBar } from '../components/SearchBar';
-import { PlayerGrid } from '../components/PlayerGrid';
 import photoTaggerClient from '../api/photoTaggerClient';
+import LoadingSpinner from '../components/LoadingSpinner';
+import type { SearchResult } from '../types';
 
-interface SearchPageProps {
-  onSearch?: (jersey: string, minConfidence: number) => Promise<void>;
-}
-
-/**
- * SearchPage - Search interface for finding players by jersey number
- * Combines SearchBar with PlayerGrid for results display
- */
-export const SearchPage: React.FC<SearchPageProps> = ({ onSearch }) => {
-  const [results, setResults] = useState<IdentifiedPlayer[]>([]);
+export const SearchPage: React.FC = () => {
+  const [results, setResults] = useState<SearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchPerformed, setSearchPerformed] = useState(false);
-  const [lastQuery, setLastQuery] = useState<string>('');
+  const [lastQuery, setLastQuery] = useState('');
 
   const handleSearch = async (jersey: string, minConfidence: number) => {
+    setIsLoading(true);
+    setLastQuery(jersey);
+    setSearchPerformed(true);
     try {
-      setIsLoading(true);
-      setLastQuery(jersey);
-      setSearchPerformed(true);
-
-      if (onSearch) {
-        // Use custom handler if provided
-        await onSearch(jersey, minConfidence);
-      } else {
-        // Default: call photoTaggerClient.search
-        const options: SearchOptions = { minConfidence };
-        const response = await photoTaggerClient.search(jersey, options);
-
-        // API returns SearchResult[], we need to convert to IdentifiedPlayer[]
-        // For now, results will be empty since API returns photos not players
-        // TODO: Transform SearchResult to IdentifiedPlayer when backend is enhanced
-        setResults([]);
-      }
+      const options: SearchOptions = { minConfidence };
+      const response = await photoTaggerClient.search(jersey, options);
+      setResults(response.results);
     } catch (error) {
       console.error('Search failed:', error);
       setResults([]);
@@ -47,19 +29,84 @@ export const SearchPage: React.FC<SearchPageProps> = ({ onSearch }) => {
 
   return (
     <div className="w-full space-y-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold text-gray-900">Search Players</h1>
-        <p className="text-gray-600">
+      <div>
+        <h1 className="font-outfit text-4xl font-extrabold text-foreground">
+          {!searchPerformed ? 'Search by Jersey' : `Jersey #${lastQuery}`}
+        </h1>
+        <p className="mt-2 font-jakarta text-muted-fg">
           {!searchPerformed
-            ? 'Enter a jersey number to search for players'
-            : `Search Results for Jersey #${lastQuery}`}
+            ? 'Find photos by jersey number across both rosters'
+            : `${results.length} photo${results.length !== 1 ? 's' : ''} found`}
         </p>
       </div>
 
       <SearchBar onSearch={handleSearch} isLoading={isLoading} />
 
-      {searchPerformed && (
-        <PlayerGrid players={results} isLoading={isLoading} />
+      {isLoading && (
+        <div className="flex justify-center py-12">
+          <LoadingSpinner message="Searching photos…" />
+        </div>
+      )}
+
+      {searchPerformed && !isLoading && results.length === 0 && (
+        <div role="status" className="bg-white border-2 border-foreground rounded-2xl shadow-pop p-10 text-center relative overflow-hidden">
+          <div aria-hidden="true" className="absolute top-3 right-3 w-6 h-6 bg-tertiary rotate-45 border-2 border-foreground opacity-60" />
+          <p className="font-outfit text-2xl font-bold text-foreground mb-2">No results</p>
+          <p className="font-jakarta text-muted-fg">
+            Jersey #{lastQuery} wasn't detected in any photos yet.<br/>
+            Try running OCR from the Upload page first.
+          </p>
+        </div>
+      )}
+
+      {results.length > 0 && !isLoading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {results.map((result) => (
+            <div
+              key={result.id}
+              className="sticker-card bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden"
+            >
+              {/* Photo thumbnail */}
+              <div className="aspect-video bg-muted overflow-hidden">
+                <img
+                  src={`http://127.0.0.1:5001/api/image/${result.id}`}
+                  alt={result.file_path}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                />
+              </div>
+
+              <div className="p-4">
+                {/* Jersey number badge */}
+                <div className="flex items-start gap-3">
+                  <div className="w-12 h-12 flex-shrink-0 bg-accent rounded-xl border-2 border-foreground shadow-pop-sm flex items-center justify-center">
+                    <span className="font-outfit font-extrabold text-white text-lg leading-none">
+                      #{result.jersey_number}
+                    </span>
+                  </div>
+                  <div className="min-w-0">
+                    {result.player_name && (
+                      <p className="font-outfit font-bold text-foreground text-sm truncate">{result.player_name}</p>
+                    )}
+                    <p className="font-jakarta text-xs text-muted-fg truncate">{result.file_path.split('/').pop()}</p>
+                    {/* Confidence bar */}
+                    <div className="mt-2 flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-quaternary rounded-full"
+                          style={{ width: `${Math.min(result.confidence * 100, 100)}%` }}
+                        />
+                      </div>
+                      <span className="font-jakarta text-xs text-muted-fg whitespace-nowrap">
+                        {Math.round(result.confidence * 100)}%
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
