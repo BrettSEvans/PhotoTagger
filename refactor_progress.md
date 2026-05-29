@@ -88,3 +88,4 @@ Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is 
 - `10a7c67` docs: record frontend jobs checkpoint
 - `b231117` test: add frontend behavior checks
 - `cf39cc3` docs: record frontend test checkpoint
+- `408d305` test: add playwright smoke coverage
