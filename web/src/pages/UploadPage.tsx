@@ -175,7 +175,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void }> = ({ onOpenW
                           onClick={onOpenWorkspace}
                           className="btn-candy bg-foreground text-white font-jakarta font-bold text-sm px-5 py-2 rounded-full border-2 border-foreground shadow-pop whitespace-nowrap"
                         >
-                          Open Cleanup Workspace →
+                          Open Cleanup Workspace ({summary?.needs_review ?? reviewPhotos.length}) →
                         </button>
                       </div>
                     )}
