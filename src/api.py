@@ -561,10 +561,13 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         data = request.get_json() or {}
         player_name   = str(data.get("player_name", "")).strip()
         jersey_number = str(data.get("jersey_number", "")).strip()
+        roster_entry_id = data.get("roster_entry_id", None)
+        if roster_entry_id is not None:
+            roster_entry_id = int(roster_entry_id)
         if not player_name:
             return jsonify({"error": "player_name is required"}), 400
         try:
-            db.assign_cluster_to_player(cluster_id, player_name, jersey_number)
+            db.assign_cluster_to_player(cluster_id, player_name, jersey_number, roster_entry_id)
             return jsonify({"success": True}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
