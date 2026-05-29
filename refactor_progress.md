@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is in place, but Chromium launch is blocked by this desktop sandbox.
+Phase: Full verification complete with one known local-only Playwright launch blocker. Backend and frontend non-browser verification passed.
 
 ## Completed
 
@@ -30,10 +30,13 @@ Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is 
 - [x] Step 11: Added frontend tests for job states and confirmation flows.
 - [x] Step 15: Committed frontend behavior test checkpoint.
 - [x] Step 12: Added Playwright smoke test for core navigation/workflow.
+- [x] Step 15: Committed Playwright smoke checkpoint.
+- [x] Step 13: Ran full backend and frontend verification.
+- [x] Step 14: Updated `CHANGELOG.md` with implementation commit ids.
 
 ## In Progress
 
-- [ ] Step 13: Run full verification.
+- [ ] Step 15: Commit final verification/progress checkpoint.
 
 ## Remaining
 
@@ -47,8 +50,8 @@ Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is 
 - [x] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
 - [x] Step 11: Add frontend tests for job states and confirmation flows.
 - [x] Step 12: Add Playwright smoke test for core navigation/workflow.
-- [ ] Step 13: Run full verification.
-- [ ] Step 14: Update `CHANGELOG.md` with implementation commit ids.
+- [x] Step 13: Run full verification.
+- [x] Step 14: Update `CHANGELOG.md` with implementation commit ids.
 - [ ] Step 15: Commit in small increments.
 
 ## Verification Log
@@ -68,6 +71,11 @@ Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is 
 - `npm run build` passed after frontend job polling and app shell consolidation.
 - `npm run test:frontend` passed after adding frontend behavior checks for polling and confirmation flows.
 - `npm run build && PLAYWRIGHT_BROWSERS_PATH=0 npm run test:e2e` built successfully, then Playwright failed to launch Chromium in the desktop sandbox with `MachPortRendezvousServer ... Permission denied`.
+- `./venv/bin/pytest tests/ -q` passed: 115 passed.
+- `npm run lint` passed in `web`.
+- `npm run build` passed in `web`.
+- `npm run test:frontend` passed in `web`.
+- No backend process was listening on port `5001`, so no backend restart was needed.
 
 ## Known Issues
 
@@ -89,3 +97,4 @@ Phase: Step 12 added with a local runtime blocker. Playwright smoke coverage is 
 - `b231117` test: add frontend behavior checks
 - `cf39cc3` docs: record frontend test checkpoint
 - `408d305` test: add playwright smoke coverage
+- `a191712` docs: record playwright checkpoint
