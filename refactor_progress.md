@@ -68,3 +68,4 @@ Phase: Step 7 complete. Face detection now skips photos that already have stored
 - `f41172b` feat: run processing endpoints as jobs
 - `ce78cea` feat: harden api validation
 - `3a2bc29` docs: record local hardening checkpoint
+- `ea5f2be` feat: make face detection idempotent
