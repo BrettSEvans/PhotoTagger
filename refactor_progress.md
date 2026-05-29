@@ -61,3 +61,4 @@ Phase: Step 6 complete. API validation now rejects invalid numeric inputs and un
 - `808927c` docs: track local hardening progress
 - `81a5024` feat: add local processing jobs
 - `f41172b` feat: run processing endpoints as jobs
+- `ce78cea` feat: harden api validation
