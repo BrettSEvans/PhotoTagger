@@ -268,6 +268,16 @@ export interface RosterImportResponse {
 }
 
 /**
+ * DeassignFacesResponse - Result from removing face assignments from clusters
+ */
+export interface DeassignFacesResponse {
+  success: boolean;
+  deassigned: number;
+  affected_cluster_ids: number[];
+  deleted_cluster_ids: number[];
+}
+
+/**
  * RosterResponse - API response from /api/roster
  */
 export interface RosterResponse {

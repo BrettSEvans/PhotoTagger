@@ -19,6 +19,7 @@ import {
   SearchOptions,
   RosterResponse,
   RosterImportResponse,
+  DeassignFacesResponse,
   RosterSearchResult,
   ProcessingSummary,
   TaggedPhoto,
@@ -325,8 +326,9 @@ class PhotoTaggerClient {
     await this.client.post(`/api/players/${clusterId}/assign`, { player_name: playerName, jersey_number: jerseyNumber });
   }
 
-  async deassignFaces(faceIds: number[]): Promise<void> {
-    await this.client.post('/api/faces/deassign', { face_ids: faceIds });
+  async deassignFaces(faceIds: number[]): Promise<DeassignFacesResponse> {
+    const response = await this.client.post<DeassignFacesResponse>('/api/faces/deassign', { face_ids: faceIds });
+    return response.data;
   }
 
   /**
