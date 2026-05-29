@@ -531,14 +531,56 @@ class Database:
             ]
 
     def deassign_faces(self, face_ids: List[int]):
-        """Remove specific faces from their cluster (set cluster_id = NULL)."""
+        """Remove specific faces from their cluster and refresh affected cluster stats."""
         if not face_ids:
-            return
+            return {"deassigned": 0, "affected_cluster_ids": [], "deleted_cluster_ids": []}
         with self._lock:
             cursor = self.conn.cursor()
             placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(
+                f"SELECT DISTINCT cluster_id FROM faces WHERE id IN ({placeholders}) AND cluster_id IS NOT NULL",
+                face_ids,
+            )
+            affected_cluster_ids = [row[0] for row in cursor.fetchall()]
+
             cursor.execute(f"UPDATE faces SET cluster_id = NULL WHERE id IN ({placeholders})", face_ids)
+            deassigned_count = cursor.rowcount
+
+            deleted_cluster_ids = []
+            for cluster_id in affected_cluster_ids:
+                cursor.execute("""
+                    SELECT COUNT(*), COUNT(DISTINCT photo_id)
+                    FROM faces
+                    WHERE cluster_id = ?
+                """, (cluster_id,))
+                face_count, photo_count = cursor.fetchone()
+
+                if face_count == 0:
+                    cursor.execute("DELETE FROM player_clusters WHERE id = ?", (cluster_id,))
+                    deleted_cluster_ids.append(cluster_id)
+                    continue
+
+                cursor.execute("""
+                    SELECT id
+                    FROM faces
+                    WHERE cluster_id = ?
+                    ORDER BY confidence DESC, id
+                    LIMIT 1
+                """, (cluster_id,))
+                thumbnail_row = cursor.fetchone()
+                thumbnail_face_id = thumbnail_row[0] if thumbnail_row else None
+                cursor.execute("""
+                    UPDATE player_clusters
+                    SET face_count = ?, photo_count = ?, thumbnail_face_id = ?
+                    WHERE id = ?
+                """, (face_count, photo_count, thumbnail_face_id, cluster_id))
+
             self.conn.commit()
+            return {
+                "deassigned": deassigned_count,
+                "affected_cluster_ids": affected_cluster_ids,
+                "deleted_cluster_ids": deleted_cluster_ids,
+            }
 
     def assign_cluster_to_player(self, cluster_id: int, player_name: str, jersey_number: str):
         """Attach a player name and jersey to a face cluster."""

@@ -114,14 +114,40 @@ export const ReviewPage: React.FC = () => {
 
   // ── Remove face from cluster permanently ────────────────────────────────
   const handleRemoveFace = useCallback(async (faceId: number) => {
+    const photo = clusterPhotos.find(p => p.face_id === faceId);
+    const clusterName = selectedCluster?.player_name ?? (selectedCluster ? `Cluster #${selectedCluster.id}` : 'this cluster');
+    const confirmed = window.confirm(`Remove ${photo?.filename ?? 'this photo'} from ${clusterName}?`);
+    if (!confirmed) return;
+
     try {
-      await photoTaggerClient.deassignFaces([faceId]);
-      setClusterPhotos(prev => prev.filter(p => p.face_id !== faceId));
+      const result = await photoTaggerClient.deassignFaces([faceId]);
+      const remainingPhotos = clusterPhotos.filter(p => p.face_id !== faceId);
+      setClusterPhotos(remainingPhotos);
       setSelected(prev => { const next = new Set(prev); next.delete(faceId); return next; });
+      setLens(prev => prev?.photo.face_id === faceId ? null : prev);
+      setModalPhoto(prev => prev?.face_id === faceId ? null : prev);
+
+      if (selectedCluster && result.deleted_cluster_ids.includes(selectedCluster.id)) {
+        setClusters(prev => prev.filter(c => c.id !== selectedCluster.id));
+        setSelectedCluster(null);
+        setClusterPhotos([]);
+        setSelected(new Set());
+        setImgDims(new Map());
+        setAssignSuccess(null);
+      } else {
+        await loadClusters();
+        if (selectedCluster) {
+          setSelectedCluster(prev => prev ? {
+            ...prev,
+            face_count: Math.max(0, prev.face_count - 1),
+            photo_count: remainingPhotos.length,
+          } : prev);
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to remove face');
     }
-  }, []);
+  }, [clusterPhotos, selectedCluster]);
 
   // ── Image load → capture natural dims ───────────────────────────────────
   const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {

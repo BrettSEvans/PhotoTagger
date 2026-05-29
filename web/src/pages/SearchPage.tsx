@@ -106,6 +106,9 @@ export const SearchPage: React.FC = () => {
   // ── Remove face assignment from selected player ─────────────────────────
   const removeFromPlayer = useCallback(async (photo: PlayerPhotoItem) => {
     if (photo.face_id === 0) return;
+    const playerName = selectedPlayer?.player_name ?? 'this player';
+    const confirmed = window.confirm(`Remove ${photo.filename} from ${playerName}?`);
+    if (!confirmed) return;
 
     setRemovingFaces(prev => new Set(prev).add(photo.face_id));
     setError(null);
@@ -123,7 +126,7 @@ export const SearchPage: React.FC = () => {
         return next;
       });
     }
-  }, [lens, modalPhoto]);
+  }, [lens, modalPhoto, selectedPlayer]);
 
   const clearSearch = () => {
     setQuery('');

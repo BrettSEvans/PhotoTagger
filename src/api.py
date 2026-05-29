@@ -551,8 +551,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         data = request.get_json() or {}
         face_ids = [int(x) for x in data.get("face_ids", [])]
         try:
-            db.deassign_faces(face_ids)
-            return jsonify({"success": True, "deassigned": len(face_ids)}), 200
+            result = db.deassign_faces(face_ids)
+            return jsonify({"success": True, **result}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
