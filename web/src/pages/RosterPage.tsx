@@ -18,10 +18,13 @@ export const RosterPage: React.FC = () => {
   const [isSaving,  setIsSaving]  = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
-  // CSV drag state
+  // Bulk import state
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
-  const [csvMsg,     setCsvMsg]     = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [importMsg,  setImportMsg]  = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [rosterUrl,  setRosterUrl]  = useState('');
+  const [teamYear,   setTeamYear]   = useState(2026);
+  const [duplicatePolicy, setDuplicatePolicy] = useState<'replace' | 'skip'>('replace');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadRoster(); }, []);
@@ -70,47 +73,40 @@ export const RosterPage: React.FC = () => {
     }
   };
 
-  // ── CSV drag-and-drop ─────────────────────────────────────────────────────
+  // ── Bulk import ───────────────────────────────────────────────────────────
 
-  const parseCsv = async (file: File) => {
-    setCsvMsg(null);
+  const formatImportMessage = (result: { imported: number; skipped: number; failed: number; errors?: string[] }) => {
+    const parts = [`${result.imported} imported`];
+    if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
+    if (result.failed > 0) parts.push(`${result.failed} failed`);
+    const detail = result.errors?.length ? ` · ${result.errors.slice(0, 2).join('; ')}` : '';
+    return `${parts.join(', ')}${detail}`;
+  };
+
+  const importFile = async (file: File) => {
+    setImportMsg(null);
     setIsParsing(true);
     try {
-      const text = await file.text();
-      const lines = text.split('\n').filter(l => l.trim());
-      if (lines.length < 2) { setCsvMsg({ type: 'error', text: 'File appears empty or has no data rows.' }); return; }
-
-      const header = lines[0].toLowerCase();
-      const hasName   = header.includes('name');
-      const hasJersey = header.includes('jersey') || header.includes('number') || header.includes('#');
-      if (!hasName || !hasJersey) {
-        setCsvMsg({ type: 'error', text: 'Could not find "name" and "jersey"/"number" columns. Check your CSV headers.' });
-        return;
-      }
-
-      const cols = lines[0].split(',').map(c => c.trim().toLowerCase());
-      const nameIdx   = cols.findIndex(c => c.includes('name'));
-      const jerseyIdx = cols.findIndex(c => c.includes('jersey') || c.includes('number') || c === '#');
-
-      let added = 0, failed = 0;
-      for (let i = 1; i < lines.length; i++) {
-        const cells = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-        const name   = cells[nameIdx]   ?? '';
-        const jersey = cells[jerseyIdx] ?? '';
-        if (!name || !jersey) { failed++; continue; }
-        try {
-          await photoTaggerClient.addRosterEntry(jersey, name, newTeam);
-          added++;
-        } catch { failed++; }
-      }
-
+      const result = await photoTaggerClient.importRosterFile(file, newTeam, teamYear, duplicatePolicy);
       await loadRoster();
-      setCsvMsg({
-        type: failed === 0 ? 'success' : 'error',
-        text: failed === 0
-          ? `✅ ${added} players imported successfully`
-          : `⚠️ ${added} imported, ${failed} rows failed — check name/jersey columns`,
-      });
+      setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
+    } catch (err) {
+      setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'Import failed' });
+    } finally {
+      setIsParsing(false);
+    }
+  };
+
+  const importUrl = async () => {
+    if (!rosterUrl.trim()) return;
+    setImportMsg(null);
+    setIsParsing(true);
+    try {
+      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), newTeam, teamYear, duplicatePolicy);
+      await loadRoster();
+      setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
+    } catch (err) {
+      setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'URL import failed' });
     } finally {
       setIsParsing(false);
     }
@@ -121,22 +117,22 @@ export const RosterPage: React.FC = () => {
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
     if (!file) return;
-    if (!file.name.match(/\.(csv|xlsx)$/i)) {
-      setCsvMsg({ type: 'error', text: 'Only CSV files are supported (XLSX coming soon).' });
+    if (!file.name.match(/\.(csv|txt|md|xlsx|pdf)$/i)) {
+      setImportMsg({ type: 'error', text: 'Use a CSV, TXT, MD, XLSX, or PDF roster file.' });
       return;
     }
-    parseCsv(file);
+    importFile(file);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     e.target.value = ''; // allow re-selecting the same file
     if (!file) return;
-    if (!file.name.match(/\.(csv|xlsx)$/i)) {
-      setCsvMsg({ type: 'error', text: 'Only CSV files are supported (XLSX coming soon).' });
+    if (!file.name.match(/\.(csv|txt|md|xlsx|pdf)$/i)) {
+      setImportMsg({ type: 'error', text: 'Use a CSV, TXT, MD, XLSX, or PDF roster file.' });
       return;
     }
-    parseCsv(file);
+    importFile(file);
   };
 
   const filtered = filterTeam === 'All Teams'
@@ -167,13 +163,13 @@ export const RosterPage: React.FC = () => {
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Bulk Import</h2>
-          <p className="font-jakarta text-xs text-muted-fg">Drop a CSV with "name" and "jersey" columns</p>
+          <p className="font-jakarta text-xs text-muted-fg">Drop a roster file or paste a roster URL</p>
 
           {/* Drop zone (also click-to-browse) */}
           <input
             ref={fileInputRef}
             type="file"
-            accept=".csv,text/csv"
+            accept=".csv,.txt,.md,.xlsx,.pdf,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             onChange={handleFileSelect}
             className="hidden"
           />
@@ -185,7 +181,7 @@ export const RosterPage: React.FC = () => {
             onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
             role="button"
             tabIndex={0}
-            aria-label="Drag and drop a CSV roster, or click to browse"
+            aria-label="Drag and drop a roster file, or click to browse"
             className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
               isDragging ? 'border-accent bg-accent/5' : 'border-frame bg-muted/30 hover:border-foreground'
             }`}
@@ -194,7 +190,7 @@ export const RosterPage: React.FC = () => {
             {isParsing && (
               <div className="absolute inset-0 z-10 bg-white/85 rounded-xl flex flex-col items-center justify-center gap-2">
                 <span className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
-                <p className="font-jakarta text-sm font-bold text-foreground">Parsing columns…</p>
+                <p className="font-jakarta text-sm font-bold text-foreground">Importing roster…</p>
               </div>
             )}
             <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="mx-auto mb-3 text-muted-fg">
@@ -205,29 +201,92 @@ export const RosterPage: React.FC = () => {
             <p className="font-jakarta text-sm font-semibold text-foreground">
               {isDragging ? 'Drop to import…' : 'Drag & drop roster here'}
             </p>
-            <p className="font-jakarta text-xs text-muted-fg mt-1">CSV only — or click to browse</p>
+            <p className="font-jakarta text-xs text-muted-fg mt-1">CSV, TXT, MD, XLSX, PDF — or click to browse</p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="rosterUrl" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">
+              Roster URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="rosterUrl"
+                type="url"
+                value={rosterUrl}
+                onChange={e => setRosterUrl(e.target.value)}
+                placeholder="https://play.usaultimate.org/events/teams/?EventTeamId=…"
+                className="geo-input flex-1 min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+              />
+              <button
+                type="button"
+                onClick={importUrl}
+                disabled={isParsing || !rosterUrl.trim()}
+                className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+              >
+                Scrape
+              </button>
+            </div>
           </div>
 
           {/* Team selector for import */}
-          <div>
-            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-              Import as team
-            </label>
-            <select
-              value={newTeam}
-              onChange={e => setNewTeam(e.target.value)}
-              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground appearance-none cursor-pointer"
-            >
-              <option>Manual Entry</option>
-              <option>Carleton CUT</option>
-              <option>Pittsburgh En Sabah Nur</option>
-            </select>
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_88px] gap-3">
+            <div>
+              <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Import as team
+              </label>
+              <select
+                value={newTeam}
+                onChange={e => setNewTeam(e.target.value)}
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground appearance-none cursor-pointer"
+              >
+                <option>Manual Entry</option>
+                <option>Carleton CUT</option>
+                <option>Pittsburgh En Sabah Nur</option>
+              </select>
+            </div>
+            <div>
+              <label htmlFor="teamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Year
+              </label>
+              <input
+                id="teamYear"
+                type="number"
+                value={teamYear}
+                onChange={e => setTeamYear(Number(e.target.value) || 2026)}
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
+            </div>
           </div>
 
-          {csvMsg && (
-            <div role={csvMsg.type === 'error' ? 'alert' : 'status'} aria-live="polite"
-              className={`p-3 rounded-xl border-2 font-jakarta text-sm ${csvMsg.type === 'success' ? 'bg-quaternary/10 border-quaternary' : 'bg-secondary/10 border-secondary'}`}>
-              {csvMsg.text}
+          <div>
+            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+              Existing jerseys
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'replace', label: 'Replace existing' },
+                { value: 'skip', label: 'Skip existing' },
+              ].map(option => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setDuplicatePolicy(option.value as 'replace' | 'skip')}
+                  className={`font-jakarta text-xs font-bold px-3 py-2 rounded-xl border-2 transition-colors ${
+                    duplicatePolicy === option.value
+                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
+                      : 'bg-white text-foreground border-frame hover:bg-muted'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {importMsg && (
+            <div role={importMsg.type === 'error' ? 'alert' : 'status'} aria-live="polite"
+              className={`p-3 rounded-xl border-2 font-jakarta text-sm ${importMsg.type === 'success' ? 'bg-quaternary/10 border-quaternary' : 'bg-secondary/10 border-secondary'}`}>
+              {importMsg.text}
             </div>
           )}
         </div>
@@ -304,13 +363,14 @@ export const RosterPage: React.FC = () => {
         ) : filtered.length === 0 ? (
           <div className="py-14 text-center">
             <p className="font-outfit text-lg font-bold text-foreground">No players yet</p>
-            <p className="font-jakarta text-sm text-muted-fg mt-1">Add players above or import a CSV</p>
+            <p className="font-jakarta text-sm text-muted-fg mt-1">Add players above or import a roster</p>
           </div>
         ) : (
           <table className="w-full">
             <thead>
               <tr className="border-b-2 border-frame bg-muted/40">
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-5 py-3 w-16">#</th>
+                <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 w-16">Face</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3">Name</th>
                 <th className="text-left font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg px-3 py-3 hidden sm:table-cell">Team</th>
                 <th className="w-12 px-3 py-3" />
@@ -326,6 +386,21 @@ export const RosterPage: React.FC = () => {
                     <span className="inline-flex items-center justify-center w-9 h-9 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm">
                       <span className="font-outfit font-extrabold text-white text-sm">#{entry.jersey_number}</span>
                     </span>
+                  </td>
+                  <td className="px-3 py-3">
+                    <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-frame bg-muted flex items-center justify-center">
+                      {entry.thumbnail_face_id ? (
+                        <img
+                          src={photoTaggerClient.getFaceCropUrl(entry.thumbnail_face_id)}
+                          alt={`${entry.player_name} face`}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 py-3 font-jakarta font-semibold text-foreground text-sm">{entry.player_name}</td>
                   <td className="px-3 py-3 hidden sm:table-cell">

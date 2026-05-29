@@ -1,7 +1,7 @@
 import pytest
 import json
+import io
 from src.api import create_app
-from src.db import Database
 from src.roster import RosterManager
 import tempfile
 
@@ -96,3 +96,122 @@ def test_get_faces_endpoint(client, app_with_roster):
     data = json.loads(response.data)
     assert data["photo_id"] == photo_id
     assert data["face_count"] == 1
+
+
+def test_roster_import_file_inserts_entries(client, app_with_roster):
+    response = client.post(
+        "/api/roster/import",
+        data={
+            "team_name": "Carleton CUT",
+            "team_year": "2026",
+            "duplicate_policy": "replace",
+            "file": (
+                io.BytesIO(b"Jersey,Name\n06,Will Troop\n10,Fin Fuhrmann\n"),
+                "roster.csv",
+            ),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["success"] is True
+    assert data["imported"] == 2
+
+    roster = client.get("/api/roster")
+    entries = json.loads(roster.data)["entries"]
+    assert any(e["jersey_number"] == "06" and e["player_name"] == "Will Troop" for e in entries)
+
+
+def test_roster_import_skip_preserves_existing_entry(client, app_with_roster):
+    db = app_with_roster.db
+    db.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
+
+    response = client.post(
+        "/api/roster/import",
+        data={
+            "team_name": "Carleton CUT",
+            "team_year": "2026",
+            "duplicate_policy": "skip",
+            "file": (io.BytesIO(b"Jersey,Name\n10,Updated Player\n"), "roster.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["imported"] == 0
+    assert data["skipped"] == 1
+    assert db.get_player_name("Carleton CUT", 2026, "10") == "Original Player"
+
+
+def test_roster_import_replace_updates_existing_entry(client, app_with_roster):
+    db = app_with_roster.db
+    db.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
+
+    response = client.post(
+        "/api/roster/import",
+        data={
+            "team_name": "Carleton CUT",
+            "team_year": "2026",
+            "duplicate_policy": "replace",
+            "file": (io.BytesIO(b"Jersey,Name\n10,Updated Player\n"), "roster.csv"),
+        },
+        content_type="multipart/form-data",
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["imported"] == 1
+    assert data["skipped"] == 0
+    assert db.get_player_name("Carleton CUT", 2026, "10") == "Updated Player"
+
+
+def test_roster_import_url_inserts_entries(client, app_with_roster, monkeypatch):
+    html = """
+    <table>
+      <tr><th>No.</th><th>Player</th></tr>
+      <tr><td>06</td><td>Will Troop</td></tr>
+    </table>
+    """
+
+    class FakeResponse:
+        text = html
+
+        def raise_for_status(self):
+            return None
+
+    monkeypatch.setattr("src.roster_import.requests.get", lambda *args, **kwargs: FakeResponse())
+
+    response = client.post(
+        "/api/roster/import-url",
+        json={
+            "url": "https://play.usaultimate.org/events/teams/?EventTeamId=test",
+            "team_name": "Carleton CUT",
+            "team_year": 2026,
+            "duplicate_policy": "replace",
+        },
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["imported"] == 1
+
+
+def test_roster_response_includes_assigned_thumbnail_face(client, app_with_roster, tmp_path):
+    db = app_with_roster.db
+    photo_file = tmp_path / "test.jpg"
+    photo_file.write_bytes(b"fake jpg")
+    photo_id = db.add_photo(str(photo_file))
+    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
+    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.assign_face_to_cluster(face_id, cluster_id)
+    db.assign_cluster_to_player(cluster_id, "Will Troop", "06")
+    db.add_roster_entry("Carleton CUT", 2026, "06", "Will Troop")
+
+    response = client.get("/api/roster")
+
+    assert response.status_code == 200
+    entries = json.loads(response.data)["entries"]
+    match = next(e for e in entries if e["jersey_number"] == "06")
+    assert match["thumbnail_face_id"] == face_id

@@ -253,6 +253,18 @@ export interface RosterEntry {
   team_year: number;
   jersey_number: string;
   player_name: string;
+  thumbnail_face_id?: number | null;
+}
+
+/**
+ * RosterImportResponse - Result from roster bulk import endpoints
+ */
+export interface RosterImportResponse {
+  success: boolean;
+  imported: number;
+  skipped: number;
+  failed: number;
+  errors: string[];
 }
 
 /**

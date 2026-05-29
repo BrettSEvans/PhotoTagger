@@ -230,6 +230,59 @@ class Database:
         """, (team_name, team_year, jersey_number, player_name))
         self.conn.commit()
 
+    def roster_entry_exists(self, team_name: str, team_year: int, jersey_number: str) -> bool:
+        """Return whether a roster entry already exists for team/year/jersey."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT 1 FROM rosters
+                WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+            """, (team_name, team_year, jersey_number))
+            return cursor.fetchone() is not None
+
+    def import_roster_entries(
+        self,
+        team_name: str,
+        team_year: int,
+        rows: List[Dict],
+        duplicate_policy: str = "replace",
+    ) -> Dict:
+        """Import roster rows with replace or skip duplicate handling."""
+        if duplicate_policy not in {"replace", "skip"}:
+            raise ValueError("duplicate_policy must be 'replace' or 'skip'")
+
+        imported = 0
+        skipped = 0
+        failed = 0
+        errors = []
+
+        for idx, row in enumerate(rows, start=1):
+            jersey = str(row.get("jersey_number", "")).strip()
+            name = str(row.get("player_name", "")).strip()
+            if not jersey or not name:
+                failed += 1
+                errors.append(f"Row {idx}: missing jersey_number or player_name")
+                continue
+
+            if duplicate_policy == "skip" and self.roster_entry_exists(team_name, team_year, jersey):
+                skipped += 1
+                continue
+
+            try:
+                self.add_roster_entry(team_name, team_year, jersey, name)
+                imported += 1
+            except Exception as exc:
+                failed += 1
+                errors.append(f"Row {idx}: {exc}")
+
+        return {
+            "success": failed == 0,
+            "imported": imported,
+            "skipped": skipped,
+            "failed": failed,
+            "errors": errors,
+        }
+
     def get_player_name(self, team_name: str, team_year: int, jersey_number: str) -> Optional[str]:
         """Look up player name by jersey."""
         cursor = self.conn.cursor()
@@ -370,13 +423,22 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT id, team_name, team_year, jersey_number, player_name
-                FROM rosters
+                SELECT r.id, r.team_name, r.team_year, r.jersey_number, r.player_name,
+                       (
+                         SELECT pc.thumbnail_face_id
+                         FROM player_clusters pc
+                         WHERE pc.jersey_number = r.jersey_number
+                           AND pc.player_name = r.player_name
+                           AND pc.thumbnail_face_id IS NOT NULL
+                         ORDER BY pc.photo_count DESC, pc.face_count DESC, pc.id
+                         LIMIT 1
+                       ) AS thumbnail_face_id
+                FROM rosters r
                 ORDER BY team_name, CAST(jersey_number AS INTEGER)
             """)
             return [
                 {"id": r[0], "team_name": r[1], "team_year": r[2],
-                 "jersey_number": r[3], "player_name": r[4]}
+                 "jersey_number": r[3], "player_name": r[4], "thumbnail_face_id": r[5]}
                 for r in cursor.fetchall()
             ]
 
