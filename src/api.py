@@ -33,6 +33,22 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         job = db.get_processing_job(job_id)
         return jsonify({"success": True, "job_id": job_id, "job": job}), 202
 
+    def parse_float(value):
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def parse_int_arg(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    def is_allowed_photo_directory(photo_dir: str) -> bool:
+        path_parts = os.path.abspath(photo_dir).split(os.sep)
+        return ".git" not in path_parts
+
     # Health check endpoint
     @app.route("/health", methods=["GET"])
     def health():
@@ -55,12 +71,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             JSON with matching photos and player names (if roster provided)
         """
         jersey = request.args.get("jersey", "").strip()
-        min_confidence = float(request.args.get("min_confidence", "0.0"))
+        min_confidence = parse_float(request.args.get("min_confidence", "0.0"))
         team = request.args.get("team", "").strip()
         year = request.args.get("year", "").strip()
 
         if not jersey:
             return jsonify({"error": "jersey parameter required"}), 400
+        if min_confidence is None:
+            return jsonify({"error": "min_confidence must be a number"}), 400
 
         # Get raw results
         all_results = db.get_photo_by_jersey(jersey)
@@ -99,6 +117,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         """
         data = request.get_json() or {}
         photo_dir = data.get("photo_dir", "./photos")
+
+        if not isinstance(photo_dir, str) or not photo_dir.strip():
+            return jsonify({"error": "photo_dir is required"}), 400
+
+        photo_dir = os.path.abspath(os.path.expanduser(photo_dir.strip()))
+
+        if not is_allowed_photo_directory(photo_dir):
+            return jsonify({"error": "photo_dir is not an allowed photo directory"}), 400
 
         if not os.path.isdir(photo_dir):
             return jsonify({"error": f"Directory not found: {photo_dir}"}), 404
@@ -203,8 +229,13 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def get_photos():
         """Get all photos in database."""
         try:
-            page = int(request.args.get("page", "1"))
-            per_page = int(request.args.get("per_page", "20"))
+            page = parse_int_arg(request.args.get("page", "1"))
+            per_page = parse_int_arg(request.args.get("per_page", "20"))
+
+            if page is None:
+                return jsonify({"error": "page must be an integer"}), 400
+            if per_page is None:
+                return jsonify({"error": "per_page must be an integer"}), 400
 
             # Validate pagination parameters
             if page < 1 or per_page < 1:
@@ -326,7 +357,9 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         from src.face_cluster import FaceClusterer
 
         data = request.get_json() or {}
-        threshold = float(data.get("threshold", 0.40))
+        threshold = parse_float(data.get("threshold", 0.40))
+        if threshold is None:
+            return jsonify({"error": "threshold must be a number"}), 400
 
         try:
             def run_clustering():
