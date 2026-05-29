@@ -141,6 +141,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             "db_path": db.db_path,
         }), 200
 
+    @app.route("/api/jobs/<int:job_id>", methods=["GET"])
+    def get_job(job_id: int):
+        """Get processing job status."""
+        job = db.get_processing_job(job_id)
+        if not job:
+            return jsonify({"error": "Job not found"}), 404
+        return jsonify({"job": job}), 200
+
     # Get face data endpoint
     @app.route("/api/faces/<int:photo_id>", methods=["GET"])
     def get_faces(photo_id):
