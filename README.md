@@ -37,18 +37,23 @@ Parents and grandparents at Ultimate Frisbee tournaments want to find photos of 
 - **SQLite Database** - Persistent storage of photos and OCR results
 - **18+ Unit Tests** - Full test coverage
 
-### Phase 2A: Backend Enhancement 🚀 (In Development)
+### Phase 2A: Backend Enhancement ✅
 - **Face Recognition** - Detect all faces in a photo (InsightFace)
 - **Face Embeddings** - 384-dimensional face vectors for similarity matching
+- **Face Clustering** - Group similar faces into player identities
 - **Roster Management** - JSON-based player name mapping (team/year/jersey)
 - **Parallel OCR** - Dynamic worker pool (CPU-aware)
 - **Confidence Filtering** - Filter results by detection confidence
 - **Enhanced API** - Player names, face data, filtering parameters
 
-### Phase 2B: Frontend (Planned)
-- **React Web UI** - Non-technical user interface
-- **Shareable Galleries** - Export photo collections
-- **Bulk Operations** - Download multiple photos at once
+### Phase 2B: Web UI ✅
+- **React 19 Frontend** - Responsive three-screen interface
+- **Roster Setup** - Add and manage player roster
+- **Upload & Process** - Import photos and run AI pipeline
+- **Cleanup Workspace** - Assign AI-detected faces to roster entries
+- **Face Highlighting** - Purple border highlights AI-identified face per cluster
+- **Batch Assignment** - Select and assign multiple photos at once
+- **Real-time Status** - Monitor detection and clustering progress
 
 ---
 
@@ -102,7 +107,7 @@ python -m src.cli info --db my_photos.db
 
 ### Health Check
 ```bash
-curl http://localhost:5000/health
+curl http://localhost:5001/health
 # {"status": "ok"}
 ```
 
