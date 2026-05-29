@@ -8,7 +8,7 @@ Stable baseline: `3ebc94b` tagged as `stable-before-local-hardening`.
 
 ## Current Status
 
-Phase: Step 6 complete. API validation now rejects invalid numeric inputs and unsafe crawl paths before work is queued.
+Phase: Step 7 complete. Face detection now skips photos that already have stored faces so reruns do not duplicate detections.
 
 ## Completed
 
@@ -20,10 +20,12 @@ Phase: Step 6 complete. API validation now rejects invalid numeric inputs and un
 - [x] Step 5: Converted crawl, OCR, face detection, and clustering endpoints to return `job_id`.
 - [x] Step 15: Committed job endpoint checkpoint.
 - [x] Step 6: Added path and parameter validation hardening.
+- [x] Step 15: Committed validation hardening checkpoint.
+- [x] Step 7: Added face detection idempotency tests and implementation.
 
 ## In Progress
 
-- [ ] Step 7: Add face detection idempotency tests and implementation.
+- [ ] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
 
 ## Remaining
 
@@ -31,7 +33,7 @@ Phase: Step 6 complete. API validation now rejects invalid numeric inputs and un
 - [x] Step 4: Implement `processing_jobs` table and local job service.
 - [x] Step 5: Convert long-running endpoints to return `job_id` for crawl, OCR, face detection, and clustering.
 - [x] Step 6: Add path and parameter validation hardening.
-- [ ] Step 7: Add face detection idempotency tests and implementation.
+- [x] Step 7: Add face detection idempotency tests and implementation.
 - [ ] Step 8: Update frontend API client for typed job polling and `VITE_API_BASE_URL`.
 - [ ] Step 9: Update processing pages to poll job status.
 - [ ] Step 10: Consolidate app shell so `main.tsx` mounts `App.tsx`.
@@ -50,6 +52,9 @@ Phase: Step 6 complete. API validation now rejects invalid numeric inputs and un
 - `./venv/bin/pytest tests/test_validation.py -q` failed as expected before validation implementation: invalid numeric values raised server errors and unsafe crawl paths were accepted.
 - `./venv/bin/pytest tests/test_validation.py -q` passed after validation implementation.
 - `./venv/bin/pytest tests/test_validation.py tests/test_jobs.py tests/test_api.py tests/test_api_phase2.py -q` passed after Step 6 validation hardening.
+- `./venv/bin/pytest tests/test_jobs.py::test_detect_faces_endpoint_is_idempotent -q` failed as expected before implementation: rerunning face detection duplicated stored faces.
+- `./venv/bin/pytest tests/test_jobs.py::test_detect_faces_endpoint_is_idempotent -q` passed after skipping photos with existing face detections.
+- `./venv/bin/pytest tests/test_jobs.py tests/test_db_phase2.py tests/test_api_phase2.py -q` passed after Step 7 idempotency implementation.
 
 ## Known Issues
 
@@ -62,3 +67,4 @@ Phase: Step 6 complete. API validation now rejects invalid numeric inputs and un
 - `81a5024` feat: add local processing jobs
 - `f41172b` feat: run processing endpoints as jobs
 - `ce78cea` feat: harden api validation
+- `3a2bc29` docs: record local hardening checkpoint

@@ -317,11 +317,15 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
                 total_faces = 0
                 errors = 0
+                skipped_existing = 0
 
                 for photo in photos:
                     photo_id = photo["id"]
                     file_path = photo.get("file_path", "")
                     if not file_path or not os.path.exists(file_path):
+                        continue
+                    if db.photo_has_faces(photo_id):
+                        skipped_existing += 1
                         continue
                     try:
                         faces = detector.detect_faces(file_path)
@@ -341,6 +345,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 return {
                     "photos_processed": len(photos),
                     "faces_detected": total_faces,
+                    "photos_skipped_existing": skipped_existing,
                     "errors": errors,
                 }
 

@@ -315,6 +315,13 @@ class Database:
             })
         return results
 
+    def photo_has_faces(self, photo_id: int) -> bool:
+        """Return whether a photo already has stored face detections."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT 1 FROM faces WHERE photo_id = ? LIMIT 1", (photo_id,))
+            return cursor.fetchone() is not None
+
     def add_roster_entry(self, team_name: str, team_year: int, jersey_number: str, player_name: str):
         """Add a player to the roster."""
         cursor = self.conn.cursor()
