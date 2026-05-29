@@ -2,7 +2,7 @@ import pytest
 import json
 import time
 from pathlib import Path
-from src.api import create_app
+from src.api import create_app, should_enable_debug
 from src.db import Database
 
 
@@ -30,6 +30,14 @@ def client(app):
 def test_api_initialization(app):
     """Verify API app initializes."""
     assert app is not None
+
+def test_debug_mode_is_opt_in(monkeypatch):
+    """Flask debug mode should not be enabled unless explicitly requested."""
+    monkeypatch.delenv("PHOTOTAGGER_DEBUG", raising=False)
+    assert should_enable_debug() is False
+
+    monkeypatch.setenv("PHOTOTAGGER_DEBUG", "true")
+    assert should_enable_debug() is True
 
 def test_health_endpoint(client):
     """Test health check endpoint."""

@@ -10,6 +10,10 @@ from src.job_runner import LocalJobRunner
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+def should_enable_debug() -> bool:
+    """Return whether Flask debug mode should be enabled for local development."""
+    return os.environ.get("PHOTOTAGGER_DEBUG", "").lower() in {"1", "true", "yes", "on"}
+
 def create_app(db_path: str = "photo_catalog.db") -> Flask:
     """Create and configure Flask app."""
     app = Flask(__name__)
@@ -648,5 +652,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
 if __name__ == "__main__":
     app = create_app()
+    debug = should_enable_debug()
     logger.info("Starting PhotoTagger API on http://localhost:5001")
-    app.run(debug=True, port=5001, host='127.0.0.1', use_reloader=False)
+    app.run(debug=debug, port=5001, host='127.0.0.1', use_reloader=False)
