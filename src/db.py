@@ -554,7 +554,7 @@ class Database:
                 for row in cursor.fetchall()
             ]
 
-    def get_photos_by_cluster(self, cluster_id: int) -> List[Dict]:
+    def get_photos_by_cluster(self, cluster_id: int, min_face_confidence: float = 0.0) -> List[Dict]:
         """Get all photos that contain a face in this cluster."""
         with self._lock:
             cursor = self.conn.cursor()
@@ -564,8 +564,9 @@ class Database:
                 FROM photos p
                 JOIN faces f ON f.photo_id = p.id
                 WHERE f.cluster_id = ?
+                  AND f.confidence >= ?
                 ORDER BY p.id
-            """, (cluster_id,))
+            """, (cluster_id, min_face_confidence))
             return [
                 {
                     "id": row[0],

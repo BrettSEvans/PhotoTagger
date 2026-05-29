@@ -398,8 +398,12 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/players/<int:cluster_id>/photos", methods=["GET"])
     def get_player_photos(cluster_id: int):
         """Get all photos containing a specific player."""
+        min_face_confidence = parse_float(request.args.get("min_face_confidence", "0.0"))
+        if min_face_confidence is None:
+            return jsonify({"error": "min_face_confidence must be a number"}), 400
+
         try:
-            photos = db.get_photos_by_cluster(cluster_id)
+            photos = db.get_photos_by_cluster(cluster_id, min_face_confidence)
             return jsonify({
                 "cluster_id": cluster_id,
                 "photos": [

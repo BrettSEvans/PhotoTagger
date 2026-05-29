@@ -11,6 +11,8 @@ interface ClusterWithAssignment extends PlayerCluster {
   roster_entry_id?: number | null;
 }
 
+const MIN_REVIEW_FACE_CONFIDENCE = 0.6;
+
 export const ReviewPage: React.FC = () => {
   // ── Cluster list ────────────────────────────────────────────────────────
   const [clusters,        setClusters]        = useState<ClusterWithAssignment[]>([]);
@@ -113,7 +115,7 @@ export const ReviewPage: React.FC = () => {
     setIsLoadingPhotos(true);
     setTimeout(() => searchRef.current?.focus(), 150);
     try {
-      const data = await photoTaggerClient.getPlayerPhotos(cluster.id);
+      const data = await photoTaggerClient.getPlayerPhotos(cluster.id, { minFaceConfidence: MIN_REVIEW_FACE_CONFIDENCE });
       setClusterPhotos(data.photos);
       // Default: all photos selected
       setSelected(new Set(data.photos.map(p => p.face_id)));
