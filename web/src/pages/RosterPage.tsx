@@ -20,7 +20,9 @@ export const RosterPage: React.FC = () => {
 
   // CSV drag state
   const [isDragging, setIsDragging] = useState(false);
+  const [isParsing,  setIsParsing]  = useState(false);
   const [csvMsg,     setCsvMsg]     = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { loadRoster(); }, []);
 
@@ -72,47 +74,63 @@ export const RosterPage: React.FC = () => {
 
   const parseCsv = async (file: File) => {
     setCsvMsg(null);
-    const text = await file.text();
-    const lines = text.split('\n').filter(l => l.trim());
-    if (lines.length < 2) { setCsvMsg({ type: 'error', text: 'File appears empty or has no data rows.' }); return; }
+    setIsParsing(true);
+    try {
+      const text = await file.text();
+      const lines = text.split('\n').filter(l => l.trim());
+      if (lines.length < 2) { setCsvMsg({ type: 'error', text: 'File appears empty or has no data rows.' }); return; }
 
-    const header = lines[0].toLowerCase();
-    const hasName   = header.includes('name');
-    const hasJersey = header.includes('jersey') || header.includes('number') || header.includes('#');
-    if (!hasName || !hasJersey) {
-      setCsvMsg({ type: 'error', text: 'Could not find "name" and "jersey"/"number" columns. Check your CSV headers.' });
-      return;
+      const header = lines[0].toLowerCase();
+      const hasName   = header.includes('name');
+      const hasJersey = header.includes('jersey') || header.includes('number') || header.includes('#');
+      if (!hasName || !hasJersey) {
+        setCsvMsg({ type: 'error', text: 'Could not find "name" and "jersey"/"number" columns. Check your CSV headers.' });
+        return;
+      }
+
+      const cols = lines[0].split(',').map(c => c.trim().toLowerCase());
+      const nameIdx   = cols.findIndex(c => c.includes('name'));
+      const jerseyIdx = cols.findIndex(c => c.includes('jersey') || c.includes('number') || c === '#');
+
+      let added = 0, failed = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cells = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
+        const name   = cells[nameIdx]   ?? '';
+        const jersey = cells[jerseyIdx] ?? '';
+        if (!name || !jersey) { failed++; continue; }
+        try {
+          await photoTaggerClient.addRosterEntry(jersey, name, newTeam);
+          added++;
+        } catch { failed++; }
+      }
+
+      await loadRoster();
+      setCsvMsg({
+        type: failed === 0 ? 'success' : 'error',
+        text: failed === 0
+          ? `✅ ${added} players imported successfully`
+          : `⚠️ ${added} imported, ${failed} rows failed — check name/jersey columns`,
+      });
+    } finally {
+      setIsParsing(false);
     }
-
-    const cols = lines[0].split(',').map(c => c.trim().toLowerCase());
-    const nameIdx   = cols.findIndex(c => c.includes('name'));
-    const jerseyIdx = cols.findIndex(c => c.includes('jersey') || c.includes('number') || c === '#');
-
-    let added = 0, failed = 0;
-    for (let i = 1; i < lines.length; i++) {
-      const cells = lines[i].split(',').map(c => c.trim().replace(/^"|"$/g, ''));
-      const name   = cells[nameIdx]   ?? '';
-      const jersey = cells[jerseyIdx] ?? '';
-      if (!name || !jersey) { failed++; continue; }
-      try {
-        await photoTaggerClient.addRosterEntry(jersey, name, newTeam);
-        added++;
-      } catch { failed++; }
-    }
-
-    await loadRoster();
-    setCsvMsg({
-      type: failed === 0 ? 'success' : 'error',
-      text: failed === 0
-        ? `✅ ${added} players imported successfully`
-        : `⚠️ ${added} imported, ${failed} rows failed — check name/jersey columns`,
-    });
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
     const file = e.dataTransfer.files[0];
+    if (!file) return;
+    if (!file.name.match(/\.(csv|xlsx)$/i)) {
+      setCsvMsg({ type: 'error', text: 'Only CSV files are supported (XLSX coming soon).' });
+      return;
+    }
+    parseCsv(file);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
     if (!file) return;
     if (!file.name.match(/\.(csv|xlsx)$/i)) {
       setCsvMsg({ type: 'error', text: 'Only CSV files are supported (XLSX coming soon).' });
@@ -151,15 +169,34 @@ export const RosterPage: React.FC = () => {
           <h2 className="font-outfit text-lg font-bold text-foreground">Bulk Import</h2>
           <p className="font-jakarta text-xs text-muted-fg">Drop a CSV with "name" and "jersey" columns</p>
 
-          {/* Drop zone */}
+          {/* Drop zone (also click-to-browse) */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={handleFileSelect}
+            className="hidden"
+          />
           <div
             onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
             onDragLeave={() => setIsDragging(false)}
             onDrop={handleDrop}
-            className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${
-              isDragging ? 'border-accent bg-accent/5' : 'border-frame bg-muted/30'
+            onClick={() => fileInputRef.current?.click()}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+            role="button"
+            tabIndex={0}
+            aria-label="Drag and drop a CSV roster, or click to browse"
+            className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
+              isDragging ? 'border-accent bg-accent/5' : 'border-frame bg-muted/30 hover:border-foreground'
             }`}
           >
+            {/* Parsing overlay */}
+            {isParsing && (
+              <div className="absolute inset-0 z-10 bg-white/85 rounded-xl flex flex-col items-center justify-center gap-2">
+                <span className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
+                <p className="font-jakarta text-sm font-bold text-foreground">Parsing columns…</p>
+              </div>
+            )}
             <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="mx-auto mb-3 text-muted-fg">
               <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
               <polyline points="17 8 12 3 7 8" />
@@ -168,7 +205,7 @@ export const RosterPage: React.FC = () => {
             <p className="font-jakarta text-sm font-semibold text-foreground">
               {isDragging ? 'Drop to import…' : 'Drag & drop roster here'}
             </p>
-            <p className="font-jakarta text-xs text-muted-fg mt-1">CSV only — headers: name, jersey</p>
+            <p className="font-jakarta text-xs text-muted-fg mt-1">CSV only — or click to browse</p>
           </div>
 
           {/* Team selector for import */}

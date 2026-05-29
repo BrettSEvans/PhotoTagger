@@ -314,7 +314,8 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT id, face_count, photo_count, thumbnail_face_id, created_at
+                SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
+                       player_name, jersey_number
                 FROM player_clusters
                 ORDER BY photo_count DESC
             """)
@@ -325,6 +326,8 @@ class Database:
                     "photo_count": row[2],
                     "thumbnail_face_id": row[3],
                     "created_at": row[4],
+                    "player_name": row[5],
+                    "jersey_number": row[6],
                 }
                 for row in cursor.fetchall()
             ]
