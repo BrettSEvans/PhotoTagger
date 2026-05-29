@@ -17,6 +17,11 @@ import {
   DetectionStatus,
   APIError,
   SearchOptions,
+  RosterResponse,
+  RosterSearchResult,
+  ProcessingSummary,
+  TaggedPhoto,
+  ReviewPhoto,
 } from '../types/index';
 
 /**
@@ -244,6 +249,62 @@ class PhotoTaggerClient {
    */
   getPhotoUrl(photoId: number): string {
     return `${this.baseURL}/api/image/${photoId}`;
+  }
+
+  // ── Roster ────────────────────────────────────────────────────────────────
+
+  async getRoster(): Promise<RosterResponse> {
+    const response = await this.client.get<RosterResponse>('/api/roster');
+    return response.data;
+  }
+
+  async addRosterEntry(jerseyNumber: string, playerName: string, teamName = 'Manual Entry', teamYear = 2026): Promise<void> {
+    await this.client.post('/api/roster', {
+      jersey_number: jerseyNumber,
+      player_name: playerName,
+      team_name: teamName,
+      team_year: teamYear,
+    });
+  }
+
+  async deleteRosterEntry(entryId: number): Promise<void> {
+    await this.client.delete(`/api/roster/${entryId}`);
+  }
+
+  async searchRoster(query: string): Promise<RosterSearchResult[]> {
+    const response = await this.client.get<{ results: RosterSearchResult[] }>(
+      '/api/roster/search', { params: { q: query } }
+    );
+    return response.data.results;
+  }
+
+  // ── Processing summary ────────────────────────────────────────────────────
+
+  async getProcessingSummary(): Promise<ProcessingSummary> {
+    const response = await this.client.get<ProcessingSummary>('/api/processing-summary');
+    return response.data;
+  }
+
+  async getConfirmedPhotos(limit = 60, offset = 0): Promise<TaggedPhoto[]> {
+    const response = await this.client.get<{ photos: TaggedPhoto[] }>(
+      '/api/confirmed-photos', { params: { limit, offset } }
+    );
+    return response.data.photos;
+  }
+
+  async getReviewPhotos(limit = 60, offset = 0): Promise<ReviewPhoto[]> {
+    const response = await this.client.get<{ photos: ReviewPhoto[] }>(
+      '/api/review-photos', { params: { limit, offset } }
+    );
+    return response.data.photos;
+  }
+
+  async assignCluster(clusterId: number, playerName: string, jerseyNumber: string): Promise<void> {
+    await this.client.post(`/api/players/${clusterId}/assign`, { player_name: playerName, jersey_number: jerseyNumber });
+  }
+
+  async deassignFaces(faceIds: number[]): Promise<void> {
+    await this.client.post('/api/faces/deassign', { face_ids: faceIds });
   }
 
   /**

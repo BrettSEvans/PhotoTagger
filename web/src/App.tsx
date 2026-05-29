@@ -4,6 +4,8 @@ import { UploadPage } from './pages/UploadPage'
 import { SearchPage } from './pages/SearchPage'
 import { GalleryPage } from './pages/GalleryPage'
 import { PlayersPage } from './pages/PlayersPage'
+import { RosterPage } from './pages/RosterPage'
+import { ReviewPage } from './pages/ReviewPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -11,7 +13,7 @@ import './styles/globals.css'
 
 const BACKEND_URL = 'http://127.0.0.1:5001'
 
-type Page = 'upload' | 'gallery' | 'search' | 'players'
+type Page = 'upload' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
 
 async function checkConnection(setIsConnected: (value: boolean) => void) {
   try {
@@ -107,10 +109,12 @@ function App() {
       {/* Navigation */}
       <nav className="bg-cream border-b-2 border-foreground sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4">
-          <div className="flex gap-1">
+          <div className="flex gap-1 overflow-x-auto">
             <NavButton label="Upload"   isActive={currentPage === 'upload'}  onClick={() => setCurrentPage('upload')} />
-            <NavButton label="Gallery"  isActive={currentPage === 'gallery'} onClick={() => setCurrentPage('gallery')} />
+            <NavButton label="Roster"   isActive={currentPage === 'roster'}  onClick={() => setCurrentPage('roster')} />
+            <NavButton label="Review"   isActive={currentPage === 'review'}  onClick={() => setCurrentPage('review')} />
             <NavButton label="Players"  isActive={currentPage === 'players'} onClick={() => setCurrentPage('players')} />
+            <NavButton label="Gallery"  isActive={currentPage === 'gallery'} onClick={() => setCurrentPage('gallery')} />
             <NavButton label="Search"   isActive={currentPage === 'search'}  onClick={() => setCurrentPage('search')} />
           </div>
         </div>
@@ -119,7 +123,9 @@ function App() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <ErrorBoundary>
-          {currentPage === 'upload'  && <UploadPage />}
+          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} />}
+          {currentPage === 'roster'  && <RosterPage />}
+          {currentPage === 'review'  && <ReviewPage />}
           {currentPage === 'search'  && <SearchPage />}
           {currentPage === 'gallery' && <GalleryPage />}
           {currentPage === 'players' && <PlayersPage />}

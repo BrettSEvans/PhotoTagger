@@ -88,6 +88,16 @@ class Database:
         except Exception:
             pass  # Column already exists
 
+        # Add player_name / jersey_number to player_clusters if not present
+        try:
+            cursor.execute("ALTER TABLE player_clusters ADD COLUMN player_name TEXT")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE player_clusters ADD COLUMN jersey_number TEXT")
+        except Exception:
+            pass
+
         self.conn.commit()
 
     def add_photo(self, file_path: str, file_hash: Optional[str] = None) -> int:
@@ -349,6 +359,131 @@ class Database:
             cursor = self.conn.cursor()
             cursor.execute("SELECT COUNT(*) FROM faces")
             return cursor.fetchone()[0]
+
+    # ── Roster CRUD ─────────────────────────────────────────────────────────────
+
+    def get_all_roster_entries(self) -> List[Dict]:
+        """Return every roster row ordered by team then jersey number."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, team_name, team_year, jersey_number, player_name
+                FROM rosters
+                ORDER BY team_name, CAST(jersey_number AS INTEGER)
+            """)
+            return [
+                {"id": r[0], "team_name": r[1], "team_year": r[2],
+                 "jersey_number": r[3], "player_name": r[4]}
+                for r in cursor.fetchall()
+            ]
+
+    def delete_roster_entry(self, entry_id: int):
+        """Delete a single roster row by primary key."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM rosters WHERE id = ?", (entry_id,))
+            self.conn.commit()
+
+    def search_roster(self, query: str) -> List[Dict]:
+        """Fuzzy search roster by player name or jersey number (max 10 results)."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            pattern = f"%{query}%"
+            cursor.execute("""
+                SELECT id, team_name, jersey_number, player_name
+                FROM rosters
+                WHERE player_name LIKE ? OR jersey_number LIKE ?
+                ORDER BY CAST(jersey_number AS INTEGER)
+                LIMIT 10
+            """, (pattern, pattern))
+            return [
+                {"id": r[0], "team_name": r[1], "jersey_number": r[2], "player_name": r[3]}
+                for r in cursor.fetchall()
+            ]
+
+    # ── Processing summary ───────────────────────────────────────────────────────
+
+    def get_processing_summary(self) -> Dict:
+        """Return counts: total photos, auto-tagged (jersey→roster match), needs review."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT COUNT(*) FROM photos")
+            total = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(DISTINCT o.photo_id)
+                FROM ocr_results o
+                INNER JOIN rosters r ON r.jersey_number = o.jersey_number
+                WHERE o.jersey_number IS NOT NULL
+            """)
+            tagged = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(DISTINCT o.photo_id)
+                FROM ocr_results o
+                LEFT JOIN rosters r ON r.jersey_number = o.jersey_number
+                WHERE o.jersey_number IS NOT NULL AND r.id IS NULL
+            """)
+            needs_review = cursor.fetchone()[0]
+
+            return {"total_photos": total, "tagged": tagged, "needs_review": needs_review}
+
+    def get_confirmed_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
+        """Photos where OCR jersey matched a roster player."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT p.id, p.file_path, o.jersey_number, r.player_name, o.confidence
+                FROM photos p
+                JOIN ocr_results o ON o.photo_id = p.id
+                JOIN rosters r ON r.jersey_number = o.jersey_number
+                WHERE o.jersey_number IS NOT NULL
+                ORDER BY o.confidence DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+            return [
+                {"id": r[0], "file_path": r[1], "jersey_number": r[2],
+                 "player_name": r[3], "confidence": r[4]}
+                for r in cursor.fetchall()
+            ]
+
+    def get_review_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
+        """Photos where OCR found a jersey but it didn't match any roster entry."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT p.id, p.file_path, o.jersey_number, o.confidence
+                FROM photos p
+                JOIN ocr_results o ON o.photo_id = p.id
+                LEFT JOIN rosters r ON r.jersey_number = o.jersey_number
+                WHERE o.jersey_number IS NOT NULL AND r.id IS NULL
+                ORDER BY o.confidence DESC
+                LIMIT ? OFFSET ?
+            """, (limit, offset))
+            return [
+                {"id": r[0], "file_path": r[1], "jersey_number": r[2], "confidence": r[3]}
+                for r in cursor.fetchall()
+            ]
+
+    def deassign_faces(self, face_ids: List[int]):
+        """Remove specific faces from their cluster (set cluster_id = NULL)."""
+        if not face_ids:
+            return
+        with self._lock:
+            cursor = self.conn.cursor()
+            placeholders = ','.join('?' * len(face_ids))
+            cursor.execute(f"UPDATE faces SET cluster_id = NULL WHERE id IN ({placeholders})", face_ids)
+            self.conn.commit()
+
+    def assign_cluster_to_player(self, cluster_id: int, player_name: str, jersey_number: str):
+        """Attach a player name and jersey to a face cluster."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                UPDATE player_clusters SET player_name = ?, jersey_number = ?
+                WHERE id = ?
+            """, (player_name, jersey_number, cluster_id))
+            self.conn.commit()
 
     def close(self):
         """Close database connection."""

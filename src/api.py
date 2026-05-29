@@ -419,6 +419,103 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.error(f"face-crop error for face {face_id}: {e}")
             return jsonify({"error": str(e)}), 500
 
+    # ── Roster endpoints ─────────────────────────────────────────────────────────
+
+    @app.route("/api/roster", methods=["GET"])
+    def get_roster():
+        try:
+            entries = db.get_all_roster_entries()
+            return jsonify({"entries": entries, "total": len(entries)}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster", methods=["POST"])
+    def add_roster():
+        data = request.get_json() or {}
+        jersey = str(data.get("jersey_number", "")).strip()
+        name   = str(data.get("player_name", "")).strip()
+        team   = str(data.get("team_name", "Manual Entry")).strip()
+        year   = int(data.get("team_year", 2026))
+        if not jersey or not name:
+            return jsonify({"error": "jersey_number and player_name are required"}), 400
+        try:
+            db.add_roster_entry(team, year, jersey, name)
+            return jsonify({"success": True}), 201
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster/<int:entry_id>", methods=["DELETE"])
+    def delete_roster(entry_id: int):
+        try:
+            db.delete_roster_entry(entry_id)
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster/search", methods=["GET"])
+    def search_roster():
+        q = request.args.get("q", "").strip()
+        if not q:
+            return jsonify({"results": []}), 200
+        try:
+            results = db.search_roster(q)
+            return jsonify({"results": results}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ── Processing summary & review endpoints ─────────────────────────────────
+
+    @app.route("/api/processing-summary", methods=["GET"])
+    def processing_summary():
+        try:
+            summary = db.get_processing_summary()
+            return jsonify(summary), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/confirmed-photos", methods=["GET"])
+    def confirmed_photos():
+        limit  = int(request.args.get("limit", 60))
+        offset = int(request.args.get("offset", 0))
+        try:
+            photos = db.get_confirmed_photos(limit, offset)
+            return jsonify({"photos": photos, "total": len(photos)}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/review-photos", methods=["GET"])
+    def review_photos():
+        limit  = int(request.args.get("limit", 60))
+        offset = int(request.args.get("offset", 0))
+        try:
+            photos = db.get_review_photos(limit, offset)
+            return jsonify({"photos": photos, "total": len(photos)}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/faces/deassign", methods=["POST"])
+    def deassign_faces():
+        data = request.get_json() or {}
+        face_ids = [int(x) for x in data.get("face_ids", [])]
+        try:
+            db.deassign_faces(face_ids)
+            return jsonify({"success": True, "deassigned": len(face_ids)}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/players/<int:cluster_id>/assign", methods=["POST"])
+    def assign_cluster(cluster_id: int):
+        data = request.get_json() or {}
+        player_name   = str(data.get("player_name", "")).strip()
+        jersey_number = str(data.get("jersey_number", "")).strip()
+        if not player_name:
+            return jsonify({"error": "player_name is required"}), 400
+        try:
+            db.assign_cluster_to_player(cluster_id, player_name, jersey_number)
+            return jsonify({"success": True}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     # Get detection status
     @app.route("/api/detection-status", methods=["GET"])
     def detection_status():
@@ -439,7 +536,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def after_request(response):
         response.headers.add('Access-Control-Allow-Origin', '*')
         response.headers.add('Access-Control-Allow-Headers', 'Content-Type')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS')
         return response
 
     return app

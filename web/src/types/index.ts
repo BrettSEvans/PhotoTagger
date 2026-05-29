@@ -243,3 +243,70 @@ export interface DetectionStatus {
   face_count: number;
   cluster_count: number;
 }
+
+/**
+ * RosterEntry - Single player in the roster table
+ */
+export interface RosterEntry {
+  id: number;
+  team_name: string;
+  team_year: number;
+  jersey_number: string;
+  player_name: string;
+}
+
+/**
+ * RosterResponse - API response from /api/roster
+ */
+export interface RosterResponse {
+  entries: RosterEntry[];
+  total: number;
+}
+
+/**
+ * RosterSearchResult - Hit from /api/roster/search
+ */
+export interface RosterSearchResult {
+  id: number;
+  team_name: string;
+  jersey_number: string;
+  player_name: string;
+}
+
+/**
+ * ProcessingSummary - Counts from /api/processing-summary
+ */
+export interface ProcessingSummary {
+  total_photos: number;
+  tagged: number;
+  needs_review: number;
+}
+
+/**
+ * TaggedPhoto - Photo confirmed matched to a roster player
+ */
+export interface TaggedPhoto {
+  id: number;
+  file_path: string;
+  jersey_number: string;
+  player_name: string;
+  confidence: number;
+}
+
+/**
+ * ReviewPhoto - Photo with unmatched OCR jersey
+ */
+export interface ReviewPhoto {
+  id: number;
+  file_path: string;
+  jersey_number: string;
+  confidence: number;
+}
+
+/**
+ * PlayerCluster extended with optional player assignment
+ */
+export interface PlayerClusterFull extends PlayerCluster {
+  player_name?: string;
+  jersey_number?: string;
+}
