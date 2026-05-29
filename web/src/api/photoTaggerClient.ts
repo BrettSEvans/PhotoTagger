@@ -279,8 +279,13 @@ class PhotoTaggerClient {
    * Get all photos for a specific player cluster
    * GET /api/players/:id/photos
    */
-  async getPlayerPhotos(clusterId: number): Promise<PlayerPhotosResponse> {
-    const response = await this.client.get<PlayerPhotosResponse>(`/api/players/${clusterId}/photos`);
+  async getPlayerPhotos(clusterId: number, options: { minFaceConfidence?: number } = {}): Promise<PlayerPhotosResponse> {
+    const params: Record<string, number> = {};
+    if (options.minFaceConfidence !== undefined) {
+      params.min_face_confidence = options.minFaceConfidence;
+    }
+
+    const response = await this.client.get<PlayerPhotosResponse>(`/api/players/${clusterId}/photos`, { params });
     return response.data;
   }
 

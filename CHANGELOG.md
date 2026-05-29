@@ -2,6 +2,8 @@
 
 ## 2026-05-29
 
+- Filtered the Review workspace so face-cluster photos below 60% face match confidence are not shown.
+  - Commit: pending
 - Restored the Playful Geometric UI styling pipeline so Tailwind utilities compile into the app CSS again.
   - Commit: 0e34ef5
 - Hid ambiguous duplicate confirmed cards in the Upload UI when the same photo and jersey are returned with multiple player names.

@@ -57,3 +57,12 @@ test('tailwind css pipeline is configured for the geometric design system', () =
   assert.match(config, /tailwindcss/);
   assert.match(config, /autoprefixer/);
 });
+
+test('review workspace excludes face matches below sixty percent confidence', () => {
+  const client = source('src/api/photoTaggerClient.ts');
+  const review = source('src/pages/ReviewPage.tsx');
+
+  assert.match(client, /min_face_confidence/);
+  assert.match(review, /MIN_REVIEW_FACE_CONFIDENCE\s*=\s*0\.6/);
+  assert.match(review, /getPlayerPhotos\(cluster\.id,\s*\{ minFaceConfidence: MIN_REVIEW_FACE_CONFIDENCE \}\)/);
+});

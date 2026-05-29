@@ -55,6 +55,34 @@ def test_search_with_confidence_filter(client, app_with_roster):
     data = json.loads(response.data)
     assert data["count"] == 0
 
+
+def test_player_photos_support_min_face_confidence_filter(client, app_with_roster):
+    """Review can request only sufficiently confident face matches."""
+    db = app_with_roster.db
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as low_file:
+        low_file.write(b"fake low confidence jpg")
+        low_file.flush()
+        low_photo_id = db.add_photo(low_file.name)
+
+    with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as high_file:
+        high_file.write(b"fake high confidence jpg")
+        high_file.flush()
+        high_photo_id = db.add_photo(high_file.name)
+
+    low_face_id = db.add_face(low_photo_id, [0.1] * 384, [10, 20, 100, 150], 0.59)
+    high_face_id = db.add_face(high_photo_id, [0.2] * 384, [10, 20, 100, 150], 0.60)
+    cluster_id = db.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=high_face_id)
+    db.assign_face_to_cluster(low_face_id, cluster_id)
+    db.assign_face_to_cluster(high_face_id, cluster_id)
+
+    response = client.get(f"/api/players/{cluster_id}/photos?min_face_confidence=0.6")
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["total"] == 1
+    assert data["photos"][0]["face_id"] == high_face_id
+
 def test_search_returns_player_name(client, app_with_roster):
     """Test that search returns player names via roster lookup."""
     db = app_with_roster.db
