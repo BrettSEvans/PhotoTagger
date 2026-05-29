@@ -3,7 +3,7 @@
 ## 2026-05-29
 
 - Added Railway hybrid hosting support with a cloud UI mode, protected local-agent settings, Railway Docker config, and local photo-root hardening.
-  - Commit: pending
+  - Commit: e8ce6e5
 - Added Review assignment XMP sidecar export for IPTC-compatible player, team, year, opponent, event, and keyword metadata.
   - Commit: aa1103b
 - Filtered the Review workspace so face-cluster photos below 60% face match confidence are not shown.
