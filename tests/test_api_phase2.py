@@ -165,6 +165,41 @@ def test_assign_cluster_metadata_missing_photo_reports_failure(client, app_with_
     assert data["metadata"]["failed"] == 1
     assert "Photo not found" in data["metadata"]["errors"][0]
 
+
+def test_assign_cluster_metadata_rejects_outside_allowed_roots(client, app_with_roster, tmp_path, monkeypatch):
+    """Metadata writes should honor the local agent photo root allowlist."""
+    db = app_with_roster.db
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", str(allowed))
+    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.search_roster("Thomas")[0]
+    photo = outside / "outside.jpg"
+    photo.write_bytes(b"outside")
+    photo_id = db.add_photo(str(photo))
+    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.assign_face_to_cluster(face_id, cluster_id)
+
+    response = client.post(
+        f"/api/players/{cluster_id}/assign",
+        json={
+            "player_name": "Thomas Shope",
+            "jersey_number": "12",
+            "roster_entry_id": roster_entry["id"],
+            "write_metadata": True,
+            "face_ids": [face_id],
+        },
+    )
+
+    assert response.status_code == 200
+    data = json.loads(response.data)
+    assert data["metadata"]["failed"] == 1
+    assert "outside allowed photo roots" in data["metadata"]["errors"][0]
+    assert not photo.with_suffix(".xmp").exists()
+
 def test_search_returns_player_name(client, app_with_roster):
     """Test that search returns player names via roster lookup."""
     db = app_with_roster.db

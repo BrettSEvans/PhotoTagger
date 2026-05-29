@@ -2,7 +2,7 @@ import pytest
 import json
 import time
 from pathlib import Path
-from src.api import create_app, should_enable_debug
+from src.api import create_app, get_server_bind, should_enable_debug
 from src.db import Database
 
 
@@ -38,6 +38,14 @@ def test_debug_mode_is_opt_in(monkeypatch):
 
     monkeypatch.setenv("PHOTOTAGGER_DEBUG", "true")
     assert should_enable_debug() is True
+
+
+def test_server_bind_uses_railway_port(monkeypatch):
+    """Hosted mode should bind to Railway's PORT on all interfaces."""
+    monkeypatch.setenv("PORT", "8123")
+    monkeypatch.setenv("PHOTOTAGGER_MODE", "cloud-ui")
+
+    assert get_server_bind() == ("0.0.0.0", 8123)
 
 def test_health_endpoint(client):
     """Test health check endpoint."""

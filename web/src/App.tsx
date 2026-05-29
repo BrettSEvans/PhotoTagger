@@ -9,9 +9,8 @@ import { ReviewPage } from './pages/ReviewPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import type { AgentSettings } from './types/index'
 import './styles/globals.css'
-
-const BACKEND_URL = photoTaggerClient.getBaseURL()
 
 type Page = 'upload' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
 
@@ -27,10 +26,17 @@ async function checkConnection(setIsConnected: (value: boolean) => void) {
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('upload')
   const [isConnected, setIsConnected] = useState<boolean | null>(null)
+  const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => photoTaggerClient.getLocalAgentSettings())
 
   useEffect(() => {
     checkConnection(setIsConnected)
   }, [])
+
+  const saveLocalAgent = async () => {
+    photoTaggerClient.setLocalAgentSettings(agentSettings)
+    setIsConnected(null)
+    await checkConnection(setIsConnected)
+  }
 
   if (isConnected === null) {
     return (
@@ -55,19 +61,38 @@ function App() {
             </svg>
           </div>
 
-          <h1 className="font-outfit text-2xl font-bold text-foreground mb-2">Connection Error</h1>
+          <h1 className="font-outfit text-2xl font-bold text-foreground mb-2">Local agent disconnected</h1>
           <p className="font-jakarta text-muted-fg mb-3">
-            Could not connect to PhotoTagger backend at <span className="font-mono text-foreground text-sm">{BACKEND_URL}</span>
+            Could not connect to the PhotoTagger Local Agent at <span className="font-mono text-foreground text-sm">{agentSettings.localAgentUrl}</span>
           </p>
           <p className="font-jakarta text-sm text-muted-fg mb-6">
-            Make sure the backend is running:<br />
+            Make sure the local agent is running:<br />
             <code className="bg-muted px-2 py-1 rounded-md text-sm font-mono text-foreground mt-1 inline-block">python -m src.api</code>
           </p>
+          <div className="space-y-3 mb-5">
+            <label className="block">
+              <span className="font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">Local Agent URL</span>
+              <input
+                value={agentSettings.localAgentUrl}
+                onChange={e => setAgentSettings(prev => ({ ...prev, localAgentUrl: e.target.value }))}
+                className="geo-input mt-1 w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
+            </label>
+            <label className="block">
+              <span className="font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">Agent Token</span>
+              <input
+                type="password"
+                value={agentSettings.agentToken}
+                onChange={e => setAgentSettings(prev => ({ ...prev, agentToken: e.target.value }))}
+                className="geo-input mt-1 w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
+            </label>
+          </div>
           <button
-            onClick={() => checkConnection(setIsConnected)}
+            onClick={saveLocalAgent}
             className="btn-candy w-full bg-accent text-white font-jakarta font-bold px-6 py-3 rounded-full border-2 border-foreground shadow-pop"
           >
-            Retry Connection
+            Save & Retry Connection
           </button>
         </div>
       </div>
@@ -137,7 +162,7 @@ function App() {
         <div className="max-w-6xl mx-auto px-4 py-5 flex items-center justify-between">
           <p className="font-outfit font-bold text-foreground text-sm">PhotoTagger</p>
           <p className="font-jakarta text-xs text-muted-fg">
-            Backend: <span className="font-mono">{BACKEND_URL}</span>
+            Local Agent: <span className="font-mono">{agentSettings.localAgentUrl}</span>
           </p>
         </div>
       </footer>

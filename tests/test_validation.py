@@ -56,3 +56,40 @@ def test_crawl_rejects_git_metadata_directory():
 
     assert response.status_code == 400
     assert json.loads(response.data)["error"] == "photo_dir is not an allowed photo directory"
+
+
+def test_local_agent_token_required_for_file_backed_endpoints(monkeypatch, tmp_path):
+    monkeypatch.setenv("PHOTOTAGGER_MODE", "local-agent")
+    monkeypatch.setenv("PHOTOTAGGER_AGENT_TOKEN", "secret-token")
+    monkeypatch.setenv("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", str(tmp_path))
+    app = create_app(db_path=":memory:")
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    response = client.post("/api/crawl", json={"photo_dir": str(tmp_path)})
+
+    assert response.status_code == 401
+    assert json.loads(response.data)["error"] == "local agent token required"
+
+    authed = client.post(
+        "/api/crawl",
+        json={"photo_dir": str(tmp_path)},
+        headers={"X-PhotoTagger-Agent-Token": "secret-token"},
+    )
+    assert authed.status_code == 202
+
+
+def test_allowed_photo_roots_reject_outside_paths(monkeypatch, tmp_path):
+    allowed = tmp_path / "allowed"
+    outside = tmp_path / "outside"
+    allowed.mkdir()
+    outside.mkdir()
+    monkeypatch.setenv("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", str(allowed))
+    app = create_app(db_path=":memory:")
+    app.config["TESTING"] = True
+    client = app.test_client()
+
+    response = client.post("/api/crawl", json={"photo_dir": str(outside)})
+
+    assert response.status_code == 400
+    assert json.loads(response.data)["error"] == "photo_dir is not an allowed photo directory"

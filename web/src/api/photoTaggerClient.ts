@@ -6,6 +6,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import {
   HealthCheckResponse,
+  AgentSettings,
   InfoResponse,
   CrawlResponse,
   OCRProcessResponse,
@@ -35,7 +36,15 @@ import {
 } from '../types/index';
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5001';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+const LOCAL_AGENT_URL_KEY = 'phototagger.localAgentUrl';
+const AGENT_TOKEN_KEY = 'phototagger.agentToken';
+
+function storedValue(key: string): string | null {
+  if (typeof window === 'undefined') return null;
+  return window.localStorage.getItem(key);
+}
+
+const API_BASE_URL = storedValue(LOCAL_AGENT_URL_KEY) || import.meta.env.VITE_LOCAL_AGENT_URL || import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
 
 /**
  * PhotoTaggerClient - Encapsulates all API communication
@@ -44,6 +53,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
 class PhotoTaggerClient {
   private client: AxiosInstance;
   private baseURL: string;
+  private agentToken: string;
 
   /**
    * Constructor
@@ -51,6 +61,7 @@ class PhotoTaggerClient {
    */
   constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
+    this.agentToken = storedValue(AGENT_TOKEN_KEY) || import.meta.env.VITE_AGENT_TOKEN || '';
     this.client = axios.create({
       baseURL: this.baseURL,
       timeout: 30000, // 30 second timeout
@@ -64,6 +75,12 @@ class PhotoTaggerClient {
       response => response,
       error => this.handleError(error)
     );
+    this.client.interceptors.request.use(config => {
+      if (this.agentToken) {
+        config.headers.set('X-PhotoTagger-Agent-Token', this.agentToken);
+      }
+      return config;
+    });
   }
 
   /**
@@ -294,14 +311,14 @@ class PhotoTaggerClient {
    * Get the URL for a cropped face thumbnail
    */
   getFaceCropUrl(faceId: number): string {
-    return `${this.baseURL}/api/face-crop/${faceId}`;
+    return this.withAgentToken(`${this.baseURL}/api/face-crop/${faceId}`);
   }
 
   /**
    * Get the URL for a full photo
    */
   getPhotoUrl(photoId: number): string {
-    return `${this.baseURL}/api/image/${photoId}`;
+    return this.withAgentToken(`${this.baseURL}/api/image/${photoId}`);
   }
 
   // ── Roster ────────────────────────────────────────────────────────────────
@@ -437,11 +454,33 @@ class PhotoTaggerClient {
     this.client.defaults.baseURL = baseURL;
   }
 
+  setLocalAgentSettings(settings: AgentSettings): void {
+    const cleanUrl = settings.localAgentUrl.trim().replace(/\/+$/, '') || DEFAULT_API_BASE_URL;
+    this.baseURL = cleanUrl;
+    this.agentToken = settings.agentToken.trim();
+    this.client.defaults.baseURL = cleanUrl;
+    window.localStorage.setItem(LOCAL_AGENT_URL_KEY, cleanUrl);
+    window.localStorage.setItem(AGENT_TOKEN_KEY, this.agentToken);
+  }
+
+  getLocalAgentSettings(): AgentSettings {
+    return {
+      localAgentUrl: this.baseURL,
+      agentToken: this.agentToken,
+    };
+  }
+
   /**
    * Get current base URL
    */
   getBaseURL(): string {
     return this.baseURL;
+  }
+
+  private withAgentToken(url: string): string {
+    if (!this.agentToken) return url;
+    const separator = url.includes('?') ? '&' : '?';
+    return `${url}${separator}agent_token=${encodeURIComponent(this.agentToken)}`;
   }
 }
 

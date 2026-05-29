@@ -200,6 +200,12 @@ export interface InfoResponse extends DatabaseInfo {
  */
 export interface HealthCheckResponse {
   status: 'ok' | 'error';
+  mode?: string;
+}
+
+export interface AgentSettings {
+  localAgentUrl: string;
+  agentToken: string;
 }
 
 /**
