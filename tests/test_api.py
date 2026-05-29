@@ -1,8 +1,19 @@
 import pytest
 import json
+import time
 from pathlib import Path
 from src.api import create_app
 from src.db import Database
+
+
+def wait_for_job(db, job_id: int, timeout: float = 5.0):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        job = db.get_processing_job(job_id)
+        if job and job["status"] in {"succeeded", "failed"}:
+            return job
+        time.sleep(0.05)
+    raise AssertionError(f"Timed out waiting for job {job_id}")
 
 @pytest.fixture
 def app():
@@ -65,10 +76,13 @@ def test_crawl_endpoint(client, tmp_path):
 
     # Call crawl endpoint
     response = client.post("/api/crawl", json={"photo_dir": str(tmp_path)})
-    assert response.status_code == 200
+    assert response.status_code == 202
     data = json.loads(response.data)
     assert data["success"] is True
-    assert data["results"]["photos_found"] == 2
+    assert data["job_id"] > 0
+    job = wait_for_job(client.application.db, data["job_id"])
+    assert job["status"] == "succeeded"
+    assert job["result"]["photos_found"] == 2
 
 def test_info_endpoint(client):
     """Test info endpoint."""
