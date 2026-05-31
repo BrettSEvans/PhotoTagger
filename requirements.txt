@@ -1,4 +1,5 @@
 Flask>=3.0.0
+gunicorn>=21.2.0
 Pillow>=10.2.0
 easyocr>=1.7.1
 insightface>=0.7.3
