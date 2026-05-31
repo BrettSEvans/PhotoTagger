@@ -66,7 +66,7 @@ class PhotoTaggerClient {
     this.agentToken = storedValue(AGENT_TOKEN_KEY) || import.meta.env.VITE_AGENT_TOKEN || '';
     this.client = axios.create({
       baseURL: this.baseURL,
-      timeout: 30000, // 30 second timeout
+      timeout: 300000, // 5 minute timeout for long-running operations
       headers: {
         'Content-Type': 'application/json',
       },
@@ -178,26 +178,42 @@ class PhotoTaggerClient {
       onUpdate?: (job: ProcessingJob<TResult>) => void;
     } = {}
   ): Promise<ProcessingJob<TResult>> {
-    const intervalMs = options.intervalMs ?? 1000;
-    const timeoutMs = options.timeoutMs ?? 600000;
+    // Use adaptive polling: start fast, then back off for long-running jobs
+    const initialIntervalMs = options.intervalMs ?? 500;
+    const maxIntervalMs = 5000;
+    const timeoutMs = options.timeoutMs ?? 1800000; // 30 minutes for large batches
     const startedAt = Date.now();
+    let currentIntervalMs = initialIntervalMs;
 
     while (Date.now() - startedAt <= timeoutMs) {
-      const job = await this.getJob<TResult>(jobId);
-      options.onUpdate?.(job);
+      try {
+        const job = await this.getJob<TResult>(jobId);
+        options.onUpdate?.(job);
 
-      if (job.status === 'succeeded') {
-        return job;
+        if (job.status === 'succeeded') {
+          return job;
+        }
+
+        if (job.status === 'failed') {
+          throw new Error(job.error || 'Processing job failed');
+        }
+
+        // Increase polling interval over time to reduce server load
+        currentIntervalMs = Math.min(currentIntervalMs * 1.2, maxIntervalMs);
+      } catch (error) {
+        // If we get a timeout error on a poll request, retry with longer interval
+        if (error instanceof Error && error.message.includes('timeout')) {
+          console.warn('Poll request timed out, increasing interval');
+          currentIntervalMs = Math.min(currentIntervalMs * 2, maxIntervalMs);
+        } else {
+          throw error;
+        }
       }
 
-      if (job.status === 'failed') {
-        throw new Error(job.error || 'Processing job failed');
-      }
-
-      await new Promise(resolve => window.setTimeout(resolve, intervalMs));
+      await new Promise(resolve => window.setTimeout(resolve, currentIntervalMs));
     }
 
-    throw new Error('Processing job timed out');
+    throw new Error(`Processing job timed out after ${Math.round(timeoutMs / 1000)} seconds`);
   }
 
   /**
