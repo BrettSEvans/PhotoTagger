@@ -831,8 +831,18 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if get_runtime_mode() != "cloud-ui":
             return jsonify({"error": "cloud UI is not enabled"}), 404
         dist = Path(__file__).resolve().parents[1] / "web" / "dist"
-        if asset_path and (dist / asset_path).is_file():
-            return send_from_directory(dist, asset_path)
+
+        # Validate asset_path to prevent directory traversal
+        if asset_path:
+            try:
+                resolved = (dist / asset_path).resolve()
+                if not str(resolved).startswith(str(dist.resolve())):
+                    return jsonify({"error": "invalid asset path"}), 400
+                if resolved.is_file():
+                    return send_from_directory(dist, asset_path)
+            except (ValueError, OSError):
+                return jsonify({"error": "invalid asset path"}), 400
+
         index = dist / "index.html"
         if index.is_file():
             return send_from_directory(dist, "index.html")
