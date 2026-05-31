@@ -4,6 +4,8 @@ import re
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Dict, List, Sequence
+from urllib.parse import urlparse
+import ipaddress
 
 import requests
 
@@ -88,6 +90,34 @@ class RosterImporter:
 
     @staticmethod
     def fetch_url(url: str) -> List[RosterRow]:
+        # Validate URL to prevent SSRF attacks
+        parsed = urlparse(url)
+
+        # Only allow HTTP/HTTPS
+        if parsed.scheme not in ("http", "https"):
+            raise RosterImportError("Only HTTP/HTTPS URLs are supported")
+
+        hostname = parsed.hostname
+        if not hostname:
+            raise RosterImportError("Invalid URL: missing hostname")
+
+        # Block localhost and loopback addresses
+        if hostname in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
+            raise RosterImportError("URLs pointing to localhost are not allowed")
+
+        # Block cloud metadata services
+        if hostname in {"169.254.169.254", "metadata.google.internal", "169.254.170.2"}:
+            raise RosterImportError("URLs pointing to cloud metadata services are not allowed")
+
+        # Block private IP ranges
+        try:
+            ip = ipaddress.ip_address(hostname)
+            if ip.is_private or ip.is_loopback or ip.is_link_local:
+                raise RosterImportError("URLs pointing to private or reserved IP addresses are not allowed")
+        except ValueError:
+            # hostname is not an IP address, which is fine
+            pass
+
         try:
             response = requests.get(
                 url,
