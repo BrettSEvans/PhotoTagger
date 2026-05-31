@@ -468,20 +468,22 @@ export const ReviewPage: React.FC = () => {
 
             {/* Roster search + assign */}
             <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden">
-              <div className="px-4 py-3 border-b-2 border-foreground bg-foreground flex items-center justify-between">
-                <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Roster Search</p>
-                {selectedCount > 0 && (
-                  <span className="font-jakarta text-xs text-white/70">
-                    Will assign {selectedCount} photo{selectedCount !== 1 ? 's' : ''}
-                    {clusterPhotos.length - selectedCount > 0 && `, release ${clusterPhotos.length - selectedCount}`}
-                  </span>
-                )}
+              <div className="px-4 py-3 border-b-2 border-foreground bg-foreground">
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Match to Roster</p>
+                  {selectedCount > 0 && (
+                    <span className="font-jakarta text-xs text-white/70">
+                      {selectedCount} photo{selectedCount !== 1 ? 's' : ''} selected
+                    </span>
+                  )}
+                </div>
+                <p className="font-jakarta text-xs text-white/80">Select a roster entry to pull metadata into sidecar files</p>
               </div>
               <div className="p-4 space-y-3">
                 <label className="flex items-center justify-between gap-3 rounded-xl border-2 border-frame bg-muted/20 px-3 py-2">
                   <span>
                     <span className="block font-jakarta text-xs font-bold text-foreground">Write XMP sidecar metadata</span>
-                    <span className="block font-jakarta text-[11px] text-muted-fg">Adds player, team, year, and opponent metadata to selected photos</span>
+                    <span className="block font-jakarta text-[11px] text-muted-fg">Player, team, year, and opponent to each photo</span>
                   </span>
                   <input
                     type="checkbox"
@@ -497,7 +499,7 @@ export const ReviewPage: React.FC = () => {
                     value={searchQuery}
                     onChange={e => handleSearchChange(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    placeholder="Type name or jersey # …"
+                    placeholder="Find player by name or jersey…"
                     disabled={isAssigning}
                     className="geo-input w-full px-4 py-2.5 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg pr-10 disabled:bg-muted"
                   />
@@ -509,38 +511,56 @@ export const ReviewPage: React.FC = () => {
                 </div>
 
                 {searchResults.length > 0 && (
-                  <div className="border-2 border-frame rounded-xl overflow-hidden divide-y divide-frame">
-                    {searchResults.map((result, i) => (
-                      <button
-                        key={result.id}
-                        onClick={() => handleAssign(result)}
-                        disabled={isAssigning || selectedCount === 0}
-                        className={`w-full text-left px-4 py-2.5 flex items-center gap-3 hover:bg-accent/5 transition-colors disabled:opacity-40 ${i === 0 ? 'bg-muted/20' : ''}`}
-                      >
-                        <span className="w-9 h-9 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm flex items-center justify-center flex-shrink-0">
-                          <span className="font-outfit font-extrabold text-white text-xs leading-none">#{result.jersey_number}</span>
-                        </span>
-                        <div className="min-w-0 flex-1">
-                          <p className="font-outfit font-bold text-foreground text-sm">{result.player_name}</p>
-                          <p className="font-jakarta text-xs text-muted-fg">{result.team_name}</p>
-                        </div>
-                        {i === 0 && (
-                          <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded border border-frame whitespace-nowrap">↵ Enter</span>
-                        )}
-                      </button>
-                    ))}
+                  <div className="space-y-2">
+                    <p className="font-jakarta text-xs font-bold text-muted-fg uppercase">Roster entries found</p>
+                    <div className="border-2 border-frame rounded-xl overflow-hidden divide-y divide-frame">
+                      {searchResults.map((result, i) => (
+                        <button
+                          key={result.id}
+                          onClick={() => handleAssign(result)}
+                          disabled={isAssigning || selectedCount === 0}
+                          className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/10 transition-colors disabled:opacity-40 disabled:hover:bg-transparent ${i === 0 ? 'bg-accent/5 border-l-4 border-l-accent' : ''}`}
+                        >
+                          <span className="w-10 h-10 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm flex items-center justify-center flex-shrink-0">
+                            <span className="font-outfit font-extrabold text-white text-sm leading-none">#{result.jersey_number}</span>
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-outfit font-bold text-foreground text-sm">{result.player_name}</p>
+                            <p className="font-jakarta text-xs text-muted-fg">
+                              {result.team_name}
+                              {result.uniform_color && ` · ${result.uniform_color}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {i === 0 && (
+                              <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded border border-frame whitespace-nowrap">↵ Enter</span>
+                            )}
+                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-muted-fg flex-shrink-0">
+                              <polyline points="9 18 15 12 9 6"></polyline>
+                            </svg>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 )}
 
                 {searchQuery && !isSearching && searchResults.length === 0 && (
-                  <p className="font-jakarta text-xs text-muted-fg text-center py-2">
-                    No match for "{searchQuery}" — add them on the Roster tab
+                  <p className="font-jakarta text-xs text-secondary text-center py-3 bg-secondary/5 rounded-lg border border-secondary/20">
+                    No roster entry found for "{searchQuery}"<br/>
+                    <span className="text-muted-fg text-[11px]">Add new players on the Roster tab</span>
                   </p>
                 )}
 
                 {selectedCount === 0 && clusterPhotos.length > 0 && (
-                  <p className="font-jakarta text-xs text-secondary text-center">
+                  <p className="font-jakarta text-xs text-secondary text-center py-3 bg-secondary/5 rounded-lg border border-secondary/20">
                     Select at least one photo before assigning
+                  </p>
+                )}
+
+                {!searchQuery && searchResults.length === 0 && selectedCount > 0 && (
+                  <p className="font-jakarta text-xs text-muted-fg text-center py-2">
+                    Start typing to search available players
                   </p>
                 )}
               </div>
