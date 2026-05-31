@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem, RosterSearchResult } from '../types/index';
+import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem, RosterSearchResult, PhotoBatch, BatchesResponse } from '../types/index';
 import { bboxStyle } from '../utils/bboxUtils';
 import type { ImgDim } from '../utils/bboxUtils';
 
@@ -9,11 +9,17 @@ interface ClusterWithAssignment extends PlayerCluster {
   player_name?: string;
   jersey_number?: string;
   roster_entry_id?: number | null;
+  selected?: boolean;
 }
 
 const MIN_REVIEW_FACE_CONFIDENCE = 0.6;
 
 export const ReviewPage: React.FC = () => {
+  // ── Batches ─────────────────────────────────────────────────────────────
+  const [batches, setBatches] = useState<PhotoBatch[]>([]);
+  const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(true);
+
   // ── Cluster list ────────────────────────────────────────────────────────
   const [clusters,        setClusters]        = useState<ClusterWithAssignment[]>([]);
   const [selectedCluster, setSelectedCluster] = useState<ClusterWithAssignment | null>(null);
@@ -21,8 +27,11 @@ export const ReviewPage: React.FC = () => {
   const [isLoadingList,   setIsLoadingList]   = useState(true);
   const [isLoadingPhotos, setIsLoadingPhotos] = useState(false);
 
-  // ── Bulk selection ──────────────────────────────────────────────────────
-  // Keyed by face_id; true = included in next assign, false = excluded
+  // ── Cluster bulk selection (select multiple clusters for batch assignment) ──
+  const [bulkSelectedClusters, setBulkSelectedClusters] = useState<Set<number>>(new Set());
+
+  // ── Selected faces within a cluster ──────────────────────────────────────
+  // Keyed by face_id; true = included in assign, false = excluded
   const [selected, setSelected] = useState<Set<number>>(new Set());
 
   // ── Image natural dims for bbox overlay ─────────────────────────────────
@@ -51,14 +60,31 @@ export const ReviewPage: React.FC = () => {
   const searchRef   = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Load clusters ────────────────────────────────────────────────────────
-  useEffect(() => { loadClusters(); }, []);
+  // ── Load batches and clusters ────────────────────────────────────────────
+  useEffect(() => {
+    loadBatches();
+    loadClusters();
+  }, []);
+
+  const loadBatches = async () => {
+    setIsLoadingBatches(true);
+    try {
+      const data = await photoTaggerClient.getBatches();
+      setBatches(data.batches);
+      // Auto-select first batch
+      if (data.batches.length > 0 && !selectedBatchId) {
+        setSelectedBatchId(data.batches[0].id);
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load batches');
+    } finally { setIsLoadingBatches(false); }
+  };
 
   const loadClusters = async () => {
     setIsLoadingList(true);
     try {
       const data = await photoTaggerClient.getPlayers();
-      setClusters(data.players as ClusterWithAssignment[]);
+      setClusters((data.players as ClusterWithAssignment[]).map(c => ({ ...c, selected: false })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load clusters');
     } finally { setIsLoadingList(false); }
@@ -238,86 +264,103 @@ export const ReviewPage: React.FC = () => {
     if (e.key === 'Escape') { setSearchQuery(''); setSearchResults([]); }
   };
 
-  const unassigned = clusters.filter(c => !c.player_name);
-  const assigned   = clusters.filter(c =>  c.player_name);
-  const selectedCount = selected.size;
   const handleWriteMetadataChange = (checked: boolean) => {
     setWriteMetadata(checked);
     window.localStorage.setItem('phototagger.writeMetadata', checked ? 'true' : 'false');
   };
 
+  // Batch stats
+  const currentBatch = batches.find(b => b.id === selectedBatchId);
+  const unassignedClusters = clusters.filter(c => !c.player_name);
+  const assignedClusters = clusters.filter(c => c.player_name);
+  const bulkSelectedCount = bulkSelectedClusters.size;
+  const selectedCount = selected.size;
+
   return (
-    <div className="w-full max-w-7xl mx-auto py-4 space-y-4">
-      {/* Header */}
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="w-full h-screen flex flex-col bg-cream overflow-hidden">
+      {/* Header with batch selector */}
+      <header className="border-b-2 border-foreground bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div>
-          <h1 className="font-outfit text-4xl font-extrabold text-foreground">Cleanup Workspace</h1>
-          <p className="mt-2 font-jakarta text-muted-fg">
-            {unassigned.length} unassigned · {assigned.length} identified
-          </p>
+          <h1 className="font-outfit text-2xl font-extrabold text-foreground">Review & Assign</h1>
+          {currentBatch && (
+            <p className="font-jakarta text-xs text-muted-fg mt-1">
+              Batch: <span className="font-bold text-foreground">{currentBatch.source_folder}</span>
+              <span className="mx-2">·</span>
+              {unassignedClusters.length} unassigned • {assignedClusters.length} assigned
+            </p>
+          )}
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {detectMsg && (
             <span role="status" className="font-jakarta text-xs text-muted-fg">{detectMsg}</span>
           )}
           <button
             onClick={handleDetectAndGroup}
             disabled={isDetecting}
-            className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-5 py-2.5 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            className="btn-candy bg-accent text-white font-jakarta font-bold text-xs px-3 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
           >
             {isDetecting ? (
-              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin block" />
             ) : (
-              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
                 <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
               </svg>
             )}
-            {isDetecting ? 'Working…' : 'Detect & Group Faces'}
+            {isDetecting ? 'Working…' : 'Detect'}
           </button>
         </div>
-      </div>
+      </header>
 
-      {error && (
-        <div role="alert" aria-live="assertive"
-          className="bg-white border-2 border-secondary rounded-xl shadow-pop-pink p-3 flex items-center justify-between">
-          <p className="font-jakarta text-sm text-foreground">⚠️ {error}</p>
-          <button onClick={() => setError(null)} className="font-jakarta text-xs text-muted-fg hover:text-foreground ml-4">×</button>
-        </div>
-      )}
+      {/* Main content area */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* LEFT: Cluster list sidebar */}
+        <div className="w-64 bg-white border-r-2 border-foreground flex flex-col overflow-hidden flex-shrink-0">
 
-      {/* ── Split screen ─────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-4 items-start">
-
-        {/* LEFT: cluster list */}
-        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden">
-          <div className="px-4 py-3 border-b-2 border-foreground bg-foreground">
-            <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Face Clusters</p>
+          <div className="px-3 py-2 border-b-2 border-foreground bg-foreground flex items-center justify-between">
+            <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Clusters</p>
+            <span className="text-white text-xs">{unassignedClusters.length} unassigned</span>
           </div>
 
           {isLoadingList ? (
-            <div className="flex justify-center py-8"><LoadingSpinner message="Loading…" /></div>
+            <div className="flex justify-center py-6"><LoadingSpinner message="Loading…" /></div>
           ) : clusters.length === 0 ? (
-            <div className="p-6 text-center">
-              <p className="font-outfit font-bold text-foreground text-sm">No face clusters yet</p>
-              <p className="font-jakarta text-xs text-muted-fg mt-1">Click <span className="font-bold text-foreground">Detect &amp; Group Faces</span> above to build clusters from your photos</p>
+            <div className="p-4 text-center flex-1 flex items-center justify-center">
+              <div>
+                <p className="font-outfit font-bold text-foreground text-xs">No clusters yet</p>
+                <p className="font-jakarta text-xs text-muted-fg mt-1">Run detection above</p>
+              </div>
             </div>
           ) : (
-            <div className="divide-y-2 divide-frame max-h-[70vh] overflow-y-auto">
-              {unassigned.length > 0 && (
-                <div className="px-4 py-2 bg-muted/40">
-                  <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg">Unassigned ({unassigned.length})</p>
-                </div>
-              )}
-              {unassigned.map(c => (
-                <ClusterRow key={c.id} cluster={c} isSelected={selectedCluster?.id === c.id} onClick={selectCluster} />
+            <div className="overflow-y-auto flex-1 divide-y divide-frame">
+              {unassignedClusters.map(c => (
+                <ClusterRowWithCheckbox
+                  key={c.id}
+                  cluster={c}
+                  isSelected={selectedCluster?.id === c.id}
+                  isBulkSelected={bulkSelectedClusters.has(c.id)}
+                  onSelect={() => selectCluster(c)}
+                  onToggleBulk={() => {
+                    const next = new Set(bulkSelectedClusters);
+                    next.has(c.id) ? next.delete(c.id) : next.add(c.id);
+                    setBulkSelectedClusters(next);
+                  }}
+                />
               ))}
-              {assigned.length > 0 && (
+              {assignedClusters.length > 0 && (
                 <>
-                  <div className="px-4 py-2 bg-muted/40">
-                    <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg">Identified ({assigned.length})</p>
+                  <div className="px-3 py-2 bg-muted/40 sticky top-0">
+                    <p className="font-jakarta text-xs font-bold text-muted-fg">IDENTIFIED ({assignedClusters.length})</p>
                   </div>
-                  {assigned.map(c => (
-                    <ClusterRow key={c.id} cluster={c} isSelected={selectedCluster?.id === c.id} onClick={selectCluster} identified />
+                  {assignedClusters.map(c => (
+                    <ClusterRowWithCheckbox
+                      key={c.id}
+                      cluster={c}
+                      isSelected={selectedCluster?.id === c.id}
+                      isBulkSelected={false}
+                      onSelect={() => selectCluster(c)}
+                      onToggleBulk={() => {}}
+                      identified
+                    />
                   ))}
                 </>
               )}
@@ -325,173 +368,117 @@ export const ReviewPage: React.FC = () => {
           )}
         </div>
 
-        {/* RIGHT: active workspace */}
-        {!selectedCluster ? (
-          <div className="bg-white border-2 border-frame rounded-2xl flex items-center justify-center p-16 text-center">
-            <div>
-              <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg mx-auto mb-3">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
-              </svg>
-              <p className="font-outfit font-bold text-foreground">Select a cluster</p>
-              <p className="font-jakarta text-xs text-muted-fg mt-1">Choose a stack from the left to review</p>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {/* Cluster header */}
-            <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop px-5 py-4 flex flex-wrap items-center gap-4">
-              {selectedCluster.thumbnail_face_id && (
-                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-foreground shadow-pop-sm flex-shrink-0">
-                  <img src={photoTaggerClient.getFaceCropUrl(selectedCluster.thumbnail_face_id)} alt="" className="w-full h-full object-cover" />
-                </div>
-              )}
-              <div className="flex-1 min-w-0">
-                <p className="font-outfit font-extrabold text-foreground">
-                  {selectedCluster.player_name ?? `Cluster #${selectedCluster.id}`}
-                </p>
-                <p className="font-jakarta text-xs text-muted-fg">
-                  {selectedCluster.photo_count} photos · {selectedCluster.face_count} detections
-                  {selectedCluster.jersey_number && ` · #${selectedCluster.jersey_number}`}
-                </p>
-              </div>
-              {assignSuccess && (
-                <span role="status" className="font-jakarta text-xs text-quaternary font-bold bg-quaternary/10 px-3 py-1.5 rounded-full border border-quaternary">
-                  ✓ {assignSuccess}
-                </span>
-              )}
-            </div>
-
-            {/* Photo grid */}
-            <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden">
-              {/* Grid toolbar */}
-              <div className="flex items-center justify-between px-4 py-3 border-b-2 border-foreground">
-                <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-muted-fg">
-                  Active Stack · {selectedCount} of {clusterPhotos.length} selected
-                </p>
-                <div className="flex gap-2">
-                  <button onClick={selectAll}   className="font-jakarta text-xs font-bold px-3 py-1 rounded-full border-2 border-frame hover:border-foreground hover:bg-muted transition-colors">All</button>
-                  <button onClick={deselectAll} className="font-jakarta text-xs font-bold px-3 py-1 rounded-full border-2 border-frame hover:border-foreground hover:bg-muted transition-colors">None</button>
+        {/* CENTER + RIGHT: Photo grid + Assignment drawer */}
+        <div className="flex-1 flex overflow-hidden">
+          {/* CENTER: Photo grid */}
+          <div className="flex-1 flex flex-col overflow-hidden bg-muted/20">
+            {!selectedCluster ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg mx-auto mb-3">
+                    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="12" cy="12" r="3" />
+                  </svg>
+                  <p className="font-outfit font-bold text-foreground">Select a cluster</p>
+                  <p className="font-jakarta text-xs text-muted-fg mt-1">Choose from the left to review photos</p>
                 </div>
               </div>
+            ) : (
+              <div className="flex flex-col overflow-hidden">
+                {/* Grid header */}
+                <div className="px-4 py-3 border-b border-frame bg-white flex items-center justify-between flex-shrink-0">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-outfit font-bold text-foreground text-sm truncate">
+                      {selectedCluster.player_name || `Cluster #${selectedCluster.id}`}
+                    </p>
+                    <p className="font-jakarta text-xs text-muted-fg">
+                      {selectedCount} of {clusterPhotos.length} photos selected
+                    </p>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <button onClick={selectAll} className="font-jakarta text-xs px-2 py-1 rounded border border-frame hover:bg-muted">All</button>
+                    <button onClick={deselectAll} className="font-jakarta text-xs px-2 py-1 rounded border border-frame hover:bg-muted">None</button>
+                  </div>
+                </div>
 
-              {isLoadingPhotos ? (
-                <div className="flex justify-center py-10"><LoadingSpinner message="Loading photos…" /></div>
-              ) : clusterPhotos.length === 0 ? (
-                <p className="py-8 text-center font-jakarta text-sm text-muted-fg">No photos in this cluster</p>
-              ) : (
-                <div className="p-3 grid grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 xl:grid-cols-10 gap-2">
-                  {clusterPhotos.map(photo => {
-                    const src = photoTaggerClient.getPhotoUrl(photo.id);
-                    const dim = imgDims.get(photo.id);
-                    const isChecked = selected.has(photo.face_id);
-                    return (
-                      <div
-                        key={photo.id}
-                        onMouseEnter={e => setLens({ photo, x: e.clientX, y: e.clientY })}
-                        onMouseMove={e => setLens({ photo, x: e.clientX, y: e.clientY })}
-                        onMouseLeave={() => setLens(null)}
-                        className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                          isChecked ? 'border-accent shadow-pop-sm' : 'border-frame opacity-40'
-                        }`}
-                      >
-                        <img
-                          src={src}
-                          alt={photo.filename}
-                          className="w-full h-full object-cover"
-                          onLoad={e => handleImgLoad(e, photo.id)}
-                          onError={e => { e.currentTarget.style.display = 'none'; }}
-                        />
-
-                        {/* Purple face bbox — 5px buffer, border sits outside the face */}
-                        {dim && (
+                {/* Photo grid */}
+                <div className="flex-1 overflow-auto p-3">
+                  {isLoadingPhotos ? (
+                    <div className="flex justify-center py-10"><LoadingSpinner message="Loading photos…" /></div>
+                  ) : clusterPhotos.length === 0 ? (
+                    <p className="text-center font-jakarta text-sm text-muted-fg py-10">No photos in this cluster</p>
+                  ) : (
+                    <div className="grid grid-cols-auto gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))' }}>
+                      {clusterPhotos.map(photo => {
+                        const src = photoTaggerClient.getPhotoUrl(photo.id);
+                        const dim = imgDims.get(photo.id);
+                        const isChecked = selected.has(photo.face_id);
+                        return (
                           <div
-                            className="absolute pointer-events-none"
-                            style={{
-                              ...bboxStyle(photo.face_bbox, dim, 7),
-                              border: '2px solid #A855F7',
-                              background: 'transparent',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                        )}
-
-                        {/* Checkbox - top left */}
-                        <button
-                          onClick={() => togglePhoto(photo.face_id)}
-                          aria-label={isChecked ? 'Deselect' : 'Select'}
-                          className={`absolute top-1 left-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors ${
-                            isChecked
-                              ? 'bg-accent border-white'
-                              : 'bg-white/80 border-frame'
-                          }`}
-                        >
-                          {isChecked && (
-                            <svg width="8" height="8" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10">
-                              <polyline points="1.5,5.5 4,8 8.5,2" />
-                            </svg>
-                          )}
-                        </button>
-
-                        {/* Enlarge button - top right */}
-                        <button
-                          onClick={() => { setModalPhoto(photo); setModalDim(dim ?? null); }}
-                          aria-label="View full size"
-                          className="absolute top-1 right-1 w-5 h-5 rounded bg-white/80 border border-frame flex items-center justify-center hover:bg-white transition-colors"
-                        >
-                          <svg width="8" height="8" fill="none" stroke="#1E293B" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10">
-                            <path d="M1 4V1h3M6 1h3v3M9 6v3H6M4 9H1V6" />
-                          </svg>
-                        </button>
-
-                        {/* Confidence badge + remove button - bottom */}
-                        <div className="absolute bottom-0 left-0 right-0 bg-foreground/60 px-1 py-0.5 flex items-center justify-between gap-1">
-                          <button
-                            onClick={e => { e.stopPropagation(); handleRemoveFace(photo.face_id); }}
-                            aria-label="Remove from cluster"
-                            title="Remove this face from the cluster"
-                            className="w-3.5 h-3.5 rounded-sm bg-secondary/90 flex items-center justify-center flex-shrink-0 hover:bg-secondary transition-colors"
+                            key={photo.id}
+                            onMouseEnter={e => setLens({ photo, x: e.clientX, y: e.clientY })}
+                            onMouseMove={e => setLens({ photo, x: e.clientX, y: e.clientY })}
+                            onMouseLeave={() => setLens(null)}
+                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all cursor-pointer ${
+                              isChecked ? 'border-accent shadow-pop-sm' : 'border-frame opacity-50 hover:opacity-70'
+                            }`}
+                            onClick={() => togglePhoto(photo.face_id)}
                           >
-                            <svg width="6" height="6" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 6 6">
-                              <path d="M1 1l4 4M5 1L1 5"/>
-                            </svg>
-                          </button>
-                          <span className="font-jakarta text-white flex-1 text-center" style={{ fontSize: '9px' }}>
-                            {Math.round(photo.face_confidence * 100)}%
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+                            <img
+                              src={src}
+                              alt={photo.filename}
+                              className="w-full h-full object-cover"
+                              onLoad={e => handleImgLoad(e, photo.id)}
+                              onError={e => { e.currentTarget.style.display = 'none'; }}
+                            />
 
-            {/* Roster search + assign */}
-            <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop overflow-hidden">
-              <div className="px-4 py-3 border-b-2 border-foreground bg-foreground">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white">Match to Roster</p>
-                  {selectedCount > 0 && (
-                    <span className="font-jakarta text-xs text-white/70">
-                      {selectedCount} photo{selectedCount !== 1 ? 's' : ''} selected
-                    </span>
+                            {dim && (
+                              <div
+                                className="absolute pointer-events-none"
+                                style={{
+                                  ...bboxStyle(photo.face_bbox, dim, 5),
+                                  border: '2px solid #A855F7',
+                                  background: 'transparent',
+                                  boxSizing: 'border-box',
+                                }}
+                              />
+                            )}
+
+                            <div className="absolute top-1 left-1 w-4 h-4 rounded border-2 flex items-center justify-center bg-white/80 border-frame">
+                              {isChecked && (
+                                <svg width="7" height="7" fill="none" stroke="#06B6D4" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 10 10">
+                                  <polyline points="1.5,5.5 4,8 8.5,2" />
+                                </svg>
+                              )}
+                            </div>
+
+                            <div className="absolute bottom-0 left-0 right-0 bg-foreground/70 px-1 py-0.5">
+                              <span className="font-jakarta text-white text-[8px]">
+                                {Math.round(photo.face_confidence * 100)}%
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-                <p className="font-jakarta text-xs text-white/80">Select a roster entry to pull metadata into sidecar files</p>
               </div>
-              <div className="p-4 space-y-3">
-                <label className="flex items-center justify-between gap-3 rounded-xl border-2 border-frame bg-muted/20 px-3 py-2">
-                  <span>
-                    <span className="block font-jakarta text-xs font-bold text-foreground">Write XMP sidecar metadata</span>
-                    <span className="block font-jakarta text-[11px] text-muted-fg">Player, team, year, and opponent to each photo</span>
+            )}
+          </div>
+
+          {/* RIGHT: Assignment drawer */}
+          {selectedCluster && (
+            <div className="w-80 bg-white border-l-2 border-foreground flex flex-col overflow-hidden flex-shrink-0">
+              <div className="px-3 py-3 border-b border-frame bg-foreground">
+                <p className="font-jakarta text-xs font-bold uppercase tracking-wider text-white mb-2">Assign Player</p>
+                {assignSuccess && (
+                  <span role="status" className="font-jakarta text-xs text-quaternary font-bold bg-quaternary/10 px-2 py-1 rounded border border-quaternary inline-block">
+                    ✓ {assignSuccess}
                   </span>
-                  <input
-                    type="checkbox"
-                    checked={writeMetadata}
-                    onChange={e => handleWriteMetadataChange(e.target.checked)}
-                    className="h-4 w-4 accent-accent"
-                  />
-                </label>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-3">
                 <div className="relative">
                   <input
                     ref={searchRef}
@@ -499,74 +486,64 @@ export const ReviewPage: React.FC = () => {
                     value={searchQuery}
                     onChange={e => handleSearchChange(e.target.value)}
                     onKeyDown={handleSearchKeyDown}
-                    placeholder="Find player by name or jersey…"
+                    placeholder="Search player…"
                     disabled={isAssigning}
-                    className="geo-input w-full px-4 py-2.5 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg pr-10 disabled:bg-muted"
+                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-lg font-jakarta text-sm text-foreground placeholder:text-muted-fg pr-8 disabled:bg-muted"
                   />
                   {(isSearching || isAssigning) && (
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                      <span className="w-4 h-4 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                      <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
                     </div>
                   )}
                 </div>
 
                 {searchResults.length > 0 && (
-                  <div className="space-y-2">
-                    <p className="font-jakarta text-xs font-bold text-muted-fg uppercase">Roster entries found</p>
-                    <div className="border-2 border-frame rounded-xl overflow-hidden divide-y divide-frame">
-                      {searchResults.map((result, i) => (
-                        <button
-                          key={result.id}
-                          onClick={() => handleAssign(result)}
-                          disabled={isAssigning || selectedCount === 0}
-                          className={`w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-accent/10 transition-colors disabled:opacity-40 disabled:hover:bg-transparent ${i === 0 ? 'bg-accent/5 border-l-4 border-l-accent' : ''}`}
-                        >
-                          <span className="w-10 h-10 bg-accent rounded-lg border-2 border-foreground shadow-pop-sm flex items-center justify-center flex-shrink-0">
-                            <span className="font-outfit font-extrabold text-white text-sm leading-none">#{result.jersey_number}</span>
-                          </span>
-                          <div className="min-w-0 flex-1">
-                            <p className="font-outfit font-bold text-foreground text-sm">{result.player_name}</p>
-                            <p className="font-jakarta text-xs text-muted-fg">
-                              {result.team_name}
-                              {result.uniform_color && ` · ${result.uniform_color}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            {i === 0 && (
-                              <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded border border-frame whitespace-nowrap">↵ Enter</span>
-                            )}
-                            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="text-muted-fg flex-shrink-0">
-                              <polyline points="9 18 15 12 9 6"></polyline>
-                            </svg>
-                          </div>
-                        </button>
-                      ))}
-                    </div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto">
+                    {searchResults.map((result, i) => (
+                      <button
+                        key={result.id}
+                        onClick={() => handleAssign(result)}
+                        disabled={isAssigning || selectedCount === 0}
+                        className={`w-full text-left px-2 py-2 rounded text-sm flex items-center gap-2 transition-colors disabled:opacity-40 ${
+                          i === 0 ? 'bg-accent/10 border border-accent' : 'hover:bg-muted border border-transparent'
+                        }`}
+                      >
+                        <span className="w-7 h-7 bg-accent rounded flex items-center justify-center flex-shrink-0">
+                          <span className="font-outfit font-bold text-white text-xs">#{result.jersey_number}</span>
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-outfit font-bold text-foreground text-xs">{result.player_name}</p>
+                          <p className="font-jakarta text-xs text-muted-fg truncate">{result.team_name}</p>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 )}
 
+                {!searchQuery && searchResults.length === 0 && (
+                  <p className="font-jakarta text-xs text-muted-fg text-center py-2">Start typing to search</p>
+                )}
+
                 {searchQuery && !isSearching && searchResults.length === 0 && (
-                  <p className="font-jakarta text-xs text-secondary text-center py-3 bg-secondary/5 rounded-lg border border-secondary/20">
-                    No roster entry found for "{searchQuery}"<br/>
-                    <span className="text-muted-fg text-[11px]">Add new players on the Roster tab</span>
-                  </p>
+                  <p className="font-jakarta text-xs text-secondary text-center py-2">No matches found</p>
                 )}
 
-                {selectedCount === 0 && clusterPhotos.length > 0 && (
-                  <p className="font-jakarta text-xs text-secondary text-center py-3 bg-secondary/5 rounded-lg border border-secondary/20">
-                    Select at least one photo before assigning
-                  </p>
-                )}
-
-                {!searchQuery && searchResults.length === 0 && selectedCount > 0 && (
-                  <p className="font-jakarta text-xs text-muted-fg text-center py-2">
-                    Start typing to search available players
-                  </p>
-                )}
+                <label className="flex items-center gap-2 rounded border-2 border-frame bg-muted/20 px-2 py-2">
+                  <input
+                    type="checkbox"
+                    checked={writeMetadata}
+                    onChange={e => handleWriteMetadataChange(e.target.checked)}
+                    className="h-3 w-3 accent-accent"
+                  />
+                  <span>
+                    <span className="block font-jakarta text-xs font-bold text-foreground">Write metadata</span>
+                    <span className="block font-jakarta text-[10px] text-muted-fg">to XMP sidecars</span>
+                  </span>
+                </label>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* ── Hover-zoom lens (spec Scen B) ───────────────────────────────────── */}
@@ -654,29 +631,46 @@ export const ReviewPage: React.FC = () => {
   );
 };
 
-// ── Cluster list row ─────────────────────────────────────────────────────────
-const ClusterRow: React.FC<{
+// ── Cluster row with checkbox for bulk selection ──────────────────────────
+const ClusterRowWithCheckbox: React.FC<{
   cluster: ClusterWithAssignment;
   isSelected: boolean;
+  isBulkSelected: boolean;
   identified?: boolean;
-  onClick: (c: ClusterWithAssignment) => void;
-}> = ({ cluster, isSelected, identified, onClick }) => (
+  onSelect: () => void;
+  onToggleBulk: () => void;
+}> = ({ cluster, isSelected, isBulkSelected, identified, onSelect, onToggleBulk }) => (
   <button
-    onClick={() => onClick(cluster)}
-    className={`w-full text-left px-4 py-3 flex items-center gap-3 transition-colors ${
+    onClick={onSelect}
+    className={`w-full text-left px-2 py-2 flex items-center gap-2 transition-colors border-l-4 ${
       isSelected
         ? identified
-          ? 'bg-quaternary/10 border-l-4 border-quaternary'
-          : 'bg-accent/10 border-l-4 border-accent'
-        : 'hover:bg-muted/40 border-l-4 border-transparent'
+          ? 'bg-quaternary/10 border-quaternary'
+          : 'bg-accent/10 border-accent'
+        : 'hover:bg-muted/30 border-transparent'
     }`}
   >
-    <div className={`w-9 h-9 rounded-full overflow-hidden border-2 flex-shrink-0 ${identified ? 'border-quaternary' : 'border-foreground'} bg-muted`}>
+    {!identified && (
+      <button
+        onClick={e => { e.stopPropagation(); onToggleBulk(); }}
+        className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+          isBulkSelected ? 'bg-accent border-accent' : 'border-frame hover:border-foreground'
+        }`}
+      >
+        {isBulkSelected && (
+          <svg width="6" height="6" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 10 10">
+            <polyline points="1.5,5.5 4,8 8.5,2" />
+          </svg>
+        )}
+      </button>
+    )}
+
+    <div className={`w-7 h-7 rounded-full overflow-hidden border-2 flex-shrink-0 ${identified ? 'border-quaternary' : 'border-foreground'} bg-muted`}>
       {cluster.thumbnail_face_id ? (
         <img src={photoTaggerClient.getFaceCropUrl(cluster.thumbnail_face_id)} alt="" className="w-full h-full object-cover" />
       ) : (
-        <div className="w-full h-full flex items-center justify-center">
-          <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg">
+        <div className="w-full h-full flex items-center justify-center bg-muted">
+          <svg width="10" height="10" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-muted-fg">
             <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
           </svg>
         </div>
@@ -684,14 +678,13 @@ const ClusterRow: React.FC<{
     </div>
     <div className="min-w-0 flex-1">
       <p className="font-outfit font-bold text-foreground text-xs leading-tight truncate">
-        {cluster.player_name ?? `Cluster #${cluster.id}`}
+        {cluster.player_name ?? `#${cluster.id}`}
       </p>
       <p className="font-jakarta text-xs text-muted-fg">
         {cluster.photo_count} photo{cluster.photo_count !== 1 ? 's' : ''}
-        {cluster.jersey_number && ` · #${cluster.jersey_number}`}
       </p>
     </div>
-    {isSelected && <span className="text-accent text-xs ml-auto">▶</span>}
+    {isSelected && <span className="text-accent text-xs ml-auto flex-shrink-0">▶</span>}
   </button>
 );
 
