@@ -33,6 +33,8 @@ import {
   ClusterPlayersResult,
   GameContextResponse,
   GameContextTeam,
+  PhotoBatch,
+  BatchesResponse,
 } from '../types/index';
 
 const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5001';
@@ -440,6 +442,28 @@ class PhotoTaggerClient {
 
   async deassignFaces(faceIds: number[]): Promise<DeassignFacesResponse> {
     const response = await this.client.post<DeassignFacesResponse>('/api/faces/deassign', { face_ids: faceIds });
+    return response.data;
+  }
+
+  // ── Photo Batches (Import Groups) ─────────────────────────────────────────
+
+  async getBatches(): Promise<BatchesResponse> {
+    const response = await this.client.get<BatchesResponse>('/api/batches');
+    return response.data;
+  }
+
+  async getBatch(batchId: number): Promise<{ batch: PhotoBatch; photos: any[] }> {
+    const response = await this.client.get(`/api/batches/${batchId}`);
+    return response.data;
+  }
+
+  async updateBatch(batchId: number, data: Partial<PhotoBatch>): Promise<{ success: boolean; batch: PhotoBatch }> {
+    const response = await this.client.put<{ success: boolean; batch: PhotoBatch }>(`/api/batches/${batchId}`, data);
+    return response.data;
+  }
+
+  async deleteBatch(batchId: number): Promise<{ success: boolean; affected_photos: number }> {
+    const response = await this.client.delete<{ success: boolean; affected_photos: number }>(`/api/batches/${batchId}`);
     return response.data;
   }
 

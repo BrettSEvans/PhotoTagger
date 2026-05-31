@@ -16,9 +16,13 @@ class PhotoCrawler:
         """Initialize crawler with a database connection."""
         self.db = db
 
-    def crawl(self, photo_dir: str) -> Dict:
+    def crawl(self, photo_dir: str, batch_id: int | None = None) -> Dict:
         """
         Crawl a directory for photos and ingest them.
+
+        Args:
+            photo_dir: Directory path to crawl
+            batch_id: Optional batch ID to assign photos to
 
         Returns:
             Dict with keys:
@@ -26,6 +30,8 @@ class PhotoCrawler:
             - photos_ingested: successfully added to database
             - duplicates_skipped: already in database
             - errors: number of processing errors
+            - source_folder: the crawled folder path
+            - batch_id: the batch ID (if created or provided)
         """
         photo_dir = Path(photo_dir)
 
@@ -37,6 +43,8 @@ class PhotoCrawler:
             "photos_ingested": 0,
             "duplicates_skipped": 0,
             "errors": 0,
+            "source_folder": str(photo_dir.resolve()),
+            "batch_id": batch_id,
         }
 
         # Walk the directory recursively (case-insensitive)
@@ -59,8 +67,13 @@ class PhotoCrawler:
                     results["duplicates_skipped"] += 1
                     continue
 
-                # Ingest the photo
-                photo_id = self.db.add_photo(str(file_path), file_hash)
+                # Ingest the photo with source folder and batch
+                photo_id = self.db.add_photo(
+                    str(file_path),
+                    file_hash,
+                    source_folder=str(photo_dir.resolve()),
+                    batch_id=batch_id,
+                )
                 logger.debug(f"Ingested: {file_path} (ID: {photo_id})")
                 results["photos_ingested"] += 1
 

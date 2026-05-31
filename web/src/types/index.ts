@@ -412,3 +412,25 @@ export interface PlayerClusterFull extends PlayerCluster {
   player_name?: string;
   jersey_number?: string;
 }
+
+/**
+ * PhotoBatch - A group of photos from a single import folder with metadata
+ */
+export interface PhotoBatch {
+  id: number;
+  name?: string;
+  source_folder: string;
+  team_name?: string | null;
+  team_year?: number | null;
+  tournament?: string | null;
+  photo_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * BatchesResponse - API response from /api/batches
+ */
+export interface BatchesResponse {
+  batches: PhotoBatch[];
+}

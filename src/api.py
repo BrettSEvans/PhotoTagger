@@ -230,7 +230,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         JSON body:
         {
-            "photo_dir": "/path/to/photos"
+            "photo_dir": "/path/to/photos",
+            "team_name": "Team A",  // optional
+            "team_year": 2026,       // optional
+            "tournament": "Regional" // optional
         }
         """
         data = request.get_json() or {}
@@ -248,7 +251,21 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"error": f"Directory not found: {photo_dir}"}), 404
 
         try:
-            return enqueue_job("crawl", {"photo_dir": photo_dir}, lambda: app.crawler.crawl(photo_dir))
+            # Create batch for this import
+            batch_id = db.create_batch(
+                source_folder=photo_dir,
+                team_name=data.get("team_name"),
+                team_year=data.get("team_year"),
+                tournament=data.get("tournament"),
+            )
+
+            def crawl_with_batch():
+                result = app.crawler.crawl(photo_dir, batch_id=batch_id)
+                # Update batch photo count
+                db.update_batch_photo_count(batch_id)
+                return result
+
+            return enqueue_job("crawl", {"photo_dir": photo_dir, "batch_id": batch_id}, crawl_with_batch)
         except Exception as e:
             logger.error(f"Crawl error: {e}")
             return jsonify({"error": str(e)}), 500
@@ -728,6 +745,54 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         try:
             results = db.search_roster(q)
             return jsonify({"results": results}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ── Photo Batch (Import Group) Management ────────────────────────────────
+
+    @app.route("/api/batches", methods=["GET"])
+    def list_batches():
+        """List all photo batches."""
+        try:
+            batches = db.get_all_batches()
+            return jsonify({"batches": batches}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batches/<int:batch_id>", methods=["GET"])
+    def get_batch(batch_id: int):
+        """Get a single batch by ID."""
+        try:
+            batch = db.get_batch(batch_id)
+            if not batch:
+                return jsonify({"error": "Batch not found"}), 404
+            photos = db.get_photos_by_batch(batch_id)
+            return jsonify({"batch": batch, "photos": photos}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batches/<int:batch_id>", methods=["PUT"])
+    def update_batch(batch_id: int):
+        """Update batch metadata (team_name, team_year, tournament)."""
+        data = request.get_json() or {}
+        try:
+            db.update_batch(
+                batch_id,
+                team_name=data.get("team_name"),
+                team_year=data.get("team_year"),
+                tournament=data.get("tournament"),
+            )
+            batch = db.get_batch(batch_id)
+            return jsonify({"success": True, "batch": batch}), 200
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batches/<int:batch_id>", methods=["DELETE"])
+    def delete_batch(batch_id: int):
+        """Delete a batch (unpin photos from it)."""
+        try:
+            affected = db.delete_batch(batch_id)
+            return jsonify({"success": True, "affected_photos": affected}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
