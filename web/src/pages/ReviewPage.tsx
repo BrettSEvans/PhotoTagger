@@ -640,9 +640,9 @@ const ClusterRowWithCheckbox: React.FC<{
   onSelect: () => void;
   onToggleBulk: () => void;
 }> = ({ cluster, isSelected, isBulkSelected, identified, onSelect, onToggleBulk }) => (
-  <button
+  <div
     onClick={onSelect}
-    className={`w-full text-left px-2 py-2 flex items-center gap-2 transition-colors border-l-4 ${
+    className={`w-full text-left px-2 py-2 flex items-center gap-2 transition-colors border-l-4 cursor-pointer ${
       isSelected
         ? identified
           ? 'bg-quaternary/10 border-quaternary'
@@ -651,18 +651,20 @@ const ClusterRowWithCheckbox: React.FC<{
     }`}
   >
     {!identified && (
-      <button
+      <div
         onClick={e => { e.stopPropagation(); onToggleBulk(); }}
-        className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors ${
+        className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-colors cursor-pointer ${
           isBulkSelected ? 'bg-accent border-accent' : 'border-frame hover:border-foreground'
         }`}
+        role="checkbox"
+        aria-checked={isBulkSelected}
       >
         {isBulkSelected && (
           <svg width="6" height="6" fill="none" stroke="white" strokeWidth="2.5" viewBox="0 0 10 10">
             <polyline points="1.5,5.5 4,8 8.5,2" />
           </svg>
         )}
-      </button>
+      </div>
     )}
 
     <div className={`w-7 h-7 rounded-full overflow-hidden border-2 flex-shrink-0 ${identified ? 'border-quaternary' : 'border-foreground'} bg-muted`}>
@@ -685,7 +687,7 @@ const ClusterRowWithCheckbox: React.FC<{
       </p>
     </div>
     {isSelected && <span className="text-accent text-xs ml-auto flex-shrink-0">▶</span>}
-  </button>
+  </div>
 );
 
 export default ReviewPage;
