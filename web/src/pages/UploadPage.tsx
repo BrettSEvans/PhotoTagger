@@ -136,7 +136,9 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         .filter(team => team.team_name && team.uniform_color);
       const data = await photoTaggerClient.setGameContext(teams);
       setGameContext(data.teams);
-      setContextMsg('Game context saved');
+      setContextMsg('Game saved');
+      // Refresh sidebar so updated batch metadata is reflected
+      await loadBatches();
     } catch (err) {
       console.error('Failed to save game context:', err);
     }
@@ -201,6 +203,9 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         </div>
       )}
 
+      {/* Import form */}
+      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
+
       {/* Game Context */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
         <div className="flex items-center justify-between gap-3">
@@ -213,7 +218,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
             onClick={saveGameContext}
             className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
           >
-            Save Context
+            Save Game
           </button>
         </div>
         <div className="space-y-4">
@@ -275,9 +280,6 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         </div>
         {contextMsg && <p className="font-jakarta text-xs font-semibold text-foreground">{contextMsg}</p>}
       </div>
-
-      {/* Import form */}
-      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
 
       {/* ── Summary Accordion ──────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden relative">
