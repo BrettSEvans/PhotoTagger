@@ -682,6 +682,33 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/roster/infer", methods=["POST"])
+    def infer_team_and_year():
+        """Infer team name and year from a roster filename.
+
+        JSON body:
+        {
+            "filename": "Carleton CUT 2026.csv"
+        }
+
+        Returns:
+        {
+            "team_name": "Carleton CUT" or null,
+            "team_year": 2026 or null
+        }
+        """
+        data = request.get_json() or {}
+        filename = data.get("filename", "").strip()
+        if not filename:
+            return jsonify({"error": "filename is required"}), 400
+
+        from src.roster_import import infer_team_and_year
+        team, year = infer_team_and_year(filename)
+        return jsonify({
+            "team_name": team,
+            "team_year": year,
+        }), 200
+
     @app.route("/api/roster/import", methods=["POST"])
     def import_roster_file():
         team = str(request.form.get("team_name", "Manual Entry")).strip() or "Manual Entry"

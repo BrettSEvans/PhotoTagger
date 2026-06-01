@@ -18,6 +18,45 @@ class RosterImportError(ValueError):
     """Raised when roster rows cannot be extracted from an import source."""
 
 
+def infer_team_and_year(filename: str) -> tuple[str | None, int | None]:
+    """Infer team name and year from a roster filename.
+
+    Examples:
+      "Carleton CUT 2026.csv" → ("Carleton CUT", 2026)
+      "2026 - Team Name.xlsx" → ("Team Name", 2026)
+      "team_roster.txt" → (None, None)
+      "Finals_2024_Roster.xlsx" → ("Finals Roster", 2024)
+
+    Returns:
+      (team_name, year) where either or both may be None if not found
+    """
+    basename = Path(filename).stem  # Remove extension
+
+    # Try to extract year (4-digit number, 2000-2099 range)
+    # Look for year with optional separators before/after
+    year_match = re.search(r'[_\-\s]?(20\d{2})[_\-\s]?', basename)
+    year = int(year_match.group(1)) if year_match else None
+
+    # Remove year and separators to get team name
+    team = basename
+    if year_match:
+        # Remove the year match including surrounding separators
+        team = team[:year_match.start()] + ' ' + team[year_match.end():]
+
+    # Clean up separators and whitespace
+    team = re.sub(r'[_\-]+', ' ', team)
+    team = re.sub(r'\s+', ' ', team).strip()
+
+    # Only remove trailing suffixes that are very unlikely to be part of a team name
+    team = re.sub(r'\s+(roster|export|data|file)$', '', team, flags=re.IGNORECASE).strip()
+
+    # Return None for team if it's empty or too short
+    if not team or len(team) < 2:
+        team = None
+
+    return (team, year)
+
+
 # Cloud metadata endpoints (AWS/Azure IMDS, ECS task metadata, GCP).
 _METADATA_HOSTNAMES = {"metadata.google.internal"}
 _METADATA_IPS = {"169.254.169.254", "169.254.170.2"}

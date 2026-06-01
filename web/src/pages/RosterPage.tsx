@@ -159,7 +159,27 @@ export const RosterPage: React.FC = () => {
     setImportMsg(null);
     setIsParsing(true);
     try {
-      const result = await photoTaggerClient.importRosterFile(file, importTeam, importTeamYear, duplicatePolicy, importTeamColor.trim() || undefined);
+      // Infer team name and year from filename
+      let teamName = importTeam;
+      let teamYear = importTeamYear;
+      try {
+        const inferResponse = await fetch('http://127.0.0.1:5001/api/roster/infer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ filename: file.name }),
+        });
+        if (inferResponse.ok) {
+          const inferred = await inferResponse.json();
+          if (inferred.team_name) teamName = inferred.team_name;
+          if (inferred.team_year) teamYear = inferred.team_year;
+          setImportTeam(teamName);
+          setImportTeamYear(teamYear);
+        }
+      } catch {
+        // Inference failed, continue with current values
+      }
+
+      const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy, importTeamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
