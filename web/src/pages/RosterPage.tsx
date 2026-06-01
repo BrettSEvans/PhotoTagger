@@ -1,9 +1,7 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import type { GameContextTeam, RosterEntry } from '../types/index';
-
-const TEAMS = ['All Teams', 'Carleton CUT', 'Pittsburgh En Sabah Nur', 'Manual Entry'];
 
 export const RosterPage: React.FC = () => {
   const [entries, setEntries]       = useState<RosterEntry[]>([]);
@@ -14,7 +12,8 @@ export const RosterPage: React.FC = () => {
   // Inline entry form
   const [newName,   setNewName]   = useState('');
   const [newJersey, setNewJersey] = useState('');
-  const [newTeam,   setNewTeam]   = useState('Manual Entry');
+  const [newTeam,   setNewTeam]   = useState('');
+  const [teamYear,  setTeamYear]  = useState(2026);
   const [teamColor, setTeamColor] = useState('');
   const [isSaving,  setIsSaving]  = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
@@ -27,9 +26,24 @@ export const RosterPage: React.FC = () => {
   const [isParsing,  setIsParsing]  = useState(false);
   const [importMsg,  setImportMsg]  = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [rosterUrl,  setRosterUrl]  = useState('');
-  const [teamYear,   setTeamYear]   = useState(2026);
+  const [importTeam, setImportTeam] = useState('');
+  const [importTeamYear,   setImportTeamYear]   = useState(2026);
   const [duplicatePolicy, setDuplicatePolicy] = useState<'replace' | 'skip'>('replace');
+  const [importTeamColor, setImportTeamColor] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derived team list for filtering
+  const rosterTeams = useMemo(() => {
+    const teams = new Set<string>();
+    entries.forEach(e => {
+      if (e.team_name) teams.add(e.team_name);
+    });
+    return Array.from(teams).sort();
+  }, [entries]);
+
+  const allTeamOptions = useMemo(() => {
+    return ['All Teams', ...rosterTeams];
+  }, [rosterTeams]);
 
   useEffect(() => {
     loadRoster();
@@ -144,7 +158,7 @@ export const RosterPage: React.FC = () => {
     setImportMsg(null);
     setIsParsing(true);
     try {
-      const result = await photoTaggerClient.importRosterFile(file, newTeam, teamYear, duplicatePolicy, teamColor.trim() || undefined);
+      const result = await photoTaggerClient.importRosterFile(file, importTeam, importTeamYear, duplicatePolicy, importTeamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
@@ -159,7 +173,7 @@ export const RosterPage: React.FC = () => {
     setImportMsg(null);
     setIsParsing(true);
     try {
-      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), newTeam, teamYear, duplicatePolicy, teamColor.trim() || undefined);
+      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), importTeam, importTeamYear, duplicatePolicy, importTeamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
@@ -191,8 +205,6 @@ export const RosterPage: React.FC = () => {
     }
     importFile(file);
   };
-
-  const rosterTeams = Array.from(new Set([...TEAMS.slice(1), ...entries.map(e => e.team_name)])).filter(Boolean);
 
   const filtered = filterTeam === 'All Teams'
     ? entries
@@ -333,45 +345,70 @@ export const RosterPage: React.FC = () => {
           </div>
 
           {/* Team selector for import */}
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_88px] gap-3">
-            <div>
-              <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Import as team
-              </label>
-              <select
-                value={newTeam}
-                onChange={e => setNewTeam(e.target.value)}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground appearance-none cursor-pointer"
-              >
-                {rosterTeams.map(team => <option key={team}>{team}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="teamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Year
-              </label>
-              <input
-                id="teamYear"
-                type="number"
-                value={teamYear}
-                onChange={e => setTeamYear(Number(e.target.value) || 2026)}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-              />
+          <div>
+            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
+              Import as team
+            </label>
+            <div className="space-y-2">
+              {rosterTeams.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {rosterTeams.map(team => (
+                    <button
+                      key={team}
+                      onClick={() => setImportTeam(team)}
+                      className={`font-jakarta text-sm px-3 py-1.5 rounded-full border-2 transition-colors ${
+                        importTeam === team
+                          ? 'bg-accent text-white border-foreground shadow-pop'
+                          : 'bg-white text-foreground border-frame hover:border-foreground'
+                      }`}
+                    >
+                      {team}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div>
+                <label htmlFor="importTeam" className="block font-jakarta text-xs text-muted-fg mb-1">
+                  Or type a new team name:
+                </label>
+                <input
+                  id="importTeam"
+                  type="text"
+                  value={importTeam}
+                  onChange={e => setImportTeam(e.target.value)}
+                  placeholder="Team name…"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                />
+              </div>
             </div>
           </div>
 
-          <div>
-            <label htmlFor="teamColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-              Team uniform color
-            </label>
-            <input
-              id="teamColor"
-              type="text"
-              value={teamColor}
-              onChange={e => setTeamColor(e.target.value)}
-              placeholder="red, white, blue…"
-              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_130px] gap-3">
+            <div>
+              <label htmlFor="importTeamColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Team uniform color
+              </label>
+              <input
+                id="importTeamColor"
+                type="text"
+                value={importTeamColor}
+                onChange={e => setImportTeamColor(e.target.value)}
+                placeholder="red, white, blue…"
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+              />
+            </div>
+            <div>
+              <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Year
+              </label>
+              <input
+                id="importTeamYear"
+                type="number"
+                value={importTeamYear}
+                onChange={e => setImportTeamYear(Number(e.target.value) || 2026)}
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
+            </div>
           </div>
 
           <div>
