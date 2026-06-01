@@ -999,9 +999,17 @@ class Database:
         team_year: Optional[int] = None,
         tournament: Optional[str] = None,
     ) -> int:
-        """Create a photo batch for an import folder and return its ID."""
+        """Create a photo batch for an import folder and return its ID.
+
+        If a batch for this source_folder already exists, returns its ID.
+        """
         with self._lock:
             cursor = self.conn.cursor()
+            # Check if batch already exists for this folder
+            cursor.execute("SELECT id FROM photo_batches WHERE source_folder = ?", (source_folder,))
+            existing = cursor.fetchone()
+            if existing:
+                return existing[0]
             # Auto-generate name from folder if not provided
             if not name:
                 name = Path(source_folder).name
