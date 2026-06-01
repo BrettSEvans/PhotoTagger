@@ -5,6 +5,8 @@ from typing import List, Optional, Dict
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
+import cv2
+import numpy as np
 import easyocr
 from src.db import Database
 from src.face_detector import FaceDetector
@@ -44,9 +46,6 @@ class OCREngine:
 
         Returns numpy array ready for EasyOCR, or None on failure.
         """
-        import cv2
-        import numpy as np
-
         img = cv2.imread(photo_path)
         if img is None:
             return None
