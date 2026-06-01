@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-01 (continued — 2)
+
+- Added a bright red "Danger zone" banner at the top of the Roster page with a "🗑 Delete All Data" CTA. Clicking opens a confirmation modal that lists exactly what will be deleted. Confirming calls the new `POST /api/data/reset` endpoint, which wipes all photos, OCR results, detected faces, player clusters, photo batches, rosters, game context, and processing jobs in a single transaction and returns per-table row counts. The roster list reloads (empty) after a successful reset.
+  - Commit: 5d62444
+
 ## 2026-06-01 (continued)
 
 - Added post-assignment face similarity scan on the Review tab. After tagging a cluster, the backend computes cosine similarity between the assigned cluster's face centroid and every remaining unidentified cluster. Clusters with ≥85% similarity are auto-tagged immediately (reflected live in the cluster list). Clusters with 70–85% similarity appear as interactive suggestion cards in the assignment drawer — each shows a face thumbnail, match %, and "Yes, tag" / "Skip" buttons. New backend helpers: `get_cluster_by_id`, `get_cluster_face_embeddings`, `get_unidentified_clusters_with_embeddings`; new endpoint `POST /api/players/<id>/match-similar`.
