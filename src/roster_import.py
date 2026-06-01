@@ -1,10 +1,11 @@
 import csv
 import io
 import re
+import socket
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import Dict, List, Sequence
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 import ipaddress
 
 import requests
@@ -15,6 +16,72 @@ RosterRow = Dict[str, str]
 
 class RosterImportError(ValueError):
     """Raised when roster rows cannot be extracted from an import source."""
+
+
+# Cloud metadata endpoints (AWS/Azure IMDS, ECS task metadata, GCP).
+_METADATA_HOSTNAMES = {"metadata.google.internal"}
+_METADATA_IPS = {"169.254.169.254", "169.254.170.2"}
+_LOCALHOST_HOSTNAMES = {"localhost", "ip6-localhost"}
+_MAX_REDIRECTS = 5
+
+
+def _blocked_ip_reason(ip_str: str) -> "str | None":
+    """Return a human reason if the IP must be blocked, else None.
+
+    The message wording is categorized (metadata / localhost / private) so callers
+    and tests can distinguish why a destination was rejected.
+    """
+    if ip_str in _METADATA_IPS:
+        return "URLs pointing to cloud metadata services are not allowed"
+    try:
+        ip = ipaddress.ip_address(ip_str)
+    except ValueError:
+        return "URLs pointing to private or reserved IP addresses are not allowed"
+    if ip.is_loopback:
+        return "URLs pointing to localhost are not allowed"
+    if (
+        ip.is_private
+        or ip.is_link_local
+        or ip.is_reserved
+        or ip.is_multicast
+        or ip.is_unspecified
+    ):
+        return "URLs pointing to private or reserved IP addresses are not allowed"
+    return None
+
+
+def _validate_public_url(url: str) -> None:
+    """Raise RosterImportError unless the URL resolves only to public IP addresses.
+
+    Resolving the hostname and checking every returned address blocks SSRF via
+    attacker-controlled domains that point at internal IPs (e.g. 127.0.0.1 or the
+    cloud metadata endpoint). A narrow DNS-rebinding window remains between this
+    check and the actual socket connection.
+    """
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise RosterImportError("Only HTTP/HTTPS URLs are supported")
+
+    hostname = parsed.hostname
+    if not hostname:
+        raise RosterImportError("Invalid URL: missing hostname")
+
+    host_lower = hostname.lower()
+    if host_lower in _LOCALHOST_HOSTNAMES:
+        raise RosterImportError("URLs pointing to localhost are not allowed")
+    if host_lower in _METADATA_HOSTNAMES:
+        raise RosterImportError("URLs pointing to cloud metadata services are not allowed")
+
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    try:
+        infos = socket.getaddrinfo(hostname, port, proto=socket.IPPROTO_TCP)
+    except socket.gaierror as exc:
+        raise RosterImportError(f"Could not fetch roster URL: cannot resolve host {hostname}") from exc
+
+    for info in infos:
+        reason = _blocked_ip_reason(info[4][0])
+        if reason:
+            raise RosterImportError(reason)
 
 
 def parse_roster_file(filename: str, content: bytes) -> List[RosterRow]:
@@ -90,44 +157,34 @@ class RosterImporter:
 
     @staticmethod
     def fetch_url(url: str) -> List[RosterRow]:
-        # Validate URL to prevent SSRF attacks
-        parsed = urlparse(url)
+        # Follow redirects manually so each hop is re-validated against SSRF rules.
+        current = url
+        for _ in range(_MAX_REDIRECTS + 1):
+            _validate_public_url(current)
+            try:
+                response = requests.get(
+                    current,
+                    timeout=20,
+                    allow_redirects=False,
+                    headers={"User-Agent": "PhotoTagger roster importer"},
+                )
+            except requests.RequestException as exc:
+                raise RosterImportError(f"Could not fetch roster URL: {exc}") from exc
 
-        # Only allow HTTP/HTTPS
-        if parsed.scheme not in ("http", "https"):
-            raise RosterImportError("Only HTTP/HTTPS URLs are supported")
+            if getattr(response, "is_redirect", False) or getattr(response, "is_permanent_redirect", False):
+                location = response.headers.get("Location")
+                if not location:
+                    break
+                current = urljoin(current, location)
+                continue
 
-        hostname = parsed.hostname
-        if not hostname:
-            raise RosterImportError("Invalid URL: missing hostname")
+            try:
+                response.raise_for_status()
+            except requests.RequestException as exc:
+                raise RosterImportError(f"Could not fetch roster URL: {exc}") from exc
+            return RosterImporter.parse_html(response.text)
 
-        # Block localhost and loopback addresses
-        if hostname in {"localhost", "127.0.0.1", "::1", "0.0.0.0"}:
-            raise RosterImportError("URLs pointing to localhost are not allowed")
-
-        # Block cloud metadata services
-        if hostname in {"169.254.169.254", "metadata.google.internal", "169.254.170.2"}:
-            raise RosterImportError("URLs pointing to cloud metadata services are not allowed")
-
-        # Block private IP ranges
-        try:
-            ip = ipaddress.ip_address(hostname)
-            if ip.is_private or ip.is_loopback or ip.is_link_local:
-                raise RosterImportError("URLs pointing to private or reserved IP addresses are not allowed")
-        except ValueError:
-            # hostname is not an IP address, which is fine
-            pass
-
-        try:
-            response = requests.get(
-                url,
-                timeout=20,
-                headers={"User-Agent": "PhotoTagger roster importer"},
-            )
-            response.raise_for_status()
-        except requests.RequestException as exc:
-            raise RosterImportError(f"Could not fetch roster URL: {exc}") from exc
-        return RosterImporter.parse_html(response.text)
+        raise RosterImportError("Too many redirects while fetching roster URL")
 
 
 def _clean_cell(value) -> str:

@@ -138,12 +138,16 @@ class FaceClusterer:
                 if not photos:
                     continue
 
+                # Fetch the latest OCR row for every photo in the cluster in one query
+                # (avoids an N+1 lookup per photo).
+                ocr_by_photo = self.db.get_latest_ocr_by_photo_ids([p["id"] for p in photos])
+
                 # Collect jersey numbers and colors from OCR results
                 jersey_candidates = {}  # jersey -> count
                 color_samples = []
 
                 for photo in photos:
-                    ocr = self.db.get_photo_ocr(photo["id"])
+                    ocr = ocr_by_photo.get(photo["id"])
                     if not ocr or not ocr.get("jersey_number"):
                         continue
 

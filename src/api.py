@@ -665,7 +665,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         jersey = str(data.get("jersey_number", "")).strip()
         name   = str(data.get("player_name", "")).strip()
         team   = str(data.get("team_name", "Manual Entry")).strip()
-        year   = int(data.get("team_year", 2026))
+        try:
+            year = int(data.get("team_year", 2026))
+        except (TypeError, ValueError):
+            return jsonify({"error": "team_year must be an integer"}), 400
         uniform_color = str(data.get("uniform_color", "")).strip().lower() or None
         if not jersey or not name:
             return jsonify({"error": "jersey_number and player_name are required"}), 400
@@ -808,8 +811,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
     @app.route("/api/confirmed-photos", methods=["GET"])
     def confirmed_photos():
-        limit  = int(request.args.get("limit", 60))
-        offset = int(request.args.get("offset", 0))
+        limit  = parse_int_arg(request.args.get("limit", 60))
+        offset = parse_int_arg(request.args.get("offset", 0))
+        if limit is None or offset is None:
+            return jsonify({"error": "limit and offset must be integers"}), 400
         try:
             photos = db.get_confirmed_photos(limit, offset)
             return jsonify({"photos": photos, "total": len(photos)}), 200
@@ -818,8 +823,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
     @app.route("/api/review-photos", methods=["GET"])
     def review_photos():
-        limit  = int(request.args.get("limit", 60))
-        offset = int(request.args.get("offset", 0))
+        limit  = parse_int_arg(request.args.get("limit", 60))
+        offset = parse_int_arg(request.args.get("offset", 0))
+        if limit is None or offset is None:
+            return jsonify({"error": "limit and offset must be integers"}), 400
         try:
             photos = db.get_review_photos(limit, offset)
             return jsonify({"photos": photos, "total": len(photos)}), 200
@@ -913,12 +920,28 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return send_from_directory(dist, "index.html")
         return jsonify({"error": "web build not found. Run npm run build in web/ before serving cloud-ui."}), 500
 
-    # Add CORS support
+    # Add CORS support — restrict to an allowlist instead of "*" so arbitrary
+    # websites cannot drive the local agent on 127.0.0.1.
+    def allowed_cors_origins() -> set[str]:
+        raw = os.environ.get("PHOTOTAGGER_ALLOWED_ORIGINS", "").strip()
+        if raw:
+            return {origin.strip() for origin in raw.split(",") if origin.strip()}
+        # Sensible defaults for local development (Vite dev server + preview).
+        return {
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        }
+
     @app.after_request
     def after_request(response):
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-PhotoTagger-Agent-Token')
-        response.headers.add('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
+        origin = request.headers.get("Origin")
+        if origin and origin in allowed_cors_origins():
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers.add("Vary", "Origin")
+            response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-PhotoTagger-Agent-Token"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
 
     return app
