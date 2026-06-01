@@ -211,13 +211,12 @@ export const RosterPage: React.FC = () => {
     setIsResetting(true);
     try {
       await photoTaggerClient.resetAllData();
-      // Reload the roster (will be empty)
-      await loadRoster();
-      setEntries([]);
+      // Full page reload clears ALL component state across every tab
+      // (Gallery, Review, Players, sidebar — every page has its own cache)
+      window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Reset failed');
-    } finally {
       setIsResetting(false);
+      setError(err instanceof Error ? err.message : 'Reset failed — check backend logs');
     }
   };
 
