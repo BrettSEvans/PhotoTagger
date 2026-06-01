@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-06-01 (continued)
+
+- Added post-assignment face similarity scan on the Review tab. After tagging a cluster, the backend computes cosine similarity between the assigned cluster's face centroid and every remaining unidentified cluster. Clusters with ≥85% similarity are auto-tagged immediately (reflected live in the cluster list). Clusters with 70–85% similarity appear as interactive suggestion cards in the assignment drawer — each shows a face thumbnail, match %, and "Yes, tag" / "Skip" buttons. New backend helpers: `get_cluster_by_id`, `get_cluster_face_embeddings`, `get_unidentified_clusters_with_embeddings`; new endpoint `POST /api/players/<id>/match-similar`.
+  - Commit: bef5791
+
 ## 2026-06-01
 
 - Fixed "Local agent disconnected" error on fresh installs by moving the default API base URL from a hardcoded constant to `VITE_LOCAL_AGENT_URL` env var (set via `web/.env.local` for local dev); Railway deployments continue to use relative URLs. Also fixed a sidebar crash when photo batches have no `team_year` set. Added `*.pid` and `.env.local` to `.gitignore`.
