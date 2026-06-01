@@ -631,7 +631,7 @@ export const ReviewPage: React.FC = () => {
                           ✓ Auto-tagged {matchResults.auto_tagged.length} more cluster{matchResults.auto_tagged.length !== 1 ? 's' : ''} as {selectedCluster?.player_name}
                         </p>
                         <p className="font-jakarta text-[10px] text-muted-fg mt-0.5">
-                          All had ≥85% face similarity
+                          All had ≥60% face similarity
                         </p>
                       </div>
                     )}
