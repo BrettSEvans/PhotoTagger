@@ -1,0 +1,16 @@
+
+> phototagger-web@0.1.0 dev
+> vite
+
+Port 3000 is in use, trying another one...
+
+  VITE v5.4.21  ready in 97 ms
+
+  ➜  Local:   http://localhost:3001/
+  ➜  Network: use --host to expose
+1:27:23 PM [vite] hmr update /src/App.tsx, /src/styles/globals.css, /src/pages/GalleryPage.tsx, /src/pages/UploadPage.tsx, /src/pages/RosterPage.tsx, /src/pages/ReviewPage.tsx, /src/pages/PlayersPage.tsx, /src/pages/SearchPage.tsx, /src/components/PhotoUpload.tsx
+1:27:30 PM [vite] hmr update /src/pages/RosterPage.tsx, /src/styles/globals.css
+1:27:43 PM [vite] hmr update /src/pages/RosterPage.tsx, /src/styles/globals.css
+1:27:53 PM [vite] hmr update /src/pages/RosterPage.tsx, /src/styles/globals.css
+1:27:58 PM [vite] hmr update /src/pages/RosterPage.tsx, /src/styles/globals.css
+1:28:15 PM [vite] hmr update /src/pages/RosterPage.tsx, /src/styles/globals.css

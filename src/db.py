@@ -697,6 +697,99 @@ class Database:
             cursor.execute("DELETE FROM rosters WHERE id = ?", (entry_id,))
             self.conn.commit()
 
+    def update_roster_entry(self, entry_id: int, **kwargs) -> Dict:
+        """Update a roster entry with any combination of fields.
+
+        Args:
+            entry_id: The roster entry ID to update
+            player_name: (optional) New player name
+            jersey_number: (optional) New jersey number
+            team_name: (optional) New team name
+            team_year: (optional) New team year
+            uniform_color: (optional) New uniform color
+
+        Returns:
+            The updated roster entry dict
+
+        Raises:
+            ValueError: If entry not found or unique constraint would be violated
+            sqlite3.IntegrityError: If database constraint is violated
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+
+            # Get current entry to compare
+            cursor.execute(
+                "SELECT id, team_name, team_year, jersey_number, player_name, uniform_color FROM rosters WHERE id = ?",
+                (entry_id,)
+            )
+            row = cursor.fetchone()
+            if not row:
+                raise ValueError(f"Roster entry {entry_id} not found")
+
+            current = {
+                "id": row[0],
+                "team_name": row[1],
+                "team_year": row[2],
+                "jersey_number": row[3],
+                "player_name": row[4],
+                "uniform_color": row[5],
+            }
+
+            # Build update dict with new values, keeping current values for unspecified fields
+            updates = {
+                "team_name": kwargs.get("team_name", current["team_name"]),
+                "team_year": kwargs.get("team_year", current["team_year"]),
+                "jersey_number": kwargs.get("jersey_number", current["jersey_number"]),
+                "player_name": kwargs.get("player_name", current["player_name"]),
+                "uniform_color": kwargs.get("uniform_color", current["uniform_color"]),
+            }
+
+            # Validate required fields
+            if not updates["player_name"] or not updates["player_name"].strip():
+                raise ValueError("player_name cannot be empty")
+            if not updates["jersey_number"] or not updates["jersey_number"].strip():
+                raise ValueError("jersey_number cannot be empty")
+
+            # Check for unique constraint violation (only if the key fields changed)
+            key_fields_changed = (
+                updates["team_name"] != current["team_name"] or
+                updates["team_year"] != current["team_year"] or
+                updates["jersey_number"] != current["jersey_number"]
+            )
+
+            if key_fields_changed:
+                cursor.execute(
+                    """SELECT 1 FROM rosters
+                    WHERE id != ? AND team_name = ? AND team_year = ? AND jersey_number = ?""",
+                    (entry_id, updates["team_name"], updates["team_year"], updates["jersey_number"])
+                )
+                if cursor.fetchone():
+                    raise ValueError(
+                        f"Roster entry already exists for {updates['team_name']} "
+                        f"({updates['team_year']}) jersey #{updates['jersey_number']}"
+                    )
+
+            # Perform update
+            cursor.execute(
+                """UPDATE rosters
+                SET player_name = ?, jersey_number = ?, team_name = ?, team_year = ?, uniform_color = ?
+                WHERE id = ?""",
+                (updates["player_name"], updates["jersey_number"], updates["team_name"],
+                 updates["team_year"], updates["uniform_color"], entry_id)
+            )
+            self.conn.commit()
+
+            # Return updated entry
+            return {
+                "id": entry_id,
+                "team_name": updates["team_name"],
+                "team_year": updates["team_year"],
+                "jersey_number": updates["jersey_number"],
+                "player_name": updates["player_name"],
+                "uniform_color": updates["uniform_color"],
+            }
+
     def search_roster(self, query: str) -> List[Dict]:
         """Fuzzy search roster by player name or jersey number (max 10 results)."""
         with self._lock:

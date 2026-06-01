@@ -821,6 +821,48 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/roster/<int:entry_id>", methods=["PUT"])
+    def update_roster(entry_id: int):
+        """Update a roster entry with any combination of fields.
+
+        JSON body (all fields optional):
+        {
+            "player_name": "New Name",
+            "jersey_number": "23",
+            "team_name": "New Team",
+            "team_year": 2026,
+            "uniform_color": "blue"
+        }
+
+        Returns: Updated roster entry or error
+        """
+        data = request.get_json() or {}
+        try:
+            # Extract and validate optional fields
+            updates = {}
+
+            if "player_name" in data:
+                updates["player_name"] = str(data["player_name"]).strip()
+            if "jersey_number" in data:
+                updates["jersey_number"] = str(data["jersey_number"]).strip()
+            if "team_name" in data:
+                updates["team_name"] = str(data["team_name"]).strip()
+            if "team_year" in data:
+                updates["team_year"] = int(data["team_year"])
+            if "uniform_color" in data:
+                updates["uniform_color"] = str(data["uniform_color"]).strip() if data["uniform_color"] else None
+
+            # Call database update
+            updated_entry = db.update_roster_entry(entry_id, **updates)
+            return jsonify(updated_entry), 200
+
+        except ValueError as e:
+            # Validation errors (unique constraint, empty fields, etc.)
+            return jsonify({"error": str(e)}), 409
+        except Exception as e:
+            logger.exception(f"Error updating roster entry {entry_id}: {e}")
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/roster/search", methods=["GET"])
     def search_roster():
         q = request.args.get("q", "").strip()

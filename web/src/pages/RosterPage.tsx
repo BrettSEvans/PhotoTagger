@@ -41,6 +41,24 @@ export const RosterPage: React.FC = () => {
   const [importTeamColor, setImportTeamColor] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Individual player edit modal state
+  const [editingEntry, setEditingEntry] = useState<RosterEntry | null>(null);
+  const [editForm, setEditForm] = useState({
+    player_name: '',
+    jersey_number: '',
+    team_name: '',
+    team_year: 2026,
+    uniform_color: '',
+  });
+  const [editError, setEditError] = useState<string | null>(null);
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+
+  // Bulk roster edit modal state
+  const [showBulkEditModal, setShowBulkEditModal] = useState(false);
+  const [bulkEditForm, setBulkEditForm] = useState({ team_name: '', team_year: 2026 });
+  const [bulkEditError, setBulkEditError] = useState<string | null>(null);
+  const [isSavingBulk, setIsSavingBulk] = useState(false);
+
   // Derived team list for filtering
   const rosterTeams = useMemo(() => {
     const teams = new Set<string>();
@@ -223,6 +241,124 @@ export const RosterPage: React.FC = () => {
       setIsResetting(false);
       setError(err instanceof Error ? err.message : 'Reset failed — check backend logs');
     }
+  };
+
+  // ── Individual Player Editing ──────────────────────────────────────────────
+
+  const handleEditOpen = (entry: RosterEntry) => {
+    setEditingEntry(entry);
+    setEditForm({
+      player_name: entry.player_name,
+      jersey_number: entry.jersey_number,
+      team_name: entry.team_name,
+      team_year: entry.team_year,
+      uniform_color: entry.uniform_color || '',
+    });
+    setEditError(null);
+  };
+
+  const handleEditChange = (field: string, value: any) => {
+    setEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleEditSave = async () => {
+    if (!editingEntry) return;
+    if (!editForm.player_name.trim()) {
+      setEditError('Player name cannot be empty');
+      return;
+    }
+    if (!editForm.jersey_number.trim()) {
+      setEditError('Jersey number cannot be empty');
+      return;
+    }
+
+    setIsSavingEdit(true);
+    setEditError(null);
+    try {
+      await photoTaggerClient.updateRosterEntry(editingEntry.id, {
+        player_name: editForm.player_name.trim(),
+        jersey_number: editForm.jersey_number.trim(),
+        team_name: editForm.team_name,
+        team_year: editForm.team_year,
+        uniform_color: editForm.uniform_color.trim() || undefined,
+      });
+      await loadRoster();
+      setEditingEntry(null);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update entry';
+      setEditError(msg);
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleEditCancel = () => {
+    setEditingEntry(null);
+    setEditForm({
+      player_name: '',
+      jersey_number: '',
+      team_name: '',
+      team_year: 2026,
+      uniform_color: '',
+    });
+    setEditError(null);
+  };
+
+  // ── Bulk Roster Editing ────────────────────────────────────────────────────
+
+  const handleOpenBulkEdit = () => {
+    if (!selectedTeam || !selectedYear) return;
+    setBulkEditForm({
+      team_name: selectedTeam,
+      team_year: selectedYear,
+    });
+    setBulkEditError(null);
+    setShowBulkEditModal(true);
+  };
+
+  const handleBulkEditChange = (field: string, value: any) => {
+    setBulkEditForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleBulkEditSave = async () => {
+    if (!bulkEditForm.team_name.trim()) {
+      setBulkEditError('Team name cannot be empty');
+      return;
+    }
+    if (!selectedTeam || !selectedYear) return;
+
+    setIsSavingBulk(true);
+    setBulkEditError(null);
+    try {
+      // Get all entries that match the current filter
+      const entriesToUpdate = entries.filter(
+        e => e.team_name === selectedTeam && e.team_year === selectedYear
+      );
+
+      // Update each entry with the new team name/year
+      await Promise.all(
+        entriesToUpdate.map(entry =>
+          photoTaggerClient.updateRosterEntry(entry.id, {
+            team_name: bulkEditForm.team_name.trim(),
+            team_year: bulkEditForm.team_year,
+          })
+        )
+      );
+
+      await loadRoster();
+      setShowBulkEditModal(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to update roster';
+      setBulkEditError(msg);
+    } finally {
+      setIsSavingBulk(false);
+    }
+  };
+
+  const handleBulkEditCancel = () => {
+    setShowBulkEditModal(false);
+    setBulkEditForm({ team_name: '', team_year: 2026 });
+    setBulkEditError(null);
   };
 
   // ── Bulk import ───────────────────────────────────────────────────────────
@@ -664,13 +800,22 @@ export const RosterPage: React.FC = () => {
             )}
           </div>
           {selectedTeam && selectedYear && (
-            <button
-              onClick={handleDeleteRoster}
-              disabled={isSaving || filtered.length === 0}
-              className="btn-candy bg-secondary text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
-            >
-              Delete Roster
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleOpenBulkEdit}
+                disabled={isSaving || filtered.length === 0}
+                className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+              >
+                Edit Roster
+              </button>
+              <button
+                onClick={handleDeleteRoster}
+                disabled={isSaving || filtered.length === 0}
+                className="btn-candy bg-secondary text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+              >
+                Delete Roster
+              </button>
+            </div>
           )}
         </div>
 
@@ -726,7 +871,14 @@ export const RosterPage: React.FC = () => {
                   <td className="px-3 py-3 hidden md:table-cell">
                     <span className="font-jakarta text-xs text-muted-fg bg-muted px-2 py-0.5 rounded-full">{entry.uniform_color || '—'}</span>
                   </td>
-                  <td className="px-3 py-3 text-right">
+                  <td className="px-3 py-3 text-right flex gap-2 justify-end">
+                    <button
+                      onClick={() => handleEditOpen(entry)}
+                      className="font-jakarta text-xs text-muted-fg hover:text-accent border border-frame rounded-full px-2 py-0.5 hover:border-accent transition-colors"
+                      aria-label={`Edit ${entry.player_name}`}
+                    >
+                      Edit
+                    </button>
                     <button
                       onClick={() => handleDelete(entry.id)}
                       className="font-jakarta text-xs text-muted-fg hover:text-secondary border border-frame rounded-full px-2 py-0.5 hover:border-secondary transition-colors"
@@ -741,6 +893,178 @@ export const RosterPage: React.FC = () => {
           </table>
         )}
       </div>
+
+      {/* ── Individual Player Edit Modal ─────────────────────────────────────── */}
+      {editingEntry && (
+        <div className="fixed inset-0 z-50 bg-foreground/70 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg max-w-md w-full p-6 space-y-4">
+            <h2 className="font-outfit text-lg font-extrabold text-foreground">
+              Edit {editingEntry.player_name}
+            </h2>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="editPlayerName" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Player Name
+                </label>
+                <input
+                  id="editPlayerName"
+                  type="text"
+                  value={editForm.player_name}
+                  onChange={e => handleEditChange('player_name', e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label htmlFor="editJersey" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                    Jersey #
+                  </label>
+                  <input
+                    id="editJersey"
+                    type="text"
+                    value={editForm.jersey_number}
+                    onChange={e => handleEditChange('jersey_number', e.target.value)}
+                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground text-center"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="editYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                    Year
+                  </label>
+                  <input
+                    id="editYear"
+                    type="number"
+                    value={editForm.team_year}
+                    onChange={e => handleEditChange('team_year', Number(e.target.value))}
+                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="editTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Team Name
+                </label>
+                <input
+                  id="editTeam"
+                  type="text"
+                  value={editForm.team_name}
+                  onChange={e => handleEditChange('team_name', e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="editColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Uniform Color
+                </label>
+                <input
+                  id="editColor"
+                  type="text"
+                  value={editForm.uniform_color}
+                  onChange={e => handleEditChange('uniform_color', e.target.value)}
+                  placeholder="red, white, blue…"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                />
+              </div>
+            </div>
+
+            {editError && (
+              <div role="alert" className="bg-secondary/10 border-2 border-secondary rounded-xl p-3">
+                <p className="font-jakarta text-xs text-secondary font-bold">{editError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleEditCancel}
+                disabled={isSavingEdit}
+                className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white hover:bg-muted disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleEditSave}
+                disabled={isSavingEdit}
+                className="flex-1 font-jakarta font-bold text-sm text-white bg-accent hover:bg-accent/80 px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 transition-colors"
+              >
+                {isSavingEdit ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Roster Edit Modal ──────────────────────────────────────────── */}
+      {showBulkEditModal && selectedTeam && selectedYear && (
+        <div className="fixed inset-0 z-50 bg-foreground/70 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg max-w-md w-full p-6 space-y-4">
+            <h2 className="font-outfit text-lg font-extrabold text-foreground">
+              Edit Roster: {selectedTeam} ({selectedYear})
+            </h2>
+            <p className="font-jakarta text-sm text-muted-fg">
+              Update team name and/or year for all {filtered.length} player{filtered.length === 1 ? '' : 's'}
+            </p>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="bulkTeamName" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  New Team Name
+                </label>
+                <input
+                  id="bulkTeamName"
+                  type="text"
+                  value={bulkEditForm.team_name}
+                  onChange={e => handleBulkEditChange('team_name', e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="bulkYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  New Year
+                </label>
+                <input
+                  id="bulkYear"
+                  type="number"
+                  value={bulkEditForm.team_year}
+                  onChange={e => handleBulkEditChange('team_year', Number(e.target.value))}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+            </div>
+
+            {bulkEditError && (
+              <div role="alert" className="bg-secondary/10 border-2 border-secondary rounded-xl p-3">
+                <p className="font-jakarta text-xs text-secondary font-bold">{bulkEditError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={handleBulkEditCancel}
+                disabled={isSavingBulk}
+                className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white hover:bg-muted disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleBulkEditSave}
+                disabled={isSavingBulk}
+                className="flex-1 font-jakarta font-bold text-sm text-white bg-accent hover:bg-accent/80 px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 transition-colors"
+              >
+                {isSavingBulk ? 'Updating…' : 'Update All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
         </div>
       }
     />
