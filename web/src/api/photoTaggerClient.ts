@@ -470,6 +470,11 @@ class PhotoTaggerClient {
     return response.data;
   }
 
+  async resetAllData(): Promise<{ success: boolean; deleted: Record<string, number> }> {
+    const response = await this.client.post('/api/data/reset', { confirm: true });
+    return response.data;
+  }
+
   // ── Photo Batches (Import Groups) ─────────────────────────────────────────
 
   async getBatches(): Promise<BatchesResponse> {

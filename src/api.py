@@ -1029,6 +1029,23 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.exception("match-similar failed for cluster %s", cluster_id)
             return jsonify({"error": str(exc)}), 500
 
+    @app.route("/api/data/reset", methods=["POST"])
+    def reset_all_data():
+        """Delete every row from all user-data tables.
+
+        Requires { "confirm": true } in the request body as a safety gate.
+        """
+        data = request.get_json() or {}
+        if not data.get("confirm"):
+            return jsonify({"error": "confirm field must be true"}), 400
+        try:
+            deleted = db.reset_all_data()
+            logger.info("Database reset: %s", deleted)
+            return jsonify({"success": True, "deleted": deleted}), 200
+        except Exception as exc:
+            logger.exception("reset_all_data failed")
+            return jsonify({"error": str(exc)}), 500
+
     # Get detection status
     @app.route("/api/detection-status", methods=["GET"])
     def detection_status():
