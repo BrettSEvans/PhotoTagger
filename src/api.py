@@ -17,6 +17,21 @@ def should_enable_debug() -> bool:
 def get_runtime_mode() -> str:
     return os.environ.get("PHOTOTAGGER_MODE", "local-agent").strip() or "local-agent"
 
+def is_railway_deployment() -> bool:
+    """Detect if running on Railway.app by checking for Railway-specific env vars."""
+    # Railway sets these environment variables automatically
+    railway_env_vars = [
+        "RAILWAY_ENVIRONMENT_ID",
+        "RAILWAY_SERVICE_ID",
+        "RAILWAY_SERVICE_NAME",
+        "RAILWAY_PROJECT_ID",
+    ]
+    return any(os.environ.get(var) for var in railway_env_vars)
+
+def get_deployment_env() -> str:
+    """Return 'railway' if running on Railway.app, 'local' otherwise."""
+    return "railway" if is_railway_deployment() else "local"
+
 def get_server_bind() -> tuple[str, int]:
     """Return host and port for local development or Railway-style hosted runtime."""
     port = int(os.environ.get("PORT", "5001"))
@@ -1018,5 +1033,7 @@ if __name__ == "__main__":
     app = create_app()
     debug = should_enable_debug()
     host, port = get_server_bind()
+    deployment_env = get_deployment_env()
     logger.info(f"Starting PhotoTagger API on http://{host}:{port}")
+    logger.info(f"Deployment environment: {deployment_env}")
     app.run(debug=debug, port=port, host=host, use_reloader=False)
