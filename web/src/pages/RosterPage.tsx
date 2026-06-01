@@ -322,11 +322,20 @@ export const RosterPage: React.FC = () => {
       children={
         <div className="w-full py-4 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="font-outfit text-4xl font-extrabold text-foreground">Roster</h1>
-        <p className="mt-2 font-jakarta text-muted-fg">
-          {entries.length} players across {teamGroups.length || '—'} teams
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-outfit text-4xl font-extrabold text-foreground">Roster</h1>
+          <p className="mt-2 font-jakarta text-muted-fg">
+            {entries.length} players across {teamGroups.length || '—'} teams
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={clearAllForms}
+          className="btn-candy bg-accent text-white font-jakarta font-bold px-5 py-2 rounded-full border-2 border-foreground shadow-pop whitespace-nowrap mt-1"
+        >
+          + Add Roster
+        </button>
       </div>
 
       {error && (
@@ -336,25 +345,8 @@ export const RosterPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* ── Add Roster ───────────────────────────────────────────────────── */}
-        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
-          <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-accent rounded-full border-2 border-foreground opacity-70" />
-          <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-accent mb-3">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          <h2 className="font-outfit text-lg font-bold text-foreground mb-1">Add Roster</h2>
-          <p className="font-jakarta text-xs text-muted-fg mb-4">Create a new roster for a team</p>
-          <button
-            type="button"
-            onClick={clearAllForms}
-            className="btn-candy bg-accent text-white font-jakarta font-bold px-6 py-2 rounded-full border-2 border-foreground shadow-pop"
-          >
-            + Add Roster
-          </button>
-        </div>
-
-        {/* ── Left: Bulk Import Zone ───────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+        {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Bulk Import</h2>
@@ -523,7 +515,7 @@ export const RosterPage: React.FC = () => {
           )}
         </div>
 
-        {/* ── Right: Inline Creation Matrix ───────────────────────────────── */}
+        {/* ── Add Player ───────────────────────────────────────────────────── */}
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-accent rounded-full border-2 border-foreground opacity-70" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Add Player</h2>
