@@ -18,6 +18,50 @@ class RosterImportError(ValueError):
     """Raised when roster rows cannot be extracted from an import source."""
 
 
+def extract_team_and_year_from_html(html: str) -> tuple[str | None, int | None]:
+    """Extract team name and year from USA Ultimate HTML page.
+
+    Looks for:
+    - Team name in the page heading or team profile (e.g., "Carleton College (CUT)")
+    - Year in event links (e.g., "2026 D-I College Championships")
+
+    Returns:
+      (team_name, year) where either or both may be None if not found
+    """
+    team = None
+    year = None
+
+    # Extract team name: look for "Carleton College (CUT)" pattern in team profile section
+    # Search near the top of the page, within team details
+    team_match = re.search(r'<img[^>]*?alt="Team Image"[^>]*>.*?([A-Z][a-zA-Z\s]+(?:College|University)?)\s*\(([A-Z]{2,})\)', html, re.DOTALL)
+    if not team_match:
+        # Fallback: search anywhere for the pattern
+        team_match = re.search(r'([A-Z][a-zA-Z\s]+(?:College|University)?)\s*\(([A-Z]{2,})\)', html)
+
+    if team_match:
+        college = team_match.group(1).strip()
+        abbr = team_match.group(2)
+        # Prefer "Carleton CUT" format (college + abbr)
+        team = f"{college} {abbr}"
+
+    # Extract year: look for "2026 D-I College Championships" or similar pattern
+    year_match = re.search(r'(20\d{2})\s+(?:D-[IMX]|Men\'s|Women\'s|Mixed)?.*?(?:Championships|Nationals|Tournament)', html)
+    if year_match:
+        year = int(year_match.group(1))
+
+    # Clean up team name if found
+    if team:
+        team = re.sub(r'\s+', ' ', team).strip()
+        # For USA Ultimate pages, prefer short format but keep college name + abbr
+        # Only shorten if it's unexpectedly long
+        if len(team) > 30:
+            abbr_match = re.search(r'\(([A-Z]{2,})\)', team)
+            if abbr_match:
+                team = abbr_match.group(1)
+
+    return (team or None, year)
+
+
 def infer_team_and_year(filename: str) -> tuple[str | None, int | None]:
     """Infer team name and year from a roster filename.
 
