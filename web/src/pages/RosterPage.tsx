@@ -24,6 +24,10 @@ export const RosterPage: React.FC = () => {
   const [gameContext, setGameContext] = useState<GameContextTeam[]>([]);
   const [contextMsg, setContextMsg] = useState<string | null>(null);
 
+  // Reset all data
+  const [isResetting,  setIsResetting]  = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   // Bulk import state
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
@@ -200,6 +204,23 @@ export const RosterPage: React.FC = () => {
     }
   };
 
+  // ── Reset all data ────────────────────────────────────────────────────────
+
+  const handleResetAllData = async () => {
+    setShowResetConfirm(false);
+    setIsResetting(true);
+    try {
+      await photoTaggerClient.resetAllData();
+      // Reload the roster (will be empty)
+      await loadRoster();
+      setEntries([]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Reset failed');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
   // ── Bulk import ───────────────────────────────────────────────────────────
 
   const formatImportMessage = (result: { imported: number; skipped: number; failed: number; errors?: string[] }) => {
@@ -321,6 +342,58 @@ export const RosterPage: React.FC = () => {
       }
       children={
         <div className="w-full py-4 space-y-6">
+
+      {/* ── Danger zone banner ──────────────────────────────────────────────── */}
+      <div className="bg-[#FFF0F0] border-2 border-red-500 rounded-2xl px-5 py-3 flex items-center justify-between gap-4">
+        <div>
+          <p className="font-outfit font-bold text-red-600 text-sm">Danger zone</p>
+          <p className="font-jakarta text-xs text-red-500 mt-0.5">
+            Permanently delete all photos, faces, players, and rosters from the database.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowResetConfirm(true)}
+          disabled={isResetting}
+          className="flex-shrink-0 font-jakarta font-bold text-sm text-white bg-red-600 hover:bg-red-700 active:bg-red-800 px-5 py-2 rounded-full border-2 border-red-800 shadow-[3px_3px_0px_0px_rgba(153,27,27,0.5)] transition-colors disabled:opacity-50 whitespace-nowrap"
+        >
+          {isResetting ? 'Deleting…' : '🗑 Delete All Data'}
+        </button>
+      </div>
+
+      {/* ── Confirmation modal ───────────────────────────────────────────────── */}
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 bg-foreground/70 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg max-w-sm w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">⚠️</span>
+              <div>
+                <h2 className="font-outfit text-lg font-extrabold text-foreground">Delete all data?</h2>
+                <p className="font-jakarta text-sm text-muted-fg mt-1">
+                  This will permanently remove <strong>all photos, detected faces, face clusters, player assignments, and rosters</strong> from the database. This cannot be undone.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white hover:bg-muted transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleResetAllData}
+                className="flex-1 font-jakarta font-bold text-sm text-white bg-red-600 hover:bg-red-700 px-4 py-2 rounded-full border-2 border-red-800 shadow-[3px_3px_0px_0px_rgba(153,27,27,0.5)] transition-colors"
+              >
+                Yes, delete everything
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>

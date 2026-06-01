@@ -1222,6 +1222,32 @@ class Database:
             self.conn.commit()
             return count
 
+    def reset_all_data(self) -> Dict:
+        """Delete every row from all user-data tables.
+
+        Clears photos, OCR results, faces, player clusters, rosters,
+        photo batches, game context, and processing jobs.
+        Returns counts of rows deleted per table.
+        """
+        tables = [
+            "ocr_results",
+            "faces",
+            "player_clusters",
+            "photo_batches",
+            "photos",
+            "rosters",
+            "game_context_teams",
+            "processing_jobs",
+        ]
+        deleted: Dict[str, int] = {}
+        with self._lock:
+            cursor = self.conn.cursor()
+            for table in tables:
+                cursor.execute(f"DELETE FROM {table}")
+                deleted[table] = cursor.rowcount
+            self.conn.commit()
+        return deleted
+
     def close(self):
         """Close database connection."""
         self.conn.close()
