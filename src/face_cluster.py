@@ -24,6 +24,8 @@ class FaceClusterer:
     - For each face, find the existing cluster whose centroid is most similar
     - If similarity > threshold, assign to that cluster and update centroid
     - Otherwise, create a new cluster
+
+    After clustering, auto-match clusters to roster players based on jersey numbers and colors.
     """
 
     def __init__(self, db: Database, similarity_threshold: float = 0.40):
@@ -99,10 +101,107 @@ class FaceClusterer:
                 self.db.assign_face_to_cluster(face["id"], cluster_id)
                 total_faces += 1
 
+        # Auto-match clusters to roster players
+        auto_matched = self._auto_match_clusters()
+
         result = {
             "clusters_created": len(clusters),
             "faces_clustered": total_faces,
             "faces_total": len(all_faces),
+            "auto_matched": auto_matched,
         }
         logger.info(f"Clustering complete: {result}")
         return result
+
+    def _auto_match_clusters(self) -> int:
+        """
+        Auto-match clusters to roster players based on jersey numbers and colors.
+
+        For each cluster, analyzes detected jersey numbers and matches to roster entries.
+        If a match is found with high confidence, auto-assigns the cluster to the player.
+
+        Returns: Number of clusters auto-matched
+        """
+        matched_count = 0
+        try:
+            clusters = self.db.get_all_player_clusters()
+
+            for cluster in clusters:
+                if cluster.get("player_name"):
+                    # Already assigned, skip
+                    continue
+
+                cluster_id = cluster["id"]
+
+                # Get all photos in this cluster
+                photos = self.db.get_photos_by_cluster(cluster_id, min_face_confidence=0.0)
+                if not photos:
+                    continue
+
+                # Collect jersey numbers and colors from OCR results
+                jersey_candidates = {}  # jersey -> count
+                color_samples = []
+
+                for photo in photos:
+                    ocr = self.db.get_photo_ocr(photo["id"])
+                    if not ocr or not ocr.get("jersey_number"):
+                        continue
+
+                    jersey = str(ocr["jersey_number"]).strip()
+                    if jersey:
+                        jersey_candidates[jersey] = jersey_candidates.get(jersey, 0) + 1
+
+                    if ocr.get("uniform_color"):
+                        color_samples.append(ocr["uniform_color"])
+
+                if not jersey_candidates:
+                    continue
+
+                # Find most common jersey number
+                most_common_jersey = max(jersey_candidates, key=jersey_candidates.get)
+                common_count = jersey_candidates[most_common_jersey]
+                photo_count = len(photos)
+                confidence = common_count / photo_count if photo_count > 0 else 0
+
+                # Only auto-match if jersey appears in 80%+ of photos in cluster
+                if confidence < 0.80:
+                    logger.debug(f"Cluster {cluster_id}: jersey #{most_common_jersey} confidence only {confidence:.1%}")
+                    continue
+
+                # Get the most common color (for matching)
+                most_common_color = max(color_samples, key=color_samples.count) if color_samples else None
+
+                # Resolve roster candidates
+                candidates = self.db.resolve_roster_candidates(most_common_jersey, most_common_color)
+
+                if not candidates:
+                    logger.debug(f"Cluster {cluster_id}: no roster match for jersey #{most_common_jersey}")
+                    continue
+
+                if len(candidates) > 1:
+                    # Multiple candidates - use color matching to narrow down
+                    if most_common_color:
+                        candidates = [c for c in candidates if c.get("match_score", 0) > 0]
+
+                    if not candidates or len(candidates) > 1:
+                        logger.debug(f"Cluster {cluster_id}: ambiguous match for jersey #{most_common_jersey} ({len(candidates)} candidates)")
+                        continue
+
+                # Auto-assign the cluster to the matched player
+                candidate = candidates[0]
+                try:
+                    self.db.assign_cluster_to_player(
+                        cluster_id,
+                        candidate["player_name"],
+                        candidate["jersey_number"],
+                        candidate["id"]  # roster_entry_id
+                    )
+                    logger.info(f"Auto-matched cluster {cluster_id} to {candidate['player_name']} (#{candidate['jersey_number']}) with {confidence:.1%} jersey confidence")
+                    matched_count += 1
+                except Exception as e:
+                    logger.warning(f"Failed to auto-assign cluster {cluster_id}: {e}")
+
+            return matched_count
+        except Exception as e:
+            logger.error(f"Auto-matching error: {e}")
+            return 0
