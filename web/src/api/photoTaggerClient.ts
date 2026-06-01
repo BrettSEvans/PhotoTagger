@@ -18,6 +18,7 @@ import {
   DetectionStatus,
   APIError,
   SearchOptions,
+  RosterEntry,
   RosterResponse,
   RosterImportResponse,
   DeassignFacesResponse,
