@@ -21,6 +21,7 @@ export const RosterPage: React.FC = () => {
   const [isSaving,  setIsSaving]  = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
   const rosterUrlRef = useRef<HTMLInputElement>(null);
+  const importCardRef = useRef<HTMLDivElement>(null);
 
   const [gameContext, setGameContext] = useState<GameContextTeam[]>([]);
   const [contextMsg, setContextMsg] = useState<string | null>(null);
@@ -107,8 +108,11 @@ export const RosterPage: React.FC = () => {
       fileInputRef.current.value = '';
     }
 
-    // Move focus to the Roster URL field in the Import card
-    setTimeout(() => rosterUrlRef.current?.focus(), 50);
+    // Scroll the Import card into view and focus the URL field
+    setTimeout(() => {
+      importCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      rosterUrlRef.current?.focus();
+    }, 50);
   };
 
   // ── Inline entry ──────────────────────────────────────────────────────────
@@ -223,6 +227,17 @@ export const RosterPage: React.FC = () => {
 
   // ── Bulk import ───────────────────────────────────────────────────────────
 
+  /** Clear only the Import card fields — called automatically after a successful import. */
+  const clearImportForm = () => {
+    setRosterUrl('');
+    setImportTeam('');
+    setImportTeamYear(2026);
+    setImportTeamColor('');
+    setDuplicatePolicy('replace');
+    setIsDragging(false);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const formatImportMessage = (result: { imported: number; skipped: number; failed: number; errors?: string[] }) => {
     const parts = [`${result.imported} imported`];
     if (result.skipped > 0) parts.push(`${result.skipped} skipped`);
@@ -258,6 +273,7 @@ export const RosterPage: React.FC = () => {
       const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy, importTeamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
+      if (result.failed === 0) clearImportForm();
     } catch (err) {
       setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'Import failed' });
     } finally {
@@ -293,6 +309,7 @@ export const RosterPage: React.FC = () => {
       const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear, duplicatePolicy, importTeamColor.trim() || undefined);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
+      if (result.failed === 0) clearImportForm();
     } catch (err) {
       setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'URL import failed' });
     } finally {
@@ -420,7 +437,7 @@ export const RosterPage: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
         {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
-        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
+        <div ref={importCardRef} className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Import</h2>
           <p className="font-jakarta text-xs text-muted-fg">Drop a roster file or paste a roster URL</p>
