@@ -24,7 +24,7 @@ async function checkConnection(setIsConnected: (value: boolean) => void) {
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('upload')
+  const [currentPage, setCurrentPage] = useState<Page>('roster')
   const [isConnected, setIsConnected] = useState<boolean | null>(null)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => photoTaggerClient.getLocalAgentSettings())
 
@@ -135,12 +135,12 @@ function App() {
       <nav className="bg-cream border-b-2 border-foreground sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-1 overflow-x-auto">
-            <NavButton label="Upload"   isActive={currentPage === 'upload'}  onClick={() => setCurrentPage('upload')} />
-            <NavButton label="Roster"   isActive={currentPage === 'roster'}  onClick={() => setCurrentPage('roster')} />
-            <NavButton label="Review"   isActive={currentPage === 'review'}  onClick={() => setCurrentPage('review')} />
-            <NavButton label="Players"  isActive={currentPage === 'players'} onClick={() => setCurrentPage('players')} />
-            <NavButton label="Gallery"  isActive={currentPage === 'gallery'} onClick={() => setCurrentPage('gallery')} />
-            <NavButton label="Search"   isActive={currentPage === 'search'}  onClick={() => setCurrentPage('search')} />
+            <NavButton label="1 Roster"   isActive={currentPage === 'roster'}  onClick={() => setCurrentPage('roster')} />
+            <NavButton label="2 Upload"   isActive={currentPage === 'upload'}  onClick={() => setCurrentPage('upload')} />
+            <NavButton label="3 Review"   isActive={currentPage === 'review'}  onClick={() => setCurrentPage('review')} />
+            <NavButton label="4 Players"  isActive={currentPage === 'players'} onClick={() => setCurrentPage('players')} />
+            <NavButton label="5 Search"   isActive={currentPage === 'search'}  onClick={() => setCurrentPage('search')} />
+            <NavButton label="6 Gallery"  isActive={currentPage === 'gallery'} onClick={() => setCurrentPage('gallery')} />
           </div>
         </div>
       </nav>
@@ -148,8 +148,8 @@ function App() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <ErrorBoundary>
-          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
           {currentPage === 'roster'  && <RosterPage />}
+          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
           {currentPage === 'review'  && <ReviewPage />}
           {currentPage === 'search'  && <SearchPage />}
           {currentPage === 'gallery' && <GalleryPage />}

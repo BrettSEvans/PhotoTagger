@@ -7,6 +7,7 @@ export const RosterPage: React.FC = () => {
   const [entries, setEntries]       = useState<RosterEntry[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [filterTeam, setFilterTeam] = useState('All Teams');
+  const [filterYear, setFilterYear] = useState<number | null>(null);
   const [error, setError]           = useState<string | null>(null);
 
   // Inline entry form
@@ -206,11 +207,14 @@ export const RosterPage: React.FC = () => {
     importFile(file);
   };
 
-  const filtered = filterTeam === 'All Teams'
-    ? entries
-    : entries.filter(e => e.team_name === filterTeam);
+  const filtered = entries.filter(e => {
+    const teamMatch = filterTeam === 'All Teams' || e.team_name === filterTeam;
+    const yearMatch = filterYear === null || e.team_year === filterYear;
+    return teamMatch && yearMatch;
+  });
 
   const teamGroups = rosterTeams.filter(t => entries.some(e => e.team_name === t));
+  const yearGroups = Array.from(new Set(entries.map(e => e.team_year))).sort((a, b) => b - a);
 
   return (
     <div className="w-full max-w-6xl mx-auto py-4 space-y-6">
@@ -449,8 +453,8 @@ export const RosterPage: React.FC = () => {
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-accent rounded-full border-2 border-foreground opacity-70" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Add Player</h2>
 
-          <form onSubmit={handleAddRow} className="flex gap-2 items-end">
-            <div className="flex-1">
+          <form onSubmit={handleAddRow} className="space-y-3">
+            <div>
               <label htmlFor="newName" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Name</label>
               <input
                 id="newName"
@@ -463,51 +467,109 @@ export const RosterPage: React.FC = () => {
                 className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
               />
             </div>
-            <div className="w-20">
-              <label htmlFor="newJersey" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">#</label>
-              <input
-                id="newJersey"
-                type="text"
-                value={newJersey}
-                onChange={e => setNewJersey(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder="23"
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg text-center"
-              />
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label htmlFor="newJersey" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">#</label>
+                <input
+                  id="newJersey"
+                  type="text"
+                  value={newJersey}
+                  onChange={e => setNewJersey(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="23"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg text-center"
+                />
+              </div>
+              <div>
+                <label htmlFor="newTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Team</label>
+                <input
+                  id="newTeam"
+                  type="text"
+                  value={newTeam}
+                  onChange={e => setNewTeam(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Team…"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                />
+              </div>
+              <div>
+                <label htmlFor="newYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Year</label>
+                <input
+                  id="newYear"
+                  type="number"
+                  value={teamYear}
+                  onChange={e => setTeamYear(Number(e.target.value) || 2026)}
+                  onKeyDown={handleKeyDown}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
             </div>
             <button
               type="submit"
               disabled={isSaving || !newName.trim() || !newJersey.trim()}
-              className="btn-candy bg-accent text-white font-jakarta font-bold px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+              className="btn-candy w-full bg-accent text-white font-jakarta font-bold px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40"
             >
-              + Add
+              + Add Player
             </button>
           </form>
-          <p className="font-jakarta text-xs text-muted-fg">Press Enter to add and stay in name field</p>
+          <p className="font-jakarta text-xs text-muted-fg">Press Enter to submit</p>
         </div>
       </div>
 
       {/* ── Roster Table ─────────────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden">
         {/* Table toolbar */}
-        <div className="flex items-center justify-between px-5 py-4 border-b-2 border-frame">
-          <h2 className="font-outfit text-lg font-bold text-foreground">
-            {filterTeam === 'All Teams' ? `All Players (${entries.length})` : `${filterTeam} (${filtered.length})`}
-          </h2>
-          <div className="flex gap-2">
-            {['All Teams', ...teamGroups].map(t => (
-              <button
-                key={t}
-                onClick={() => setFilterTeam(t)}
-                className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
-                  filterTeam === t
-                    ? 'bg-accent text-white border-foreground shadow-pop-sm'
-                    : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
-                }`}
-              >
-                {t === 'All Teams' ? t : t.split(' ')[0]}
-              </button>
-            ))}
+        <div className="px-5 py-4 border-b-2 border-frame space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="font-outfit text-lg font-bold text-foreground">
+              All Players ({filtered.length})
+            </h2>
+          </div>
+          <div className="space-y-2">
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-xs font-bold text-muted-fg uppercase tracking-wider self-center">Team:</span>
+              {['All Teams', ...teamGroups].map(t => (
+                <button
+                  key={t}
+                  onClick={() => setFilterTeam(t)}
+                  className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
+                    filterTeam === t
+                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
+                      : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
+                  }`}
+                >
+                  {t === 'All Teams' ? t : t.split(' ')[0]}
+                </button>
+              ))}
+            </div>
+            {yearGroups.length > 0 && (
+              <div className="flex gap-2 flex-wrap">
+                <span className="text-xs font-bold text-muted-fg uppercase tracking-wider self-center">Year:</span>
+                <button
+                  onClick={() => setFilterYear(null)}
+                  className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
+                    filterYear === null
+                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
+                      : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
+                  }`}
+                >
+                  All Years
+                </button>
+                {yearGroups.map(y => (
+                  <button
+                    key={y}
+                    onClick={() => setFilterYear(y)}
+                    className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
+                      filterYear === y
+                        ? 'bg-accent text-white border-foreground shadow-pop-sm'
+                        : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
+                    }`}
+                  >
+                    {y}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
