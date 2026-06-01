@@ -20,6 +20,7 @@ export const RosterPage: React.FC = () => {
   const [teamColor, setTeamColor] = useState('');
   const [isSaving,  setIsSaving]  = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
+  const rosterUrlRef = useRef<HTMLInputElement>(null);
 
   const [gameContext, setGameContext] = useState<GameContextTeam[]>([]);
   const [contextMsg, setContextMsg] = useState<string | null>(null);
@@ -92,7 +93,7 @@ export const RosterPage: React.FC = () => {
     setTeamYear(2026);
     setTeamColor('');
 
-    // Clear bulk import form
+    // Clear import form — team and year blanked so user starts fresh
     setRosterUrl('');
     setImportTeam('');
     setImportTeamYear(2026);
@@ -106,8 +107,8 @@ export const RosterPage: React.FC = () => {
       fileInputRef.current.value = '';
     }
 
-    // Focus on name input to start entering new roster
-    nameInputRef.current?.focus();
+    // Move focus to the Roster URL field in the Import card
+    setTimeout(() => rosterUrlRef.current?.focus(), 50);
   };
 
   // ── Inline entry ──────────────────────────────────────────────────────────
@@ -421,7 +422,7 @@ export const RosterPage: React.FC = () => {
         {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
-          <h2 className="font-outfit text-lg font-bold text-foreground">Bulk Import</h2>
+          <h2 className="font-outfit text-lg font-bold text-foreground">Import</h2>
           <p className="font-jakarta text-xs text-muted-fg">Drop a roster file or paste a roster URL</p>
 
           {/* Drop zone (also click-to-browse) */}
@@ -470,6 +471,7 @@ export const RosterPage: React.FC = () => {
             <div className="flex gap-2">
               <input
                 id="rosterUrl"
+                ref={rosterUrlRef}
                 type="url"
                 value={rosterUrl}
                 onChange={e => setRosterUrl(e.target.value)}
@@ -551,31 +553,6 @@ export const RosterPage: React.FC = () => {
                 onChange={e => setImportTeamYear(Number(e.target.value) || 2026)}
                 className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
               />
-            </div>
-          </div>
-
-          <div>
-            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-              Existing jerseys
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: 'replace', label: 'Replace existing' },
-                { value: 'skip', label: 'Skip existing' },
-              ].map(option => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setDuplicatePolicy(option.value as 'replace' | 'skip')}
-                  className={`font-jakarta text-xs font-bold px-3 py-2 rounded-xl border-2 transition-colors ${
-                    duplicatePolicy === option.value
-                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
-                      : 'bg-white text-foreground border-frame hover:bg-muted'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
             </div>
           </div>
 
