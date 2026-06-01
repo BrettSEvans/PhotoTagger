@@ -183,14 +183,15 @@ class Database:
 
         file_size = path.stat().st_size
 
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT INTO photos (file_path, file_hash, file_size, source_folder, batch_id)
-            VALUES (?, ?, ?, ?, ?)
-        """, (str(file_path), file_hash, file_size, source_folder, batch_id))
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO photos (file_path, file_hash, file_size, source_folder, batch_id)
+                VALUES (?, ?, ?, ?, ?)
+            """, (str(file_path), file_hash, file_size, source_folder, batch_id))
+            self.conn.commit()
 
-        return cursor.lastrowid
+            return cursor.lastrowid
 
     def add_ocr_result(
         self,
@@ -201,25 +202,27 @@ class Database:
         uniform_color: Optional[str] = None,
     ):
         """Add OCR extraction results for a photo."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT INTO ocr_results (photo_id, jersey_number, uniform_color, confidence, raw_text)
-            VALUES (?, ?, ?, ?, ?)
-        """, (photo_id, jersey_number, uniform_color, confidence, raw_text))
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO ocr_results (photo_id, jersey_number, uniform_color, confidence, raw_text)
+                VALUES (?, ?, ?, ?, ?)
+            """, (photo_id, jersey_number, uniform_color, confidence, raw_text))
+            self.conn.commit()
 
     def get_photo_by_jersey(self, jersey_number: str) -> List[Dict]:
         """Find all photos matching a jersey number."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT p.id, p.file_path, o.jersey_number, o.confidence, o.raw_text
-            FROM photos p
-            JOIN ocr_results o ON p.id = o.photo_id
-            WHERE o.jersey_number = ?
-            ORDER BY o.confidence DESC
-        """, (jersey_number,))
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT p.id, p.file_path, o.jersey_number, o.confidence, o.raw_text
+                FROM photos p
+                JOIN ocr_results o ON p.id = o.photo_id
+                WHERE o.jersey_number = ?
+                ORDER BY o.confidence DESC
+            """, (jersey_number,))
 
-        return [dict(row) for row in cursor.fetchall()]
+            return [dict(row) for row in cursor.fetchall()]
 
     def get_all_photos(self) -> List[Dict]:
         """Get all photos in the database."""
@@ -238,18 +241,42 @@ class Database:
 
     def get_photo_ocr(self, photo_id: int) -> Optional[Dict]:
         """Get OCR results for a specific photo."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT * FROM ocr_results WHERE photo_id = ? ORDER BY processed_at DESC LIMIT 1
-        """, (photo_id,))
-        row = cursor.fetchone()
-        return dict(row) if row else None
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT * FROM ocr_results WHERE photo_id = ? ORDER BY processed_at DESC LIMIT 1
+            """, (photo_id,))
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+    def get_latest_ocr_by_photo_ids(self, photo_ids: List[int]) -> Dict[int, Dict]:
+        """Return the latest OCR row for each given photo id, keyed by photo_id.
+
+        Single query instead of one lookup per photo (avoids N+1 in clustering auto-match).
+        """
+        if not photo_ids:
+            return {}
+        with self._lock:
+            cursor = self.conn.cursor()
+            placeholders = ",".join("?" for _ in photo_ids)
+            cursor.execute(f"""
+                SELECT o.*
+                FROM ocr_results o
+                WHERE o.photo_id IN ({placeholders})
+                  AND o.id = (
+                      SELECT MAX(o2.id)
+                      FROM ocr_results o2
+                      WHERE o2.photo_id = o.photo_id
+                  )
+            """, list(photo_ids))
+            return {row["photo_id"]: dict(row) for row in cursor.fetchall()}
 
     def photo_exists(self, file_hash: str) -> bool:
         """Check if a photo with this hash already exists."""
-        cursor = self.conn.cursor()
-        cursor.execute("SELECT id FROM photos WHERE file_hash = ?", (file_hash,))
-        return cursor.fetchone() is not None
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("SELECT id FROM photos WHERE file_hash = ?", (file_hash,))
+            return cursor.fetchone() is not None
 
     def create_processing_job(self, job_type: str, payload: Optional[Dict] = None) -> int:
         """Create a local processing job and return its ID."""
@@ -338,36 +365,36 @@ class Database:
         Returns:
             Face ID
         """
-        import json
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence))
-        self.conn.commit()
-        return cursor.lastrowid
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence))
+            self.conn.commit()
+            return cursor.lastrowid
 
     def get_faces_by_photo(self, photo_id: int) -> List[Dict]:
         """Get all faces detected in a photo."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence
-            FROM faces
-            WHERE photo_id = ?
-            ORDER BY confidence DESC
-        """, (photo_id,))
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence
+                FROM faces
+                WHERE photo_id = ?
+                ORDER BY confidence DESC
+            """, (photo_id,))
 
-        results = []
-        for row in cursor.fetchall():
-            import json
-            results.append({
-                "id": row[0],
-                "photo_id": row[1],
-                "embedding": json.loads(row[2]),
-                "bbox": [row[3], row[4], row[5], row[6]],
-                "confidence": row[7]
-            })
-        return results
+            results = []
+            for row in cursor.fetchall():
+                results.append({
+                    "id": row[0],
+                    "photo_id": row[1],
+                    "embedding": json.loads(row[2]),
+                    "bbox": [row[3], row[4], row[5], row[6]],
+                    "confidence": row[7]
+                })
+            return results
 
     def photo_has_faces(self, photo_id: int) -> bool:
         """Return whether a photo already has stored face detections."""
@@ -385,12 +412,13 @@ class Database:
         uniform_color: Optional[str] = None,
     ):
         """Add a player to the roster."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            INSERT OR REPLACE INTO rosters (team_name, team_year, jersey_number, player_name, uniform_color)
-            VALUES (?, ?, ?, ?, ?)
-        """, (team_name, team_year, jersey_number, player_name, uniform_color))
-        self.conn.commit()
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                INSERT OR REPLACE INTO rosters (team_name, team_year, jersey_number, player_name, uniform_color)
+                VALUES (?, ?, ?, ?, ?)
+            """, (team_name, team_year, jersey_number, player_name, uniform_color))
+            self.conn.commit()
 
     def set_game_context(self, teams: List[Dict]):
         """Replace the active game context with teams and their uniform colors."""
@@ -479,13 +507,14 @@ class Database:
 
     def get_player_name(self, team_name: str, team_year: int, jersey_number: str) -> Optional[str]:
         """Look up player name by jersey."""
-        cursor = self.conn.cursor()
-        cursor.execute("""
-            SELECT player_name FROM rosters
-            WHERE team_name = ? AND team_year = ? AND jersey_number = ?
-        """, (team_name, team_year, jersey_number))
-        result = cursor.fetchone()
-        return result[0] if result else None
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT player_name FROM rosters
+                WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+            """, (team_name, team_year, jersey_number))
+            result = cursor.fetchone()
+            return result[0] if result else None
 
     def get_all_faces(self) -> List[Dict]:
         """Get all faces with their embeddings (for clustering)."""
@@ -719,8 +748,11 @@ class Database:
 
             tagged = 0
             needs_review = 0
+            context = self.get_game_context()
             for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                matches = self.resolve_roster_candidates(
+                    row["jersey_number"], row.get("uniform_color"), context=context
+                )
                 if len(matches) == 1:
                     tagged += 1
                 else:
@@ -733,8 +765,11 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             confirmed = []
+            context = self.get_game_context()
             for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                matches = self.resolve_roster_candidates(
+                    row["jersey_number"], row.get("uniform_color"), context=context
+                )
                 if len(matches) == 1:
                     match = matches[0]
                     confirmed.append({
@@ -753,8 +788,11 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             review = []
+            context = self.get_game_context()
             for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(row["jersey_number"], row.get("uniform_color"))
+                matches = self.resolve_roster_candidates(
+                    row["jersey_number"], row.get("uniform_color"), context=context
+                )
                 if len(matches) != 1:
                     review.append({
                         "id": row["id"],
@@ -783,10 +821,15 @@ class Database:
         """)
         return [dict(row) for row in cursor.fetchall()]
 
-    def resolve_roster_candidates(self, jersey_number: str, uniform_color: Optional[str] = None) -> List[Dict]:
-        """Resolve roster candidates for a jersey within active game context and optional uniform color."""
+    def resolve_roster_candidates(self, jersey_number: str, uniform_color: Optional[str] = None, context: Optional[List[Dict]] = None) -> List[Dict]:
+        """Resolve roster candidates for a jersey within active game context and optional uniform color.
+
+        Pass a pre-fetched ``context`` (from ``get_game_context()``) when calling this in a loop
+        to avoid re-querying the game context for every row.
+        """
         cursor = self.conn.cursor()
-        context = self.get_game_context()
+        if context is None:
+            context = self.get_game_context()
 
         if context:
             candidates = []

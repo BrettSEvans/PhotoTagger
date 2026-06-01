@@ -135,10 +135,10 @@ class OCREngine:
         Returns:
             Dict with processing statistics
         """
+        # Load the photo table once and index by id (avoids an O(N²) reload per photo).
+        photos_by_id = {p["id"]: p for p in self.db.get_all_photos()}
         if photo_ids is None:
-            # Process all photos
-            photos = self.db.get_all_photos()
-            photo_ids = [p["id"] for p in photos]
+            photo_ids = list(photos_by_id.keys())
 
         results = {
             "photos_processed": 0,
@@ -147,9 +147,7 @@ class OCREngine:
         }
 
         for photo_id in photo_ids:
-            # Get photo path from database
-            photos = self.db.get_all_photos()
-            photo = next((p for p in photos if p["id"] == photo_id), None)
+            photo = photos_by_id.get(photo_id)
 
             if not photo:
                 logger.warning(f"Photo ID {photo_id} not found in database")
@@ -183,9 +181,10 @@ class OCREngine:
         if max_workers is None:
             max_workers = get_optimal_worker_count()
 
+        # Load the photo table once and index by id (avoids an O(N²) reload per photo).
+        photos_by_id = {p["id"]: p for p in self.db.get_all_photos()}
         if photo_ids is None:
-            photos = self.db.get_all_photos()
-            photo_ids = [p["id"] for p in photos]
+            photo_ids = list(photos_by_id.keys())
 
         results = {
             "photos_processed": 0,
@@ -206,8 +205,7 @@ class OCREngine:
             # Submit all tasks
             futures = {}
             for photo_id in photo_ids:
-                photos = self.db.get_all_photos()
-                photo = next((p for p in photos if p["id"] == photo_id), None)
+                photo = photos_by_id.get(photo_id)
 
                 if photo:
                     future = executor.submit(self._process_photo_with_faces, photo_id, photo["file_path"])
