@@ -2,6 +2,7 @@ import logging
 import os
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file, send_from_directory
+import requests
 from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
 from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
@@ -735,6 +736,40 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             logger.error(f"roster file import error: {e}")
             return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/roster/infer-url", methods=["POST"])
+    def infer_roster_url():
+        """Infer team name and year from a roster URL (USA Ultimate pages).
+
+        JSON body:
+        {
+            "url": "https://play.usaultimate.org/teams/events/Eventteam/?TeamId=..."
+        }
+
+        Returns:
+        {
+            "team_name": "Carleton CUT" or null,
+            "team_year": 2026 or null
+        }
+        """
+        data = request.get_json() or {}
+        url = str(data.get("url", "")).strip()
+        if not url:
+            return jsonify({"error": "url is required"}), 400
+
+        try:
+            from src.roster_import import extract_team_and_year_from_html
+            # Fetch the HTML to extract metadata
+            response = requests.get(url, timeout=20, headers={"User-Agent": "PhotoTagger roster importer"})
+            response.raise_for_status()
+            team, year = extract_team_and_year_from_html(response.text)
+            return jsonify({
+                "team_name": team,
+                "team_year": year,
+            }), 200
+        except Exception as e:
+            logger.warning(f"Could not infer team/year from URL: {e}")
+            return jsonify({"team_name": None, "team_year": None}), 200
 
     @app.route("/api/roster/import-url", methods=["POST"])
     def import_roster_url():
