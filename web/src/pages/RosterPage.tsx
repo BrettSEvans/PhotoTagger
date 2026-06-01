@@ -138,6 +138,33 @@ export const RosterPage: React.FC = () => {
     }
   };
 
+  const handleDeleteRoster = async () => {
+    if (!selectedTeam || !selectedYear) return;
+    const confirmed = window.confirm(
+      `Delete all ${selectedTeam} (${selectedYear}) players? This cannot be undone.`
+    );
+    if (!confirmed) return;
+
+    try {
+      setIsSaving(true);
+      // Delete all entries for this team/year
+      const entriesToDelete = entries.filter(
+        e => e.team_name === selectedTeam && e.team_year === selectedYear
+      );
+
+      await Promise.all(
+        entriesToDelete.map(e => photoTaggerClient.deleteRosterEntry(e.id))
+      );
+
+      await loadRoster();
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete roster');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const updateContextTeam = (index: number, patch: Partial<GameContextTeam>) => {
     setGameContext(prev => {
       const next = [...prev];
@@ -567,14 +594,25 @@ export const RosterPage: React.FC = () => {
       {/* ── Roster Table ─────────────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden">
         {/* Table toolbar */}
-        <div className="px-5 py-4 border-b-2 border-frame">
-          <h2 className="font-outfit text-lg font-bold text-foreground">
-            All Players ({filtered.length})
-          </h2>
+        <div className="px-5 py-4 border-b-2 border-frame flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-outfit text-lg font-bold text-foreground">
+              All Players ({filtered.length})
+            </h2>
+            {selectedTeam && selectedYear && (
+              <p className="font-jakarta text-sm text-muted-fg mt-1">
+                Filtered to {selectedTeam} ({selectedYear})
+              </p>
+            )}
+          </div>
           {selectedTeam && selectedYear && (
-            <p className="font-jakarta text-sm text-muted-fg mt-1">
-              Filtered to {selectedTeam} ({selectedYear})
-            </p>
+            <button
+              onClick={handleDeleteRoster}
+              disabled={isSaving || filtered.length === 0}
+              className="btn-candy bg-secondary text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+            >
+              Delete Roster
+            </button>
           )}
         </div>
 
