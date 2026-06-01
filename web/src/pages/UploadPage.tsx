@@ -24,6 +24,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const [showPostUploadMessage, setShowPostUploadMessage] = useState(false);
   const [gameContext, setGameContext] = useState<any[]>([]);
   const [contextMsg, setContextMsg] = useState<string | null>(null);
+  const [rosterTeams, setRosterTeams] = useState<string[]>([]);
 
   const confirmedPhotosForDisplay = useMemo(() => {
     const grouped = new Map<string, TaggedPhoto[]>();
@@ -79,11 +80,22 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     }
   }, []);
 
+  const loadRosterTeams = useCallback(async () => {
+    try {
+      const data = await photoTaggerClient.getRoster();
+      const teams = Array.from(new Set(data.entries.map((e: any) => e.team_name))).sort();
+      setRosterTeams(teams);
+    } catch {
+      setRosterTeams([]);
+    }
+  }, []);
+
   useEffect(() => {
     loadSummary();
     loadBatches();
     loadGameContext();
-  }, [loadSummary, loadBatches, loadGameContext]);
+    loadRosterTeams();
+  }, [loadSummary, loadBatches, loadGameContext, loadRosterTeams]);
 
   const handleUploadSuccess = () => {
     loadSummary();
@@ -204,30 +216,60 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
             Save Context
           </button>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div className="space-y-4">
           {[0, 1].map(index => (
-            <div key={index} className="grid grid-cols-[1fr_88px_110px] gap-2">
-              <input
-                type="text"
-                value={gameContext[index]?.team_name ?? ''}
-                onChange={e => updateContextTeam(index, { team_name: e.target.value })}
-                placeholder="Team name…"
-                className="geo-input min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-              />
-              <input
-                type="number"
-                value={gameContext[index]?.team_year || ''}
-                placeholder="2026"
-                onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
-                className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-              />
-              <input
-                type="text"
-                value={gameContext[index]?.uniform_color ?? ''}
-                onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
-                placeholder={index === 0 ? 'red' : 'white'}
-                className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-              />
+            <div key={index} className="space-y-2">
+              <div>
+                <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
+                  Team {index === 0 ? 'A' : 'B'}
+                </label>
+                {rosterTeams.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-2">
+                    {rosterTeams.map(team => (
+                      <button
+                        key={team}
+                        onClick={() => updateContextTeam(index, { team_name: team })}
+                        className={`font-jakarta text-sm px-3 py-1.5 rounded-full border-2 transition-colors ${
+                          gameContext[index]?.team_name === team
+                            ? 'bg-accent text-white border-foreground shadow-pop'
+                            : 'bg-white text-foreground border-frame hover:border-foreground'
+                        }`}
+                      >
+                        {team}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  type="text"
+                  value={gameContext[index]?.team_name ?? ''}
+                  onChange={e => updateContextTeam(index, { team_name: e.target.value })}
+                  placeholder="Or type a team name…"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Year</label>
+                  <input
+                    type="number"
+                    value={gameContext[index]?.team_year || ''}
+                    placeholder="2026"
+                    onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
+                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                  />
+                </div>
+                <div>
+                  <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Color</label>
+                  <input
+                    type="text"
+                    value={gameContext[index]?.uniform_color ?? ''}
+                    onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
+                    placeholder={index === 0 ? 'red' : 'white'}
+                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                  />
+                </div>
+              </div>
             </div>
           ))}
         </div>
