@@ -80,6 +80,32 @@ export const RosterPage: React.FC = () => {
     }
   };
 
+  const clearAllForms = () => {
+    // Clear player entry form
+    setNewName('');
+    setNewJersey('');
+    setNewTeam('');
+    setTeamYear(2026);
+    setTeamColor('');
+
+    // Clear bulk import form
+    setRosterUrl('');
+    setImportTeam('');
+    setImportTeamYear(2026);
+    setImportTeamColor('');
+    setDuplicatePolicy('replace');
+    setImportMsg(null);
+    setIsDragging(false);
+
+    // Clear file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+
+    // Focus on name input to start entering new roster
+    nameInputRef.current?.focus();
+  };
+
   // ── Inline entry ──────────────────────────────────────────────────────────
 
   const handleAddRow = async (e?: React.FormEvent) => {
@@ -294,7 +320,7 @@ export const RosterPage: React.FC = () => {
           <p className="font-jakarta text-xs text-muted-fg mb-4">Create a new roster for a team</p>
           <button
             type="button"
-            onClick={() => nameInputRef.current?.focus()}
+            onClick={clearAllForms}
             className="btn-candy bg-accent text-white font-jakarta font-bold px-6 py-2 rounded-full border-2 border-foreground shadow-pop"
           >
             + Add Roster
