@@ -22,6 +22,8 @@ photos/
 .env
 logs/
 *.log
+*.pid
+.env.local
 
 # OS
 .DS_Store

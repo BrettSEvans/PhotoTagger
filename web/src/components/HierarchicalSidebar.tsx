@@ -47,8 +47,10 @@ function buildRosterHierarchy(entries: RosterEntry[]): RosterHierarchy[] {
 function buildGameHierarchy(batches: PhotoBatch[]): GameHierarchy[] {
   const byYear: Record<number, PhotoBatch[]> = {};
   batches.forEach(batch => {
-    if (!byYear[batch.team_year]) byYear[batch.team_year] = [];
-    byYear[batch.team_year].push(batch);
+    if (batch.team_year !== null && batch.team_year !== undefined) {
+      if (!byYear[batch.team_year]) byYear[batch.team_year] = [];
+      byYear[batch.team_year].push(batch);
+    }
   });
 
   return Object.entries(byYear)

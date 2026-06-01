@@ -37,7 +37,6 @@ import {
   BatchesResponse,
 } from '../types/index';
 
-const DEFAULT_API_BASE_URL = 'http://127.0.0.1:5001';
 const LOCAL_AGENT_URL_KEY = 'phototagger.localAgentUrl';
 const AGENT_TOKEN_KEY = 'phototagger.agentToken';
 
@@ -46,7 +45,9 @@ function storedValue(key: string): string | null {
   return window.localStorage.getItem(key);
 }
 
-const API_BASE_URL = storedValue(LOCAL_AGENT_URL_KEY) || import.meta.env.VITE_LOCAL_AGENT_URL || import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE_URL;
+// Use relative URLs by default, which works on both local and Railway.app deployments.
+// localStorage override lets users manually set a different API URL if needed.
+const API_BASE_URL = storedValue(LOCAL_AGENT_URL_KEY) || import.meta.env.VITE_LOCAL_AGENT_URL || import.meta.env.VITE_API_BASE_URL || '';
 
 /**
  * PhotoTaggerClient - Encapsulates all API communication
@@ -495,7 +496,7 @@ class PhotoTaggerClient {
   }
 
   setLocalAgentSettings(settings: AgentSettings): void {
-    const cleanUrl = settings.localAgentUrl.trim().replace(/\/+$/, '') || DEFAULT_API_BASE_URL;
+    const cleanUrl = settings.localAgentUrl.trim().replace(/\/+$/, '') || '';
     this.baseURL = cleanUrl;
     this.agentToken = settings.agentToken.trim();
     this.client.defaults.baseURL = cleanUrl;
