@@ -9,6 +9,7 @@ import { ReviewPage } from './pages/ReviewPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SidebarProvider } from './contexts/SidebarContext'
 import type { AgentSettings } from './types/index'
 import './styles/globals.css'
 
@@ -146,16 +147,18 @@ function App() {
       </nav>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-8">
-        <ErrorBoundary>
-          {currentPage === 'roster'  && <RosterPage />}
-          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
-          {currentPage === 'review'  && <ReviewPage />}
-          {currentPage === 'search'  && <SearchPage />}
-          {currentPage === 'gallery' && <GalleryPage />}
-          {currentPage === 'players' && <PlayersPage />}
-        </ErrorBoundary>
-      </main>
+      <SidebarProvider>
+        <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col">
+          <ErrorBoundary>
+            {currentPage === 'roster'  && <RosterPage />}
+            {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
+            {currentPage === 'review'  && <ReviewPage />}
+            {currentPage === 'search'  && <SearchPage />}
+            {currentPage === 'gallery' && <GalleryPage />}
+            {currentPage === 'players' && <PlayersPage />}
+          </ErrorBoundary>
+        </main>
+      </SidebarProvider>
 
       {/* Footer */}
       <footer className="border-t-2 border-foreground bg-cream mt-16">

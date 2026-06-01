@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SidebarLayout } from '../components/SidebarLayout';
+import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
+import { useSidebar } from '../contexts/SidebarContext';
 import type { GameContextTeam, RosterEntry } from '../types/index';
 
 export const RosterPage: React.FC = () => {
+  const { selectedYear, selectedTeam } = useSidebar();
   const [entries, setEntries]       = useState<RosterEntry[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
-  const [filterTeam, setFilterTeam] = useState('All Teams');
-  const [filterYear, setFilterYear] = useState<number | null>(null);
   const [error, setError]           = useState<string | null>(null);
 
   // Inline entry form
@@ -248,8 +250,8 @@ export const RosterPage: React.FC = () => {
   };
 
   const filtered = entries.filter(e => {
-    const teamMatch = filterTeam === 'All Teams' || e.team_name === filterTeam;
-    const yearMatch = filterYear === null || e.team_year === filterYear;
+    const teamMatch = !selectedTeam || e.team_name === selectedTeam;
+    const yearMatch = !selectedYear || e.team_year === selectedYear;
     return teamMatch && yearMatch;
   });
 
@@ -257,7 +259,15 @@ export const RosterPage: React.FC = () => {
   const yearGroups = Array.from(new Set(entries.map(e => e.team_year))).sort((a, b) => b - a);
 
   return (
-    <div className="w-full max-w-6xl mx-auto py-4 space-y-6">
+    <SidebarLayout
+      sidebar={
+        <HierarchicalSidebar
+          pageType="roster"
+          rosterEntries={entries}
+        />
+      }
+      children={
+        <div className="w-full py-4 space-y-6">
       {/* Header */}
       <div>
         <h1 className="font-outfit text-4xl font-extrabold text-foreground">Roster</h1>
@@ -274,49 +284,21 @@ export const RosterPage: React.FC = () => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="md:col-span-2 bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="font-outfit text-lg font-bold text-foreground">Game Context (Empty on Start)</h2>
-              <p className="font-jakarta text-xs text-muted-fg">Set the current matchup and uniform colors before evaluating photos</p>
-            </div>
-            <button
-              type="button"
-              onClick={saveGameContext}
-              className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
-            >
-              Save Context
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {[0, 1].map(index => (
-              <div key={index} className="grid grid-cols-[1fr_88px_110px] gap-2">
-                <select
-                  value={gameContext[index]?.team_name ?? ''}
-                  onChange={e => updateContextTeam(index, { team_name: e.target.value })}
-                  className="geo-input min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-                >
-                  <option value="">Select team</option>
-                  {rosterTeams.map(team => <option key={team}>{team}</option>)}
-                </select>
-                <input
-                  type="number"
-                  value={gameContext[index]?.team_year || ''}
-                  placeholder="2026"
-                  onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
-                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                />
-                <input
-                  type="text"
-                  value={gameContext[index]?.uniform_color ?? ''}
-                  onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
-                  placeholder={index === 0 ? 'red' : 'white'}
-                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                />
-              </div>
-            ))}
-          </div>
-          {contextMsg && <p className="font-jakarta text-xs font-semibold text-foreground">{contextMsg}</p>}
+        {/* ── Add Roster ───────────────────────────────────────────────────── */}
+        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-6 flex flex-col items-center justify-center text-center relative overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-accent rounded-full border-2 border-foreground opacity-70" />
+          <svg width="32" height="32" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24" className="text-accent mb-3">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          <h2 className="font-outfit text-lg font-bold text-foreground mb-1">Add Roster</h2>
+          <p className="font-jakarta text-xs text-muted-fg mb-4">Create a new roster for a team</p>
+          <button
+            type="button"
+            onClick={() => nameInputRef.current?.focus()}
+            className="btn-candy bg-accent text-white font-jakarta font-bold px-6 py-2 rounded-full border-2 border-foreground shadow-pop"
+          >
+            + Add Roster
+          </button>
         </div>
 
         {/* ── Left: Bulk Import Zone ───────────────────────────────────────── */}
@@ -559,58 +541,15 @@ export const RosterPage: React.FC = () => {
       {/* ── Roster Table ─────────────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden">
         {/* Table toolbar */}
-        <div className="px-5 py-4 border-b-2 border-frame space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="font-outfit text-lg font-bold text-foreground">
-              All Players ({filtered.length})
-            </h2>
-          </div>
-          <div className="space-y-2">
-            <div className="flex gap-2 flex-wrap">
-              <span className="text-xs font-bold text-muted-fg uppercase tracking-wider self-center">Team:</span>
-              {['All Teams', ...teamGroups].map(t => (
-                <button
-                  key={t}
-                  onClick={() => setFilterTeam(t)}
-                  className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
-                    filterTeam === t
-                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
-                      : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
-                  }`}
-                >
-                  {t === 'All Teams' ? t : t.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-            {yearGroups.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
-                <span className="text-xs font-bold text-muted-fg uppercase tracking-wider self-center">Year:</span>
-                <button
-                  onClick={() => setFilterYear(null)}
-                  className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
-                    filterYear === null
-                      ? 'bg-accent text-white border-foreground shadow-pop-sm'
-                      : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
-                  }`}
-                >
-                  All Years
-                </button>
-                {yearGroups.map(y => (
-                  <button
-                    key={y}
-                    onClick={() => setFilterYear(y)}
-                    className={`font-jakarta text-xs font-bold px-3 py-1.5 rounded-full border-2 transition-colors ${
-                      filterYear === y
-                        ? 'bg-accent text-white border-foreground shadow-pop-sm'
-                        : 'bg-white text-foreground border-frame hover:bg-tertiary hover:border-foreground'
-                    }`}
-                  >
-                    {y}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+        <div className="px-5 py-4 border-b-2 border-frame">
+          <h2 className="font-outfit text-lg font-bold text-foreground">
+            All Players ({filtered.length})
+          </h2>
+          {selectedTeam && selectedYear && (
+            <p className="font-jakarta text-sm text-muted-fg mt-1">
+              Filtered to {selectedTeam} ({selectedYear})
+            </p>
+          )}
         </div>
 
         {isLoading ? (
@@ -680,7 +619,9 @@ export const RosterPage: React.FC = () => {
           </table>
         )}
       </div>
-    </div>
+        </div>
+      }
+    />
   );
 };
 
