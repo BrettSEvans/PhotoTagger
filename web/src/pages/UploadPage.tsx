@@ -2,19 +2,22 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import PhotoUpload from '../components/PhotoUpload';
 import LoadingSpinner from '../components/LoadingSpinner';
-import type { ProcessingSummary, TaggedPhoto, ReviewPhoto } from '../types/index';
+import type { ProcessingSummary, TaggedPhoto, ReviewPhoto, PhotoBatch } from '../types/index';
 
 type TabId = 'confirmed' | 'review';
 
 const SHADOW_CLASSES = ['shadow-pop', 'shadow-pop-pink', 'shadow-pop-yellow', 'shadow-pop-mint', 'shadow-pop-violet'];
 
-export const UploadPage: React.FC<{ onOpenWorkspace?: () => void }> = ({ onOpenWorkspace }) => {
+export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?: () => void }> = ({ onOpenWorkspace, onGoToRoster }) => {
   const [summary,       setSummary]       = useState<ProcessingSummary | null>(null);
   const [confirmedPhotos, setConfirmedPhotos] = useState<TaggedPhoto[]>([]);
   const [reviewPhotos,  setReviewPhotos]  = useState<ReviewPhoto[]>([]);
   const [activeTab,     setActiveTab]     = useState<TabId>('confirmed');
   const [isLoadingSum,  setIsLoadingSum]  = useState(true);
   const [isLoadingTab,  setIsLoadingTab]  = useState(false);
+  const [batches, setBatches] = useState<PhotoBatch[]>([]);
+  const [isLoadingBatches, setIsLoadingBatches] = useState(true);
+  const [showPostUploadMessage, setShowPostUploadMessage] = useState(false);
 
   const confirmedPhotosForDisplay = useMemo(() => {
     const grouped = new Map<string, TaggedPhoto[]>();
@@ -46,7 +49,26 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void }> = ({ onOpenW
     finally { setIsLoadingSum(false); }
   }, []);
 
-  useEffect(() => { loadSummary(); }, [loadSummary]);
+  const loadBatches = useCallback(async () => {
+    setIsLoadingBatches(true);
+    try {
+      const data = await photoTaggerClient.getBatches();
+      setBatches(data.batches || []);
+    } catch { /* batches not critical */ }
+    finally { setIsLoadingBatches(false); }
+  }, []);
+
+  useEffect(() => {
+    loadSummary();
+    loadBatches();
+  }, [loadSummary, loadBatches]);
+
+  const handleUploadSuccess = () => {
+    loadSummary();
+    loadBatches();
+    setShowPostUploadMessage(true);
+    setTimeout(() => setShowPostUploadMessage(false), 8000);
+  };
 
   const switchTab = async (tab: TabId) => {
     setActiveTab(tab);
@@ -78,8 +100,28 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void }> = ({ onOpenW
         </p>
       </div>
 
+      {/* Post-upload message */}
+      {showPostUploadMessage && (
+        <div className="bg-quaternary/20 border-2 border-quaternary rounded-2xl shadow-pop p-5">
+          <p className="font-jakarta font-semibold text-foreground mb-3">
+            ✓ Photos uploaded successfully!
+          </p>
+          <p className="font-jakarta text-sm text-muted-fg mb-4">
+            Before face matching, please upload team rosters and set uniform colors on the Roster page. This helps the AI match jersey numbers to player names.
+          </p>
+          {onGoToRoster && (
+            <button
+              onClick={onGoToRoster}
+              className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-5 py-2 rounded-full border-2 border-foreground shadow-pop"
+            >
+              Go to Roster Page →
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Import form */}
-      <PhotoUpload onUploadSuccess={loadSummary} />
+      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
 
       {/* ── Summary Accordion ──────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden relative">
@@ -241,6 +283,52 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void }> = ({ onOpenW
             <p className="font-jakarta text-sm text-muted-fg">Run OCR to see tagging results</p>
           </div>
         )}
+      </div>
+
+      {/* ── Batches Section ────────────────────────────────────────────────── */}
+      <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden relative">
+        <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-secondary rounded-full border-2 border-foreground opacity-80" />
+
+        <div className="px-6 py-5 border-b-2 border-foreground">
+          <h2 className="font-outfit text-lg font-bold text-foreground">Import Batches</h2>
+          <p className="font-jakarta text-xs text-muted-fg mt-1">Organize and tag groups of photos by import folder</p>
+        </div>
+
+        <div className="p-5">
+          {isLoadingBatches ? (
+            <div className="flex justify-center py-8"><LoadingSpinner message="Loading batches…" /></div>
+          ) : batches.length === 0 ? (
+            <p className="font-jakarta text-sm text-muted-fg text-center py-8">No import batches yet. Photos from the upload above will appear here.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="border-b-2 border-foreground">
+                  <tr>
+                    <th className="text-left px-3 py-3 font-jakarta font-bold text-muted-fg">Folder</th>
+                    <th className="text-left px-3 py-3 font-jakarta font-bold text-muted-fg">Team</th>
+                    <th className="text-left px-3 py-3 font-jakarta font-bold text-muted-fg">Year</th>
+                    <th className="text-center px-3 py-3 font-jakarta font-bold text-muted-fg">Photos</th>
+                    <th className="text-left px-3 py-3 font-jakarta font-bold text-muted-fg">Created</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-frame">
+                  {batches.map((batch) => (
+                    <tr key={batch.id} className="hover:bg-muted transition-colors">
+                      <td className="px-3 py-3">
+                        <div className="font-jakarta font-semibold text-foreground">{batch.name || batch.source_folder.split('/').pop()}</div>
+                        <div className="font-jakarta text-xs text-muted-fg truncate">{batch.source_folder}</div>
+                      </td>
+                      <td className="px-3 py-3 font-jakarta text-foreground">{batch.team_name || '—'}</td>
+                      <td className="px-3 py-3 font-jakarta text-foreground">{batch.team_year || '—'}</td>
+                      <td className="px-3 py-3 text-center font-jakarta font-semibold text-foreground">{batch.photo_count}</td>
+                      <td className="px-3 py-3 font-jakarta text-muted-fg">{new Date(batch.created_at).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
