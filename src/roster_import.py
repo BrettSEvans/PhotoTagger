@@ -22,13 +22,13 @@ def extract_team_and_year_from_html(html: str) -> tuple[str | None, int | None]:
     """Extract team name and year from a USA Ultimate event-team HTML page.
 
     Strategy (in priority order):
-    1. Pull the team name directly from the known element ID
-       ``CT_Main_0_ucTeamDetails_lnkTeamName`` — this is the authoritative
-       source and preserves the exact official name including mixed-case
-       nickname suffixes such as "Massachusetts (Zoodisc)" or "Carleton (CUT)".
-    2. Fall back to a regex that matches ``Name (Nickname)`` anywhere on the
-       page, allowing any capitalisation inside the parentheses.
-    3. Year: look for "2026 D-I College Championships" or similar heading.
+    1. Pull the team name from the ``profile_info > h4`` heading — found on
+       event-team pages like Carleton College (CUT).
+    2. Pull from the known element ID ``CT_Main_0_ucTeamDetails_lnkTeamName`` —
+       found on team detail pages like Massachusetts (Zoodisc).
+    3. Fall back to a regex that matches ``Name (Nickname)`` anywhere on the
+       page, but only if no "MemberSession" or other noise has appeared first.
+    4. Year: look for "2026 D-I College Championships" or similar heading.
 
     Returns:
       (team_name, year) where either or both may be None if not found.
@@ -36,18 +36,31 @@ def extract_team_and_year_from_html(html: str) -> tuple[str | None, int | None]:
     team: str | None = None
     year: int | None = None
 
-    # ── 1. Primary: known element ID (USA Ultimate event-team pages) ──────────
-    id_match = re.search(
-        r'id="CT_Main_0_ucTeamDetails_lnkTeamName"[^>]*>(.*?)</a>',
+    # ── 1. Primary: profile_info > h4 (USA Ultimate event-team pages) ────────
+    profile_match = re.search(
+        r'<div\s+class="profile_info">\s*<h4>\s*(.*?)\s*</h4>',
         html,
         re.DOTALL,
     )
-    if id_match:
-        raw = re.sub(r'<[^>]+>', '', id_match.group(1)).strip()
+    if profile_match:
+        raw = re.sub(r'<[^>]+>', '', profile_match.group(1)).strip()
         if raw:
             team = re.sub(r'\s+', ' ', raw)
 
-    # ── 2. Fallback: "Name (Nickname)" anywhere — mixed-case nickname allowed ─
+    # ── 2. Secondary: known element ID (some USA Ultimate pages) ─────────────
+    if not team:
+        id_match = re.search(
+            r'id="CT_Main_0_ucTeamDetails_lnkTeamName"[^>]*>(.*?)</a>',
+            html,
+            re.DOTALL,
+        )
+        if id_match:
+            raw = re.sub(r'<[^>]+>', '', id_match.group(1)).strip()
+            if raw:
+                team = re.sub(r'\s+', ' ', raw)
+
+    # ── 3. Fallback: "Name (Nickname)" anywhere — mixed-case nickname allowed
+    # Only use if no team found yet (avoids matching "MemberSession (true)" etc.)
     if not team:
         fallback = re.search(
             r'([A-Z][a-zA-Z\s\-\']+?)\s*\(([A-Za-z][A-Za-z\s]{1,})\)',
@@ -56,9 +69,11 @@ def extract_team_and_year_from_html(html: str) -> tuple[str | None, int | None]:
         if fallback:
             name_part = fallback.group(1).strip()
             nick_part = fallback.group(2).strip()
-            team = re.sub(r'\s+', ' ', f"{name_part} ({nick_part})")
+            # Additional sanity check: reject common false positives
+            if not name_part.lower().startswith(('membersession', 'college', 'member')):
+                team = re.sub(r'\s+', ' ', f"{name_part} ({nick_part})")
 
-    # ── 3. Year from event heading ─────────────────────────────────────────────
+    # ── 4. Year from event heading ────────────────────────────────────────────
     year_match = re.search(
         r'(20\d{2})\s+(?:D-[IMX]|Men\'s|Women\'s|Mixed)?.*?(?:Championships|Nationals|Tournament)',
         html,
