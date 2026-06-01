@@ -516,6 +516,24 @@ class Database:
             result = cursor.fetchone()
             return result[0] if result else None
 
+    def get_assigned_player_for_photo(self, photo_id: int) -> Optional[str]:
+        """Get the player name assigned to a photo via cluster assignment.
+
+        Returns the player_name if the photo contains a face in an assigned cluster,
+        else None.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT DISTINCT pc.player_name
+                FROM faces f
+                JOIN player_clusters pc ON f.cluster_id = pc.id
+                WHERE f.photo_id = ? AND pc.player_name IS NOT NULL
+                LIMIT 1
+            """, (photo_id,))
+            result = cursor.fetchone()
+            return result[0] if result else None
+
     def get_all_faces(self) -> List[Dict]:
         """Get all faces with their embeddings (for clustering)."""
         with self._lock:

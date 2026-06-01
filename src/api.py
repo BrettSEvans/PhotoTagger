@@ -204,16 +204,20 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         # Filter by confidence
         results = [r for r in all_results if r["confidence"] >= min_confidence]
 
-        # Add player names if roster available
-        if team and year:
-            try:
-                year_int = int(year)
-                for result in results:
+        # Add assigned player names from cluster assignments
+        for result in results:
+            assigned_name = db.get_assigned_player_for_photo(result["id"])
+            if assigned_name:
+                result["player_name"] = assigned_name
+            elif team and year:
+                # Fallback to roster lookup if no cluster assignment
+                try:
+                    year_int = int(year)
                     if hasattr(app, 'roster_manager'):
                         player_name = app.roster_manager.get_player_name(team, year_int, jersey)
                         result["player_name"] = player_name
-            except (ValueError, AttributeError):
-                pass
+                except (ValueError, AttributeError):
+                    pass
 
         return jsonify({
             "jersey": jersey,
