@@ -4,7 +4,7 @@ import LoadingSpinner from '../components/LoadingSpinner';
 import { SidebarLayout } from '../components/SidebarLayout';
 import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
 import { useSidebar } from '../contexts/SidebarContext';
-import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem, RosterSearchResult, PhotoBatch, BatchesResponse } from '../types/index';
+import type { ClusterPlayersResult, FaceDetectionResult, MatchSimilarResponse, PlayerCluster, PlayerPhotoItem, RosterSearchResult, SimilarClusterMatch, PhotoBatch, BatchesResponse } from '../types/index';
 import { bboxStyle } from '../utils/bboxUtils';
 import type { ImgDim } from '../utils/bboxUtils';
 
@@ -53,6 +53,11 @@ export const ReviewPage: React.FC = () => {
   const [error,         setError]         = useState<string | null>(null);
   const [isAssigning,   setIsAssigning]   = useState(false);
   const [writeMetadata, setWriteMetadata] = useState(() => window.localStorage.getItem('phototagger.writeMetadata') === 'true');
+
+  // ── Post-assign similarity matches ───────────────────────────────────────
+  const [matchResults,      setMatchResults]      = useState<MatchSimilarResponse | null>(null);
+  const [isMatching,        setIsMatching]        = useState(false);
+  const [dismissedSuggestions, setDismissedSuggestions] = useState<Set<number>>(new Set());
 
   // ── Detect + group pipeline ──────────────────────────────────────────────
   const [isDetecting, setIsDetecting] = useState(false);
@@ -243,6 +248,8 @@ export const ReviewPage: React.FC = () => {
     const selectedFaceIds = Array.from(selected);
     const excluded = clusterPhotos.filter(p => !selected.has(p.face_id)).map(p => p.face_id);
     setIsAssigning(true);
+    setMatchResults(null);
+    setDismissedSuggestions(new Set());
     try {
       const assignResult = await photoTaggerClient.assignCluster(
         selectedCluster.id,
@@ -268,9 +275,53 @@ export const ReviewPage: React.FC = () => {
       setAssignSuccess(`${selected.size} photo${selected.size !== 1 ? 's' : ''} assigned to ${result.player_name} #${result.jersey_number}${metadataText}`);
       setSearchQuery('');
       setSearchResults([]);
+
+      // Scan remaining clusters for similar faces
+      setIsMatching(true);
+      try {
+        const matches = await photoTaggerClient.matchSimilarClusters(selectedCluster.id);
+        setMatchResults(matches);
+        // Remove auto-tagged clusters from the unassigned list in local state
+        if (matches.auto_tagged.length > 0) {
+          const autoTaggedIds = new Set(matches.auto_tagged.map(m => m.cluster_id));
+          setClusters(prev => prev.map(c =>
+            autoTaggedIds.has(c.id)
+              ? { ...c, player_name: result.player_name, jersey_number: result.jersey_number, roster_entry_id: result.id }
+              : c
+          ));
+        }
+      } catch {
+        // Similarity scan is best-effort — don't surface errors to the user
+      } finally {
+        setIsMatching(false);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Assignment failed');
     } finally { setIsAssigning(false); }
+  };
+
+  // ── Confirm a suggested cluster ──────────────────────────────────────────
+  const handleConfirmSuggestion = async (suggestion: SimilarClusterMatch, result: RosterSearchResult) => {
+    try {
+      await photoTaggerClient.assignCluster(
+        suggestion.cluster_id,
+        result.player_name,
+        result.jersey_number,
+        result.id,
+        { faceIds: [] },
+      );
+      setClusters(prev => prev.map(c =>
+        c.id === suggestion.cluster_id
+          ? { ...c, player_name: result.player_name, jersey_number: result.jersey_number, roster_entry_id: result.id }
+          : c
+      ));
+      setMatchResults(prev => prev ? {
+        ...prev,
+        suggestions: prev.suggestions.filter(s => s.cluster_id !== suggestion.cluster_id),
+      } : prev);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to confirm suggestion');
+    }
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent) => {
@@ -562,6 +613,103 @@ export const ReviewPage: React.FC = () => {
                     <span className="block font-jakarta text-[10px] text-muted-fg">to XMP sidecars</span>
                   </span>
                 </label>
+
+                {/* ── Similarity scan results ─────────────────────────────── */}
+                {isMatching && (
+                  <div className="flex items-center gap-2 py-2">
+                    <span className="w-3 h-3 border-2 border-accent border-t-transparent rounded-full animate-spin block flex-shrink-0" />
+                    <span className="font-jakarta text-xs text-muted-fg">Scanning for similar faces…</span>
+                  </div>
+                )}
+
+                {matchResults && !isMatching && (
+                  <div className="space-y-2">
+                    {/* Auto-tagged banner */}
+                    {matchResults.auto_tagged.length > 0 && (
+                      <div className="bg-quaternary/10 border border-quaternary rounded-lg px-3 py-2">
+                        <p className="font-jakarta text-xs font-bold text-quaternary">
+                          ✓ Auto-tagged {matchResults.auto_tagged.length} more cluster{matchResults.auto_tagged.length !== 1 ? 's' : ''} as {selectedCluster?.player_name}
+                        </p>
+                        <p className="font-jakarta text-[10px] text-muted-fg mt-0.5">
+                          All had ≥85% face similarity
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Suggestions requiring user confirmation */}
+                    {matchResults.suggestions.filter(s => !dismissedSuggestions.has(s.cluster_id)).length > 0 && (
+                      <div className="space-y-1.5">
+                        <p className="font-jakarta text-[10px] font-bold uppercase tracking-wider text-muted-fg">
+                          Possible matches — confirm?
+                        </p>
+                        {matchResults.suggestions
+                          .filter(s => !dismissedSuggestions.has(s.cluster_id))
+                          .map(suggestion => (
+                          <div
+                            key={suggestion.cluster_id}
+                            className="bg-tertiary/10 border border-tertiary rounded-lg px-2 py-2 space-y-1.5"
+                          >
+                            <div className="flex items-center gap-2">
+                              {suggestion.thumbnail_face_id ? (
+                                <img
+                                  src={photoTaggerClient.getFaceCropUrl(suggestion.thumbnail_face_id)}
+                                  alt="face"
+                                  className="w-8 h-8 rounded-full border border-frame object-cover flex-shrink-0"
+                                />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full border border-frame bg-muted flex-shrink-0" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-jakarta text-xs font-bold text-foreground">
+                                  Cluster #{suggestion.cluster_id}
+                                </p>
+                                <p className="font-jakarta text-[10px] text-muted-fg">
+                                  {suggestion.face_count} face{suggestion.face_count !== 1 ? 's' : ''} · {Math.round(suggestion.similarity * 100)}% match
+                                </p>
+                              </div>
+                            </div>
+                            <p className="font-jakarta text-[10px] text-foreground">
+                              Tag as <span className="font-bold">{selectedCluster?.player_name} #{selectedCluster?.jersey_number}</span>?
+                            </p>
+                            <div className="flex gap-1.5">
+                              <button
+                                onClick={() => {
+                                  if (selectedCluster?.roster_entry_id != null) {
+                                    handleConfirmSuggestion(suggestion, {
+                                      id: selectedCluster.roster_entry_id,
+                                      player_name: selectedCluster.player_name!,
+                                      jersey_number: selectedCluster.jersey_number!,
+                                      team_name: '',
+                                    });
+                                  }
+                                }}
+                                className="flex-1 btn-candy bg-accent text-white font-jakarta font-bold text-[10px] px-2 py-1 rounded-full border border-foreground shadow-pop-sm"
+                              >
+                                Yes, tag
+                              </button>
+                              <button
+                                onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.cluster_id]))}
+                                className="flex-1 font-jakarta text-[10px] px-2 py-1 rounded-full border border-frame text-muted-fg hover:bg-muted"
+                              >
+                                Skip
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* All suggestions dismissed or none */}
+                    {matchResults.suggestions.length > 0 &&
+                      matchResults.suggestions.every(s => dismissedSuggestions.has(s.cluster_id)) && (
+                      <p className="font-jakarta text-[10px] text-muted-fg text-center py-1">All suggestions reviewed.</p>
+                    )}
+
+                    {matchResults.auto_tagged.length === 0 && matchResults.suggestions.length === 0 && (
+                      <p className="font-jakarta text-[10px] text-muted-fg text-center py-1">No similar unidentified clusters found.</p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
