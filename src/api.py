@@ -962,6 +962,73 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/players/<int:cluster_id>/match-similar", methods=["POST"])
+    def match_similar_clusters(cluster_id: int):
+        """Post-assignment similarity scan.
+
+        Compares the centroid of the just-assigned cluster against every
+        unidentified cluster's centroid.
+        - similarity >= 0.85  → auto-tag with the same player
+        - 0.70 <= similarity < 0.85 → return as user suggestions
+        """
+        import numpy as np
+
+        def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+            na, nb = np.linalg.norm(a), np.linalg.norm(b)
+            if na == 0 or nb == 0:
+                return 0.0
+            return float(np.dot(a, b) / (na * nb))
+
+        try:
+            cluster = db.get_cluster_by_id(cluster_id)
+            if not cluster or not cluster.get("player_name"):
+                return jsonify({"error": "cluster is not assigned to a player"}), 400
+
+            player_name    = cluster["player_name"]
+            jersey_number  = cluster["jersey_number"]
+            roster_entry_id = cluster["roster_entry_id"]
+
+            # Centroid of the newly-assigned cluster
+            assigned_embs = db.get_cluster_face_embeddings(cluster_id)
+            if not assigned_embs:
+                return jsonify({"auto_tagged": [], "suggestions": []}), 200
+
+            assigned_centroid = np.mean(
+                [np.array(e, dtype=np.float32) for e in assigned_embs], axis=0
+            )
+
+            auto_tagged: list = []
+            suggestions: list = []
+
+            for uc in db.get_unidentified_clusters_with_embeddings():
+                if not uc["embeddings"]:
+                    continue
+                uc_centroid = np.mean(
+                    [np.array(e, dtype=np.float32) for e in uc["embeddings"]], axis=0
+                )
+                sim = _cosine_similarity(assigned_centroid, uc_centroid)
+
+                entry = {
+                    "cluster_id":       uc["id"],
+                    "face_count":       uc["face_count"],
+                    "thumbnail_face_id": uc["thumbnail_face_id"],
+                    "similarity":       round(float(sim), 3),
+                }
+
+                if sim >= 0.85:
+                    db.assign_cluster_to_player(
+                        uc["id"], player_name, jersey_number, roster_entry_id
+                    )
+                    auto_tagged.append({**entry, "player_name": player_name, "jersey_number": jersey_number})
+                elif sim >= 0.70:
+                    suggestions.append(entry)
+
+            return jsonify({"auto_tagged": auto_tagged, "suggestions": suggestions}), 200
+
+        except Exception as exc:
+            logger.exception("match-similar failed for cluster %s", cluster_id)
+            return jsonify({"error": str(exc)}), 500
+
     # Get detection status
     @app.route("/api/detection-status", methods=["GET"])
     def detection_status():

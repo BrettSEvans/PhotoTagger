@@ -973,6 +973,59 @@ class Database:
                 "deleted_cluster_ids": deleted_cluster_ids,
             }
 
+    def get_cluster_by_id(self, cluster_id: int) -> Optional[Dict]:
+        """Get a single player cluster by ID."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
+                       player_name, jersey_number, roster_entry_id
+                FROM player_clusters WHERE id = ?
+            """, (cluster_id,))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "face_count": row[1],
+                "photo_count": row[2],
+                "thumbnail_face_id": row[3],
+                "created_at": row[4],
+                "player_name": row[5],
+                "jersey_number": row[6],
+                "roster_entry_id": row[7],
+            }
+
+    def get_cluster_face_embeddings(self, cluster_id: int) -> List[List[float]]:
+        """Return raw embedding vectors for all faces in a cluster."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT embedding FROM faces WHERE cluster_id = ?", (cluster_id,)
+            )
+            return [json.loads(row[0]) for row in cursor.fetchall()]
+
+    def get_unidentified_clusters_with_embeddings(self) -> List[Dict]:
+        """Return all unidentified clusters together with their face embeddings."""
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute("""
+                SELECT id, face_count, thumbnail_face_id
+                FROM player_clusters
+                WHERE player_name IS NULL
+                ORDER BY face_count DESC
+            """)
+            clusters = [
+                {"id": row[0], "face_count": row[1], "thumbnail_face_id": row[2], "embeddings": []}
+                for row in cursor.fetchall()
+            ]
+            for cluster in clusters:
+                cursor.execute(
+                    "SELECT embedding FROM faces WHERE cluster_id = ?", (cluster["id"],)
+                )
+                cluster["embeddings"] = [json.loads(row[0]) for row in cursor.fetchall()]
+            return clusters
+
     def assign_cluster_to_player(
         self,
         cluster_id: int,

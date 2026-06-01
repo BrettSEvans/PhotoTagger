@@ -353,6 +353,27 @@ export interface AssignClusterResponse {
 }
 
 /**
+ * SimilarClusterMatch - One result from /api/players/:id/match-similar
+ */
+export interface SimilarClusterMatch {
+  cluster_id: number;
+  face_count: number;
+  thumbnail_face_id: number | null;
+  /** Cosine similarity 0-1 */
+  similarity: number;
+  /** Present only on auto-tagged entries */
+  player_name?: string;
+  jersey_number?: string;
+}
+
+export interface MatchSimilarResponse {
+  /** Clusters that were automatically tagged (similarity >= 0.85) */
+  auto_tagged: SimilarClusterMatch[];
+  /** Clusters suggested for user confirmation (0.70 <= similarity < 0.85) */
+  suggestions: SimilarClusterMatch[];
+}
+
+/**
  * RosterResponse - API response from /api/roster
  */
 export interface RosterResponse {

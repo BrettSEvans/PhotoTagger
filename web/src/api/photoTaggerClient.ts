@@ -22,6 +22,7 @@ import {
   RosterImportResponse,
   DeassignFacesResponse,
   AssignClusterResponse,
+  MatchSimilarResponse,
   RosterSearchResult,
   ProcessingSummary,
   TaggedPhoto,
@@ -459,6 +460,13 @@ class PhotoTaggerClient {
 
   async deassignFaces(faceIds: number[]): Promise<DeassignFacesResponse> {
     const response = await this.client.post<DeassignFacesResponse>('/api/faces/deassign', { face_ids: faceIds });
+    return response.data;
+  }
+
+  async matchSimilarClusters(clusterId: number): Promise<MatchSimilarResponse> {
+    const response = await this.client.post<MatchSimilarResponse>(
+      `/api/players/${clusterId}/match-similar`,
+    );
     return response.data;
   }
 
