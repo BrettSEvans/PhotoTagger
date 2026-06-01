@@ -1009,11 +1009,20 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         """Post-assignment similarity scan.
 
         Compares the centroid of the just-assigned cluster against every
-        unidentified cluster's centroid.
-        - similarity >= 0.85  → auto-tag with the same player
-        - 0.70 <= similarity < 0.85 → return as user suggestions
+        unidentified cluster's centroid using InsightFace buffalo_l embeddings
+        (512-dim, unnormalized).  Empirical same-person cosine range: ~0.24–0.57
+        (mean 0.40, matching the cluster-building threshold of 0.40).
+
+        Thresholds calibrated to this embedding space:
+        - similarity >= 0.60  → auto-tag with the same player
+        - 0.40 <= similarity < 0.60 → return as user suggestions
         """
         import numpy as np
+
+        # Calibrated for InsightFace buffalo_l (same-person mean ≈ 0.40,
+        # cross-cluster p90 ≈ 0.39, cluster-build threshold = 0.40).
+        AUTO_TAG_THRESHOLD = 0.60
+        SUGGEST_THRESHOLD  = 0.40
 
         def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
             na, nb = np.linalg.norm(a), np.linalg.norm(b)
@@ -1057,12 +1066,12 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                     "similarity":       round(float(sim), 3),
                 }
 
-                if sim >= 0.85:
+                if sim >= AUTO_TAG_THRESHOLD:
                     db.assign_cluster_to_player(
                         uc["id"], player_name, jersey_number, roster_entry_id
                     )
                     auto_tagged.append({**entry, "player_name": player_name, "jersey_number": jersey_number})
-                elif sim >= 0.70:
+                elif sim >= SUGGEST_THRESHOLD:
                     suggestions.append(entry)
 
             return jsonify({"auto_tagged": auto_tagged, "suggestions": suggestions}), 200
