@@ -6,14 +6,13 @@ import { GalleryPage } from './pages/GalleryPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { RosterPage } from './pages/RosterPage'
 import { ReviewPage } from './pages/ReviewPage'
-import { BatchesPage } from './pages/BatchesPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import type { AgentSettings } from './types/index'
 import './styles/globals.css'
 
-type Page = 'upload' | 'batches' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
+type Page = 'upload' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
 
 async function checkConnection(setIsConnected: (value: boolean) => void) {
   try {
@@ -137,7 +136,6 @@ function App() {
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-1 overflow-x-auto">
             <NavButton label="Upload"   isActive={currentPage === 'upload'}  onClick={() => setCurrentPage('upload')} />
-            <NavButton label="Batches"  isActive={currentPage === 'batches'} onClick={() => setCurrentPage('batches')} />
             <NavButton label="Roster"   isActive={currentPage === 'roster'}  onClick={() => setCurrentPage('roster')} />
             <NavButton label="Review"   isActive={currentPage === 'review'}  onClick={() => setCurrentPage('review')} />
             <NavButton label="Players"  isActive={currentPage === 'players'} onClick={() => setCurrentPage('players')} />
@@ -150,8 +148,7 @@ function App() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-4 py-8">
         <ErrorBoundary>
-          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} />}
-          {currentPage === 'batches' && <BatchesPage />}
+          {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
           {currentPage === 'roster'  && <RosterPage />}
           {currentPage === 'review'  && <ReviewPage />}
           {currentPage === 'search'  && <SearchPage />}

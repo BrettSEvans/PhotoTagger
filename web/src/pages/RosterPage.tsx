@@ -52,13 +52,13 @@ export const RosterPage: React.FC = () => {
     try {
       const data = await photoTaggerClient.getGameContext();
       setGameContext(data.teams.length > 0 ? data.teams : [
-        { team_name: 'Carleton CUT', team_year: 2026, uniform_color: 'red' },
-        { team_name: 'Pittsburgh En Sabah Nur', team_year: 2026, uniform_color: 'white' },
+        { team_name: '', team_year: 0, uniform_color: '' },
+        { team_name: '', team_year: 0, uniform_color: '' },
       ]);
     } catch {
       setGameContext([
-        { team_name: 'Carleton CUT', team_year: 2026, uniform_color: 'red' },
-        { team_name: 'Pittsburgh En Sabah Nur', team_year: 2026, uniform_color: 'white' },
+        { team_name: '', team_year: 0, uniform_color: '' },
+        { team_name: '', team_year: 0, uniform_color: '' },
       ]);
     }
   };
@@ -221,7 +221,7 @@ export const RosterPage: React.FC = () => {
         <div className="md:col-span-2 bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <h2 className="font-outfit text-lg font-bold text-foreground">Game Context</h2>
+              <h2 className="font-outfit text-lg font-bold text-foreground">Game Context (Empty on Start)</h2>
               <p className="font-jakarta text-xs text-muted-fg">Set the current matchup and uniform colors before evaluating photos</p>
             </div>
             <button
@@ -245,9 +245,10 @@ export const RosterPage: React.FC = () => {
                 </select>
                 <input
                   type="number"
-                  value={gameContext[index]?.team_year ?? 2026}
-                  onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 2026 })}
-                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                  value={gameContext[index]?.team_year || ''}
+                  placeholder="2026"
+                  onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
+                  className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
                 />
                 <input
                   type="text"
