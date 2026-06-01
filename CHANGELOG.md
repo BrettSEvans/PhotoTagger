@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-06-01
+
+- Fixed "Local agent disconnected" error on fresh installs by moving the default API base URL from a hardcoded constant to `VITE_LOCAL_AGENT_URL` env var (set via `web/.env.local` for local dev); Railway deployments continue to use relative URLs. Also fixed a sidebar crash when photo batches have no `team_year` set. Added `*.pid` and `.env.local` to `.gitignore`.
+  - Commit: 949f681
+- Refactored Roster tab layout: replaced the large "Add Roster" placeholder card with a compact `+ Add Roster` CTA button in the page header; promoted Bulk Import to the primary left card slot; moved Add Player to the right slot alongside it; All Players table remains full-width at the bottom.
+  - Commit: fd6ed6c
+
 ## 2026-05-29
 
 - Added Railway hybrid hosting support with a cloud UI mode, protected local-agent settings, Railway Docker config, and local photo-root hardening.
