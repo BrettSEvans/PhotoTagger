@@ -4,8 +4,10 @@ import time
 from typing import List, Optional, Dict
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from functools import partial
 import easyocr
 from src.db import Database
+from src.face_detector import FaceDetector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -200,6 +202,9 @@ class OCREngine:
 
         logger.info(f"Starting parallel OCR with {max_workers} workers on {len(photo_ids)} photos")
 
+        # Create face detector once, reuse across all workers
+        detector = FaceDetector()
+
         # Use ThreadPoolExecutor for I/O-bound OCR
         with ThreadPoolExecutor(max_workers=max_workers) as executor:
             # Submit all tasks
@@ -208,7 +213,8 @@ class OCREngine:
                 photo = photos_by_id.get(photo_id)
 
                 if photo:
-                    future = executor.submit(self._process_photo_with_faces, photo_id, photo["file_path"])
+                    worker = partial(self._process_photo_with_faces, detector=detector)
+                    future = executor.submit(worker, photo_id, photo["file_path"])
                     futures[future] = photo_id
 
             # Collect results as they complete
@@ -229,17 +235,19 @@ class OCREngine:
         logger.info(f"Parallel processing complete: {results}")
         return results
 
-    def _process_photo_with_faces(self, photo_id: int, photo_path: str) -> Optional[Dict]:
+    def _process_photo_with_faces(self, photo_id: int, photo_path: str, detector: FaceDetector) -> Optional[Dict]:
         """
         Internal method: process photo with OCR and face detection.
+
+        Args:
+            photo_id: Photo ID in database
+            photo_path: Path to photo file
+            detector: Shared FaceDetector instance (reused across batch)
 
         Returns:
             Dict with jersey, faces, and metadata
         """
         try:
-            from src.face_detector import FaceDetector
-            from pathlib import Path
-
             path = Path(photo_path)
             if not path.exists():
                 logger.error(f"Photo not found: {photo_path}")
@@ -257,9 +265,8 @@ class OCREngine:
             primary_jersey = jerseys[0] if jerseys else None
             ocr_confidence = sum([conf for (_, _, conf) in results]) / len(results) if results else 0.0
 
-            # Run face detection
+            # Run face detection with shared detector
             logger.info(f"Faces: {path.name}")
-            detector = FaceDetector()
             faces = detector.detect_faces(photo_path)
 
             # Store OCR result
