@@ -378,6 +378,14 @@ class PhotoTaggerClient {
     await this.client.delete(`/api/roster/${entryId}`);
   }
 
+  async updateRosterEntry(
+    entryId: number,
+    data: Partial<Omit<RosterEntry, 'id' | 'thumbnail_face_id'>>,
+  ): Promise<RosterEntry> {
+    const response = await this.client.put<RosterEntry>(`/api/roster/${entryId}`, data);
+    return response.data;
+  }
+
   async importRosterFile(
     file: File,
     teamName: string,
