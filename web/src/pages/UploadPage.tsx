@@ -2,6 +2,9 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import PhotoUpload from '../components/PhotoUpload';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SidebarLayout } from '../components/SidebarLayout';
+import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
+import { useSidebar } from '../contexts/SidebarContext';
 import type { ProcessingSummary, TaggedPhoto, ReviewPhoto, PhotoBatch } from '../types/index';
 
 type TabId = 'confirmed' | 'review';
@@ -9,6 +12,7 @@ type TabId = 'confirmed' | 'review';
 const SHADOW_CLASSES = ['shadow-pop', 'shadow-pop-pink', 'shadow-pop-yellow', 'shadow-pop-mint', 'shadow-pop-violet'];
 
 export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?: () => void }> = ({ onOpenWorkspace, onGoToRoster }) => {
+  const { setSelectedGame, clearSelection } = useSidebar();
   const [summary,       setSummary]       = useState<ProcessingSummary | null>(null);
   const [confirmedPhotos, setConfirmedPhotos] = useState<TaggedPhoto[]>([]);
   const [reviewPhotos,  setReviewPhotos]  = useState<ReviewPhoto[]>([]);
@@ -18,6 +22,8 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const [batches, setBatches] = useState<PhotoBatch[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
   const [showPostUploadMessage, setShowPostUploadMessage] = useState(false);
+  const [gameContext, setGameContext] = useState<any[]>([]);
+  const [contextMsg, setContextMsg] = useState<string | null>(null);
 
   const confirmedPhotosForDisplay = useMemo(() => {
     const grouped = new Map<string, TaggedPhoto[]>();
@@ -58,16 +64,70 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     finally { setIsLoadingBatches(false); }
   }, []);
 
+  const loadGameContext = useCallback(async () => {
+    try {
+      const data = await photoTaggerClient.getGameContext();
+      setGameContext(data.teams.length > 0 ? data.teams : [
+        { team_name: '', team_year: 0, uniform_color: '' },
+        { team_name: '', team_year: 0, uniform_color: '' },
+      ]);
+    } catch {
+      setGameContext([
+        { team_name: '', team_year: 0, uniform_color: '' },
+        { team_name: '', team_year: 0, uniform_color: '' },
+      ]);
+    }
+  }, []);
+
   useEffect(() => {
     loadSummary();
     loadBatches();
-  }, [loadSummary, loadBatches]);
+    loadGameContext();
+  }, [loadSummary, loadBatches, loadGameContext]);
 
   const handleUploadSuccess = () => {
     loadSummary();
     loadBatches();
     setShowPostUploadMessage(true);
     setTimeout(() => setShowPostUploadMessage(false), 8000);
+  };
+
+  const handleAddGame = () => {
+    clearSelection();
+  };
+
+  const updateContextTeam = (index: number, patch: any) => {
+    setGameContext(prev => {
+      const next = [...prev];
+      const current = next[index] ?? {
+        team_name: '',
+        team_year: 2026,
+        uniform_color: '',
+      };
+      next[index] = {
+        ...current,
+        ...patch,
+      };
+      return next;
+    });
+  };
+
+  const saveGameContext = async () => {
+    setContextMsg(null);
+    try {
+      const teams = gameContext
+        .map(team => ({
+          team_name: team.team_name.trim(),
+          team_year: Number(team.team_year) || 2026,
+          uniform_color: team.uniform_color.trim().toLowerCase(),
+        }))
+        .filter(team => team.team_name && team.uniform_color);
+      const data = await photoTaggerClient.setGameContext(teams);
+      setGameContext(data.teams);
+      setContextMsg('Game context saved');
+    } catch (err) {
+      console.error('Failed to save game context:', err);
+    }
   };
 
   const switchTab = async (tab: TabId) => {
@@ -91,7 +151,16 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   };
 
   return (
-    <div className="w-full max-w-5xl mx-auto py-4 space-y-6">
+    <SidebarLayout
+      sidebar={
+        <HierarchicalSidebar
+          pageType="upload"
+          batches={batches}
+          onAddGame={handleAddGame}
+        />
+      }
+      children={
+        <div className="w-full py-4 space-y-6">
       {/* Page header */}
       <div>
         <h1 className="font-outfit text-4xl font-extrabold text-foreground">Upload</h1>
@@ -107,7 +176,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
             ✓ Photos uploaded successfully!
           </p>
           <p className="font-jakarta text-sm text-muted-fg mb-4">
-            Before face matching, please upload team rosters and set uniform colors on the Roster page. This helps the AI match jersey numbers to player names.
+            Before face matching, please upload team rosters. Set the current matchup and uniform colors below to help the AI match jersey numbers to player names.
           </p>
           {onGoToRoster && (
             <button
@@ -119,6 +188,51 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
           )}
         </div>
       )}
+
+      {/* Game Context */}
+      <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="font-outfit text-lg font-bold text-foreground">Game Context (Empty on Start)</h2>
+            <p className="font-jakarta text-xs text-muted-fg">Set the current matchup and uniform colors before evaluating photos</p>
+          </div>
+          <button
+            type="button"
+            onClick={saveGameContext}
+            className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+          >
+            Save Context
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {[0, 1].map(index => (
+            <div key={index} className="grid grid-cols-[1fr_88px_110px] gap-2">
+              <input
+                type="text"
+                value={gameContext[index]?.team_name ?? ''}
+                onChange={e => updateContextTeam(index, { team_name: e.target.value })}
+                placeholder="Team name…"
+                className="geo-input min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+              />
+              <input
+                type="number"
+                value={gameContext[index]?.team_year || ''}
+                placeholder="2026"
+                onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
+                className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+              />
+              <input
+                type="text"
+                value={gameContext[index]?.uniform_color ?? ''}
+                onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
+                placeholder={index === 0 ? 'red' : 'white'}
+                className="geo-input px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+              />
+            </div>
+          ))}
+        </div>
+        {contextMsg && <p className="font-jakarta text-xs font-semibold text-foreground">{contextMsg}</p>}
+      </div>
 
       {/* Import form */}
       <PhotoUpload onUploadSuccess={handleUploadSuccess} />
@@ -330,7 +444,9 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
           )}
         </div>
       </div>
-    </div>
+        </div>
+      }
+    />
   );
 };
 

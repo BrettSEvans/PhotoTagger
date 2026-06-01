@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { SidebarLayout } from '../components/SidebarLayout';
+import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
+import { useSidebar } from '../contexts/SidebarContext';
 import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem, RosterSearchResult, PhotoBatch, BatchesResponse } from '../types/index';
 import { bboxStyle } from '../utils/bboxUtils';
 import type { ImgDim } from '../utils/bboxUtils';
@@ -15,6 +18,7 @@ interface ClusterWithAssignment extends PlayerCluster {
 const MIN_REVIEW_FACE_CONFIDENCE = 0.6;
 
 export const ReviewPage: React.FC = () => {
+  const { selectedGame } = useSidebar();
   // ── Batches ─────────────────────────────────────────────────────────────
   const [batches, setBatches] = useState<PhotoBatch[]>([]);
   const [selectedBatchId, setSelectedBatchId] = useState<number | null>(null);
@@ -65,6 +69,16 @@ export const ReviewPage: React.FC = () => {
     loadBatches();
     loadClusters();
   }, []);
+
+  // ── Update batch when game is selected from sidebar ───────────────────────
+  useEffect(() => {
+    if (selectedGame) {
+      const batch = batches.find(b => b.source_folder === selectedGame);
+      if (batch) {
+        setSelectedBatchId(batch.id);
+      }
+    }
+  }, [selectedGame, batches]);
 
   const loadBatches = async () => {
     setIsLoadingBatches(true);
@@ -277,9 +291,17 @@ export const ReviewPage: React.FC = () => {
   const selectedCount = selected.size;
 
   return (
-    <div className="w-full h-screen flex flex-col bg-cream overflow-hidden">
-      {/* Header with batch selector */}
-      <header className="border-b-2 border-foreground bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
+    <SidebarLayout
+      sidebar={
+        <HierarchicalSidebar
+          pageType="review"
+          batches={batches}
+        />
+      }
+      children={
+        <div className="w-full h-screen flex flex-col bg-cream overflow-hidden">
+          {/* Header with batch selector */}
+          <header className="border-b-2 border-foreground bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
         <div>
           <h1 className="font-outfit text-2xl font-extrabold text-foreground">Review & Assign</h1>
           {currentBatch && (
@@ -628,6 +650,8 @@ export const ReviewPage: React.FC = () => {
         </div>
       )}
     </div>
+      }
+    />
   );
 };
 
