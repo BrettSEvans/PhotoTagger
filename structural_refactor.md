@@ -17,8 +17,8 @@
 ### Phase 1 — Repository Split 🔄 IN PROGRESS
 - [x] **Phase 1.0:** Create `src/repositories/` with `_base.py` (BaseRepository)
 - [x] **Phase 1.1:** Extract JobRepository (3 methods, 3 tests, delegation stubs)
-- [ ] **Phase 1.2:** Extract GameContextRepository (2 methods, 2 tests)
-- [ ] **Phase 1.3:** Extract BatchRepository (8 methods, 8 tests)
+- [x] **Phase 1.2:** Extract GameContextRepository (2 methods, 2 tests)
+- [x] **Phase 1.3:** Extract BatchRepository (8 methods, 8 tests)
 - [ ] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
 - [ ] **Phase 1.5:** Extract ClusterRepository (8 methods, 8 tests)
 - [ ] **Phase 1.6:** Extract RosterRepository (9 methods, 9 tests)
