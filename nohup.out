@@ -1,0 +1,1127 @@
+INFO:src.ocr:Initializing EasyOCR reader for languages: ['en']
+WARNING:easyocr.easyocr:Using CPU. Note: This module is much faster with a GPU.
+INFO:__main__:Starting PhotoTagger API on http://127.0.0.1:5001
+INFO:__main__:Deployment environment: local
+ * Serving Flask app 'api'
+ * Debug mode: off
+Address already in use
+Port 5001 is in use by another program. Either identify and stop that program, or start the server with a different port.
+INFO:src.ocr:Initializing EasyOCR reader for languages: ['en']
+WARNING:easyocr.easyocr:Using CPU. Note: This module is much faster with a GPU.
+INFO:__main__:Starting PhotoTagger API on http://127.0.0.1:5001
+INFO:__main__:Deployment environment: local
+ * Serving Flask app 'api'
+ * Debug mode: off
+INFO:werkzeug:[31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on http://127.0.0.1:5001
+INFO:werkzeug:[33mPress CTRL+C to quit[0m
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:01:45] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:01:50] "POST /api/players/394/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1731 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1569 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1517 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1620 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1399 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1190 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1549 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/948 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1458 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1584 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/979 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1666 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1510 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1267 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1259 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1006 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1307 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1444 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1450 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1792 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1188 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1308 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1454 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1764 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1597 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1571 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/980 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1098 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/982 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1554 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1704 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/987 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1624 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1468 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1106 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1122 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1664 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1164 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1008 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1173 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1690 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1263 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1152 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1146 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1283 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1349 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1596 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1391 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1796 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1400 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1031 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1187 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1619 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1623 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1177 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1606 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1154 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1211 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1672 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1320 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1730 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1305 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1317 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1379 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1789 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1732 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1780 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/932 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1423 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1776 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1670 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/950 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1126 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1663 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1041 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1499 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1629 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1077 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1184 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1743 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1274 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1109 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1131 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1170 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1155 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1136 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1171 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1176 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1174 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1630 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1627 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1637 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1531 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1832 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1243 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1750 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1367 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1256 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1684 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1438 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1455 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1588 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1526 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1589 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1595 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/931 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/934 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/935 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/941 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/942 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/943 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/949 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/957 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/973 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/985 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/989 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/988 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/991 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/990 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1001 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1005 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1003 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1009 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1007 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1010 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1012 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1013 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1014 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1016 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1015 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1018 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1017 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1020 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1022 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1025 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1024 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1028 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1029 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1034 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1035 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1044 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1065 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1060 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1085 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1107 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1108 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1127 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1115 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1130 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1132 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1140 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1137 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1138 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1144 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1145 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1153 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1165 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1160 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1167 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1168 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1172 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1175 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1178 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1179 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1182 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1181 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1186 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1183 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1189 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1192 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1200 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1194 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1203 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1196 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1245 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1205 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1216 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1215 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1212 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1249 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1255 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1250 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1262 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1264 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1268 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1277 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1285 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1289 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1290 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1288 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1312 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1319 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1321 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1322 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1324 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1331 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1332 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1325 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1335 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1338 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1352 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1342 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1368 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1351 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1372 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1374 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1375 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1385 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1387 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1390 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1389 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1392 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1395 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1413 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1420 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1418 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1419 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1421 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1430 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1431 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1434 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1437 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1440 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1441 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1443 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1439 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1474 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1471 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1482 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1478 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1483 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1475 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1505 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1506 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1501 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1514 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1507 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1516 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1523 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1539 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1582 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1587 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1594 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1581 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1608 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1614 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1615 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1617 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1618 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1622 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1626 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1633 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1634 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1638 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1641 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1644 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1639 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1645 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1648 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1649 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1651 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1652 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1653 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1654 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1660 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1662 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1661 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1667 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1674 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1683 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1676 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1688 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1685 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1693 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1699 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1700 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1701 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1702 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1715 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1714 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1718 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1716 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1722 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1725 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1736 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1753 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1758 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1740 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1775 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1759 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1760 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1777 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1781 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1782 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1783 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1795 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1806 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1801 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1811 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1813 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1821 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1843 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1826 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:53] "GET /api/face-crop/1846 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/players/357/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/411 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/430 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/419 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/450 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/436 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/426 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/456 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/569 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:04:56] "GET /api/image/511 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:03] "GET /api/roster/search?q=thom HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:03] "GET /api/roster/search?q=thoma HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:04] "GET /api/roster/search?q=thomas HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:04] "OPTIONS /api/players/357/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:04] "POST /api/players/357/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:05:05] "POST /api/players/357/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:06:08] "POST /api/players/357/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/players/412/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/452 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/424 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/498 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/515 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/469 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/516 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/561 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/566 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:07] "GET /api/image/577 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:15] "GET /api/roster/search?q=r HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:16] "GET /api/roster/search?q=ryan HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:17] "OPTIONS /api/players/412/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:17] "POST /api/players/412/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:18] "GET /api/roster/search?q=Ryan HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:18] "POST /api/players/412/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:30] "GET /api/players/401/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:30] "GET /api/image/418 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:30] "GET /api/image/453 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:30] "GET /api/image/470 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:30] "GET /api/image/544 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:37] "GET /api/roster/search?q=no HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:38] "OPTIONS /api/players/401/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:38] "POST /api/players/401/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:38] "POST /api/players/401/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:44] "OPTIONS /api/players/419/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:44] "POST /api/players/419/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:47] "GET /api/players/476/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:47] "GET /api/image/458 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:47] "GET /api/image/557 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:47] "GET /api/image/539 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:57] "GET /api/roster/search?q=de HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:57] "GET /api/roster/search?q=decla HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:58] "OPTIONS /api/players/476/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:58] "POST /api/players/476/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:08:59] "POST /api/players/476/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:09:04] "OPTIONS /api/players/391/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:09:04] "POST /api/players/391/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/players/347/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/409 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/412 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/428 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/427 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/465 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/420 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/460 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/480 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/492 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/502 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/505 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/513 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/506 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/514 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/523 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/560 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/552 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/564 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/551 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/580 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/589 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/588 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/586 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/573 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:02] "GET /api/image/597 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/players/334/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/408 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/440 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/504 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/416 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/414 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/476 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/463 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/562 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/517 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:32] "GET /api/image/593 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:46] "GET /api/roster/search?q=no HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:48] "OPTIONS /api/players/334/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:48] "POST /api/players/334/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:48] "POST /api/players/334/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:51] "OPTIONS /api/players/440/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:51] "POST /api/players/440/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:10:58] "GET /api/players/347/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/players/322/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/407 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/475 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/521 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/531 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/483 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/445 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/596 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:07] "GET /api/image/600 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:21] "GET /api/players/393/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:21] "GET /api/image/575 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:21] "GET /api/image/489 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:21] "GET /api/image/591 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:29] "GET /api/players/321/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:29] "GET /api/image/526 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:29] "GET /api/image/559 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:29] "GET /api/image/508 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:30] "GET /api/players/335/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:30] "GET /api/image/535 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:30] "GET /api/image/442 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:31] "GET /api/players/337/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:31] "GET /api/image/423 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:34] "GET /api/players/342/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:35] "GET /api/players/337/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:37] "GET /api/players/413/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:37] "GET /api/image/425 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:37] "GET /api/image/533 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:37] "GET /api/image/584 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:39] "GET /api/players/339/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:39] "GET /api/image/549 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:39] "GET /api/image/590 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:39] "GET /api/image/488 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:41] "GET /api/players/359/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:43] "GET /api/players/369/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:43] "GET /api/image/439 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:43] "GET /api/image/542 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:43] "GET /api/image/578 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:45] "GET /api/players/392/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:45] "GET /api/image/556 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:45] "GET /api/image/457 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:11:45] "GET /api/image/413 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:01] "GET /api/players/311/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:01] "GET /api/image/534 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:01] "GET /api/image/522 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:01] "GET /api/image/403 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:06] "GET /api/roster/search?q=d HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:07] "GET /api/roster/search?q=de HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:07] "GET /api/roster/search?q=dec HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:08] "OPTIONS /api/players/311/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:08] "POST /api/players/311/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:08] "POST /api/players/311/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:11] "GET /api/players/424/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:11] "GET /api/image/433 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:11] "GET /api/image/464 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:11] "GET /api/image/466 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:11] "GET /api/image/512 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:14] "GET /api/players/410/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:14] "GET /api/image/518 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:14] "GET /api/image/484 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:15] "GET /api/players/392/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:19] "GET /api/players/369/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:20] "GET /api/players/359/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:21] "GET /api/players/354/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:21] "GET /api/image/437 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:21] "GET /api/image/410 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:24] "GET /api/players/314/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:24] "GET /api/image/404 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:24] "GET /api/image/554 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:25] "GET /api/players/405/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:26] "GET /api/players/396/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:26] "GET /api/image/421 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:26] "GET /api/image/507 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:31] "GET /api/players/393/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:34] "GET /api/players/336/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:34] "GET /api/image/448 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:34] "GET /api/image/462 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:34] "GET /api/image/461 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:34] "GET /api/image/481 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:36] "GET /api/players/482/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:36] "GET /api/image/500 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:36] "GET /api/image/576 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:39] "GET /api/players/338/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:39] "GET /api/image/599 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:48] "GET /api/roster/search?q=te HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:49] "OPTIONS /api/players/338/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:49] "POST /api/players/338/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:50] "POST /api/players/338/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:55] "OPTIONS /api/players/407/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:12:55] "POST /api/players/407/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:00] "GET /api/players/429/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:00] "GET /api/image/495 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:00] "GET /api/image/545 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:00] "GET /api/image/485 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:00] "GET /api/image/447 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:14] "GET /api/roster/search?q=a HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:23] "GET /api/roster/search?q=e HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:35] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:35] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:47] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:47] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:13:52] "GET /api/players/429/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:03] "GET /api/roster/search?q=a HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:04] "GET /api/roster/search?q=ax HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:06] "OPTIONS /api/players/429/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:06] "POST /api/players/429/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:06] "POST /api/players/429/match-similar HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:14] "OPTIONS /api/players/395/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:14] "POST /api/players/395/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:15] "OPTIONS /api/players/313/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:15] "POST /api/players/313/assign HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:14:27] "GET /api/players/482/photos?min_face_confidence=0.6 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1597 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/979 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1259 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1006 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1076 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1549 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 14:23:09] "GET /api/face-crop/1444 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:05] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:05] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:05] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:07] "OPTIONS /api/data/reset HTTP/1.1" 200 -
+INFO:__main__:Database reset: {'ocr_results': 0, 'faces': 930, 'player_clusters': 305, 'photo_batches': 1, 'photos': 200, 'rosters': 49, 'game_context_teams': 2, 'processing_jobs': 3}
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:07] "POST /api/data/reset HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:07] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:07] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:07] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:23] "OPTIONS /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:25] "POST /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:25] "OPTIONS /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:25] "POST /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:25] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:47] "OPTIONS /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:47] "POST /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:47] "OPTIONS /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:48] "POST /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:48] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:53] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:14:59] "POST /api/pick-directory HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "OPTIONS /api/crawl HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "[35m[1mPOST /api/crawl HTTP/1.1[0m" 202 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/jobs/8 HTTP/1.1" 200 -
+INFO:src.crawler:Found 200 image files in /Users/brettevanssf/Desktop/Nationals/Finals/Ultimate _ CUT2025-26 _ Nationals 2026 _ Monday_files
+INFO:src.crawler:Crawl complete: {'photos_found': 200, 'photos_ingested': 200, 'duplicates_skipped': 0, 'errors': 0, 'source_folder': '/Users/brettevanssf/Desktop/Nationals/Finals/Ultimate _ CUT2025-26 _ Nationals 2026 _ Monday_files', 'batch_id': 4}
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/jobs/8 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:01] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:34] "OPTIONS /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:34] "PUT /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:34] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:41] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:41] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:46] "OPTIONS /api/detect-faces HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:46] "[35m[1mPOST /api/detect-faces HTTP/1.1[0m" 202 -
+INFO:src.face_detector:Initializing FaceDetector with model: buffalo_l
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:46] "GET /api/jobs/9 HTTP/1.1" 200 -
+/Users/brettevanssf/Code/Saasless/PhotoTagger/venv/lib/python3.14/site-packages/insightface/utils/face_align.py:23: FutureWarning: `estimate` is deprecated since version 0.26 and will be removed in version 2.2. Please use `SimilarityTransform.from_estimate` class constructor instead.
+  tform.estimate(lmk, dst)
+INFO:src.face_detector:Detected 3 face(s) in DSC_4681-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3890-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:47] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 1 face(s) in DSC_4455-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4428-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3789-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4693-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:47] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 33 face(s) in DSC_4216-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3697-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:48] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 12 face(s) in DSC_3719-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3764-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3707-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:49] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 54 face(s) in DSC_3776-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4394-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3715-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:51] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 2 face(s) in DSC_3828-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4590-sm.JPG
+INFO:src.face_detector:Detected 8 face(s) in DSC_4490-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3723-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3936-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4068-sm.JPG
+INFO:src.face_detector:Detected 11 face(s) in DSC_4064-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3752-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:52] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 10 face(s) in DSC_4756-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3959-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4770-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4396-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4818-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3861-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3774-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3705-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4762-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4150-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4701-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:54] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 4 face(s) in DSC_3733-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4646-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3721-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4758-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4725-sm.JPG
+INFO:src.face_detector:Detected 38 face(s) in DSC_3957-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4592-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4174-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4545-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4691-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:56] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 9 face(s) in DSC_4206-sm.JPG
+INFO:src.face_detector:Detected 11 face(s) in DSC_4449-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3799-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4534-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4099-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4502-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_3758-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4742-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4113-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3725-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4070-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4721-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3953-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4170-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4101-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:15:59] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 9 face(s) in DSC_4484-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4062-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3701-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4037-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4054-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4705-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3762-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4709-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3713-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4674-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4125-sm.JPG
+INFO:src.face_detector:Detected 8 face(s) in DSC_4392-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4226-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4469-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3783-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4202-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4687-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4261-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:02] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 2 face(s) in DSC_3988-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4310-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4422-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4228-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4579-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4508-sm.JPG
+INFO:src.face_detector:Detected 19 face(s) in DSC_4520-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3898-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4543-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4551-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3781-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3756-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4072-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4723-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4623-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3739-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3727-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3772-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3967-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3979-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4676-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4127-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3804-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3711-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:05] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 3 face(s) in DSC_4719-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4069-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4645-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4591-sm.JPG
+INFO:src.face_detector:Detected 8 face(s) in DSC_4757-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4583-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4065-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4809-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4761-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3765-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4702-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3718-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3769-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4122-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4395-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3714-sm.JPG
+INFO:src.face_detector:Detected 14 face(s) in DSC_3777-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4321-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4570-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4554-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4454-sm.JPG
+INFO:src.face_detector:Detected 13 face(s) in DSC_4446-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3983-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4692-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4792-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4572-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:10] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 2 face(s) in DSC_4690-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4527-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3881-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4682-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4319-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3993-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4456-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4581-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4067-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4728-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4655-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3732-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4724-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4075-sm.JPG
+INFO:src.face_detector:Detected 28 face(s) in DSC_3956-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3720-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3708-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4297-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4600-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4151-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3767-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3704-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4694-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4272-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4239-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4227-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4507-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4419-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3976-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3876-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:15] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 9 face(s) in DSC_3763-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4811-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4381-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4136-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4616-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3712-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4675-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4393-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4608-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4159-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3747-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4497-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4720-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4743-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3724-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4585-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4063-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3736-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4126-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4026-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_3773-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4665-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3702-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4149-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4606-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3874-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3821-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4653-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4587-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4825-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3833-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:20] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 4 face(s) in DSC_4073-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4722-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4595-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3745-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4688-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4450-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3780-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4578-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4574-sm.JPG
+INFO:src.face_detector:Detected 13 face(s) in DSC_4517-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:25] "GET /api/jobs/9 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:25] "OPTIONS /api/cluster-players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:25] "[35m[1mPOST /api/cluster-players HTTP/1.1[0m" 202 -
+INFO:src.face_cluster:Loading all faces from database...
+INFO:src.face_cluster:Clustering 930 faces...
+INFO:src.face_cluster:Quality filter: 930 → 0 faces (removed 930 blurry/small faces)
+WARNING:src.face_cluster:No faces passed quality filter.
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:25] "GET /api/jobs/10 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:26] "GET /api/jobs/10 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:26] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:40] "GET /api/detection-status HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:44] "OPTIONS /api/detect-faces HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:44] "[35m[1mPOST /api/detect-faces HTTP/1.1[0m" 202 -
+INFO:src.face_detector:Initializing FaceDetector with model: buffalo_l
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:44] "GET /api/jobs/11 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:45] "GET /api/jobs/11 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:16:45] "GET /api/detection-status HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:12] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:12] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:13] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:14] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:14] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:16] "OPTIONS /api/data/reset HTTP/1.1" 200 -
+INFO:__main__:Database reset: {'ocr_results': 0, 'faces': 930, 'player_clusters': 0, 'photo_batches': 1, 'photos': 200, 'rosters': 49, 'game_context_teams': 2, 'processing_jobs': 4}
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:16] "POST /api/data/reset HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:16] "GET /health HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:16] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:16] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:18] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:23] "POST /api/pick-directory HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:24] "OPTIONS /api/crawl HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:24] "[35m[1mPOST /api/crawl HTTP/1.1[0m" 202 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:24] "GET /api/jobs/12 HTTP/1.1" 200 -
+INFO:src.crawler:Found 200 image files in /Users/brettevanssf/Desktop/Nationals/Finals/Ultimate _ CUT2025-26 _ Nationals 2026 _ Monday_files
+INFO:src.crawler:Crawl complete: {'photos_found': 200, 'photos_ingested': 200, 'duplicates_skipped': 0, 'errors': 0, 'source_folder': '/Users/brettevanssf/Desktop/Nationals/Finals/Ultimate _ CUT2025-26 _ Nationals 2026 _ Monday_files', 'batch_id': 5}
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:25] "GET /api/jobs/12 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:25] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:25] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:25] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:25] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:30] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:30] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:40] "OPTIONS /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:41] "POST /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:41] "OPTIONS /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:42] "POST /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:20:42] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:16] "OPTIONS /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:16] "POST /api/roster/infer-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:16] "OPTIONS /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:17] "POST /api/roster/import-url HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:17] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/processing-summary HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/confirmed-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/review-photos?limit=60&offset=0 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/game-context HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:26] "GET /api/roster HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:28] "GET /api/batches HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:28] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:29] "OPTIONS /api/detect-faces HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:29] "[35m[1mPOST /api/detect-faces HTTP/1.1[0m" 202 -
+INFO:src.face_detector:Initializing FaceDetector with model: buffalo_l
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:29] "GET /api/jobs/13 HTTP/1.1" 200 -
+/Users/brettevanssf/Code/Saasless/PhotoTagger/venv/lib/python3.14/site-packages/insightface/utils/face_align.py:23: FutureWarning: `estimate` is deprecated since version 0.26 and will be removed in version 2.2. Please use `SimilarityTransform.from_estimate` class constructor instead.
+  tform.estimate(lmk, dst)
+INFO:src.face_detector:Detected 3 face(s) in DSC_4681-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3890-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4455-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:30] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 5 face(s) in DSC_4428-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3789-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4693-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:31] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 33 face(s) in DSC_4216-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3697-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:31] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 12 face(s) in DSC_3719-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3764-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3707-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:32] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 54 face(s) in DSC_3776-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4394-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3715-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3828-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:34] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 3 face(s) in DSC_4590-sm.JPG
+INFO:src.face_detector:Detected 8 face(s) in DSC_4490-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3723-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3936-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4068-sm.JPG
+INFO:src.face_detector:Detected 11 face(s) in DSC_4064-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3752-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4756-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:35] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 5 face(s) in DSC_3959-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4770-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4396-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4818-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3861-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3774-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3705-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4762-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4150-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4701-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3733-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4646-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:37] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 3 face(s) in DSC_3721-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4758-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4725-sm.JPG
+INFO:src.face_detector:Detected 38 face(s) in DSC_3957-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4592-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4174-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4545-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4691-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_4206-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:39] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 11 face(s) in DSC_4449-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3799-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4534-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4099-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4502-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_3758-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4742-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4113-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3725-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4070-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4721-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3953-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4170-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4101-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_4484-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:42] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 10 face(s) in DSC_4062-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3701-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4037-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4054-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4705-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3762-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4709-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3713-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4674-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4125-sm.JPG
+INFO:src.face_detector:Detected 8 face(s) in DSC_4392-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4226-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4469-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3783-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4202-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4687-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4261-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3988-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4310-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4422-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:45] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 6 face(s) in DSC_4228-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_4579-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4508-sm.JPG
+INFO:src.face_detector:Detected 19 face(s) in DSC_4520-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3898-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4543-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4551-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3781-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3756-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4072-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4723-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4623-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3739-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3727-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3772-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3967-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3979-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4676-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4127-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3804-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3711-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4719-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4069-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4645-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4591-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:49] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 8 face(s) in DSC_4757-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4583-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4065-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4809-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4761-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_3765-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4702-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_3718-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3769-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4122-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4395-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3714-sm.JPG
+INFO:src.face_detector:Detected 14 face(s) in DSC_3777-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4321-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4570-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4554-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4454-sm.JPG
+INFO:src.face_detector:Detected 13 face(s) in DSC_4446-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3983-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4692-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4792-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4572-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4690-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4527-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3881-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4682-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:53] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 4 face(s) in DSC_4319-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3993-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4456-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4581-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4067-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4728-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4655-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3732-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4724-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4075-sm.JPG
+INFO:src.face_detector:Detected 28 face(s) in DSC_3956-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3720-sm.JPG
+INFO:src.face_detector:Detected 7 face(s) in DSC_3708-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4297-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4600-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4151-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3767-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_3704-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4694-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4272-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4239-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4227-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4507-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4419-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3976-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3876-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_3763-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4811-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4381-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4136-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4616-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:21:58] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 10 face(s) in DSC_3712-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4675-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4393-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4608-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4159-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3747-sm.JPG
+INFO:src.face_detector:Detected 6 face(s) in DSC_4497-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4720-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4743-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_3724-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4585-sm.JPG
+INFO:src.face_detector:Detected 10 face(s) in DSC_4063-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3736-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4126-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4026-sm.JPG
+INFO:src.face_detector:Detected 9 face(s) in DSC_3773-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4665-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3702-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_4149-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4606-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3874-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_3821-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4653-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4587-sm.JPG
+INFO:src.face_detector:Detected 5 face(s) in DSC_4825-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3833-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4073-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4722-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_4595-sm.JPG
+INFO:src.face_detector:Detected 4 face(s) in DSC_3745-sm.JPG
+INFO:src.face_detector:Detected 2 face(s) in DSC_4688-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:03] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:src.face_detector:Detected 10 face(s) in DSC_4450-sm.JPG
+INFO:src.face_detector:Detected 1 face(s) in DSC_3780-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4578-sm.JPG
+INFO:src.face_detector:Detected 3 face(s) in DSC_4574-sm.JPG
+INFO:src.face_detector:Detected 13 face(s) in DSC_4517-sm.JPG
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:08] "GET /api/jobs/13 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:08] "OPTIONS /api/cluster-players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:08] "[35m[1mPOST /api/cluster-players HTTP/1.1[0m" 202 -
+INFO:src.face_cluster:Loading all faces from database...
+INFO:src.face_cluster:Clustering 930 faces...
+INFO:src.face_cluster:Quality filter: 930 → 0 faces (removed 930 blurry/small faces)
+WARNING:src.face_cluster:No faces passed quality filter.
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:08] "GET /api/jobs/14 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:09] "GET /api/jobs/14 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:22:09] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:49] "OPTIONS /api/detect-faces HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:49] "[35m[1mPOST /api/detect-faces HTTP/1.1[0m" 202 -
+INFO:src.face_detector:Initializing FaceDetector with model: buffalo_l
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:49] "GET /api/jobs/15 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "GET /api/jobs/15 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "OPTIONS /api/cluster-players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "[35m[1mPOST /api/cluster-players HTTP/1.1[0m" 202 -
+INFO:src.face_cluster:Loading all faces from database...
+INFO:src.face_cluster:Clustering 930 faces...
+INFO:src.face_cluster:Quality filter: 930 → 0 faces (removed 930 blurry/small faces)
+WARNING:src.face_cluster:No faces passed quality filter.
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "GET /api/jobs/16 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "GET /api/jobs/16 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:50] "GET /api/players HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:54] "OPTIONS /api/detect-faces HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:54] "[35m[1mPOST /api/detect-faces HTTP/1.1[0m" 202 -
+INFO:src.face_detector:Initializing FaceDetector with model: buffalo_l
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:54] "GET /api/jobs/17 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:55] "GET /api/jobs/17 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:55] "[35m[1mPOST /api/cluster-players HTTP/1.1[0m" 202 -
+INFO:src.face_cluster:Loading all faces from database...
+INFO:src.face_cluster:Clustering 930 faces...
+INFO:src.face_cluster:Quality filter: 930 → 0 faces (removed 930 blurry/small faces)
+WARNING:src.face_cluster:No faces passed quality filter.
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:55] "GET /api/jobs/18 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:55] "GET /api/jobs/18 HTTP/1.1" 200 -
+INFO:werkzeug:127.0.0.1 - - [01/Jun/2026 15:25:55] "GET /api/players HTTP/1.1" 200 -

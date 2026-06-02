@@ -21,8 +21,18 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
         setPhotoDir(path);
         setMessage(null);
       }
-    } catch {
-      setMessage({ type: 'error', text: 'Could not open directory picker' });
+    } catch (error) {
+      // Directory picker not available on server deployments (e.g., Railway.app)
+      // Guide user to enter path manually
+      const errorMsg = error instanceof Error ? error.message : '';
+      if (errorMsg.includes('not available') || errorMsg.includes('osascript')) {
+        setMessage({
+          type: 'error',
+          text: 'Directory picker not available on this server. Please enter the full path to your photos folder manually (e.g., /home/photos or C:\\Users\\Photos).'
+        });
+      } else {
+        setMessage({ type: 'error', text: 'Could not open directory picker. Please enter the path manually.' });
+      }
     } finally {
       setIsPicking(false);
     }
@@ -103,7 +113,11 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
               ) : '📁 Browse'}
             </button>
           </div>
-          <p className="mt-1.5 font-jakarta text-xs text-muted-fg">Browse to select a folder or paste a path directly</p>
+          <p className="mt-1.5 font-jakarta text-xs text-muted-fg">
+            {typeof window !== 'undefined' && window.location.hostname === 'localhost'
+              ? 'Browse to select a folder or paste a path directly'
+              : 'On this server, enter the full path to your photos folder (e.g., /home/photos)'}
+          </p>
         </div>
 
         <button

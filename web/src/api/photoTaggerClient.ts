@@ -133,12 +133,24 @@ class PhotoTaggerClient {
    * POST /api/pick-directory
    *
    * @returns Selected directory path, or null if cancelled
+   * @throws Error if directory picker not available (e.g., on server deployments)
    */
   async pickDirectory(): Promise<string | null> {
-    const response = await this.client.post<{ path: string | null; cancelled: boolean }>(
-      '/api/pick-directory'
-    );
-    return response.data.path;
+    try {
+      const response = await this.client.post<{ path: string | null; cancelled: boolean; error?: string }>(
+        '/api/pick-directory'
+      );
+      if (response.data.error) {
+        throw new Error(response.data.error);
+      }
+      return response.data.path;
+    } catch (error) {
+      // Re-throw with helpful context
+      if (error instanceof Error) {
+        throw new Error(error.message);
+      }
+      throw error;
+    }
   }
 
   /**
