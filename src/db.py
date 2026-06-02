@@ -8,6 +8,7 @@ from typing import Optional, List, Dict
 
 from src.schema import init_schema
 from src.repositories.job import JobRepository
+from src.repositories.game_context import GameContextRepository
 
 class Database:
     def __init__(self, db_path: str = "photo_catalog.db"):
@@ -19,6 +20,7 @@ class Database:
 
         # Repository instances — all share the same conn + lock
         self.jobs = JobRepository(self.conn, self._lock)
+        self.context = GameContextRepository(self.conn, self._lock)
 
     def init_schema(self):
         """Create database tables if they don't exist."""
@@ -245,35 +247,12 @@ class Database:
             self.conn.commit()
 
     def set_game_context(self, teams: List[Dict]):
-        """Replace the active game context with teams and their uniform colors."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("DELETE FROM game_context_teams")
-            for position, team in enumerate(teams):
-                team_name = str(team.get("team_name", "")).strip()
-                team_year = int(team.get("team_year", 2026))
-                uniform_color = str(team.get("uniform_color", "")).strip().lower()
-                if not team_name or not uniform_color:
-                    continue
-                cursor.execute("""
-                    INSERT INTO game_context_teams (team_name, team_year, uniform_color, position)
-                    VALUES (?, ?, ?, ?)
-                """, (team_name, team_year, uniform_color, position))
-            self.conn.commit()
+        """Delegation stub: set game context via GameContextRepository."""
+        return self.context.set_game_context(teams)
 
     def get_game_context(self) -> List[Dict]:
-        """Return the active game context teams in display order."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT team_name, team_year, uniform_color
-                FROM game_context_teams
-                ORDER BY position, id
-            """)
-            return [
-                {"team_name": row[0], "team_year": row[1], "uniform_color": row[2]}
-                for row in cursor.fetchall()
-            ]
+        """Delegation stub: get game context via GameContextRepository."""
+        return self.context.get_game_context()
 
     def roster_entry_exists(self, team_name: str, team_year: int, jersey_number: str) -> bool:
         """Return whether a roster entry already exists for team/year/jersey."""
