@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-01 (Phase 2 Refactoring Complete)
+
+**Major Refactoring: Blueprint Architecture Implementation**
+
+- Completed Phase 2 blueprint refactoring: Extracted all 41 API routes from monolithic `src/api.py` into 6 specialized blueprints
+  - `src/blueprints/system.py` - 7 system/health routes (6 API + root)
+  - `src/blueprints/batches.py` - 4 batch management routes
+  - `src/blueprints/roster.py` - 11 roster management routes
+  - `src/blueprints/photos.py` - 8 photo search/ingestion routes
+  - `src/blueprints/detection.py` - 5 face detection/clustering routes
+  - `src/blueprints/review.py` - 6 review/assignment routes
+- Code reduction: `src/api.py` reduced from ~1100 lines to 257 lines (79% reduction)
+- Extracted 5 shared utility functions to `src/utils.py` (path validation, parameter parsing)
+- Fixed Flask application context handling for async job task functions
+- All 272 tests passing with zero regressions
+- Architecture improvements:
+  - Blueprint handlers use `current_app.db` for clean dependency injection
+  - Shared helpers properly scoped to prevent circular imports
+  - Job task closures capture app/db references before async execution
+  - Database delegation stubs for backward-compatible test migration
+  - Commits: This session (Session 2 of Phase 2 refactoring)
+
 ## 2026-06-01 (continued — 2)
 
 - Added a bright red "Danger zone" banner at the top of the Roster page with a "🗑 Delete All Data" CTA. Clicking opens a confirmation modal that lists exactly what will be deleted. Confirming calls the new `POST /api/data/reset` endpoint, which wipes all photos, OCR results, detected faces, player clusters, photo batches, rosters, game context, and processing jobs in a single transaction and returns per-table row counts. The roster list reloads (empty) after a successful reset.

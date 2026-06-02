@@ -49,6 +49,18 @@ class Database:
         """Delegation stub: add OCR result via PhotoRepository."""
         return self.photos.add_ocr_result(photo_id, jersey_number, confidence, raw_text, uniform_color)
 
+    def get_processing_summary(self) -> Dict:
+        """Delegation stub: get processing summary via ReviewService."""
+        return self.review.get_processing_summary()
+
+    def get_confirmed_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
+        """Delegation stub: get confirmed photos via ReviewService."""
+        return self.review.get_confirmed_photos(limit, offset)
+
+    def get_review_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
+        """Delegation stub: get photos needing review via ReviewService."""
+        return self.review.get_review_photos(limit, offset)
+
     def get_photos_by_face_ids(self, cluster_id: int, face_ids: List[int]) -> List[Dict]:
         """Return photo paths for selected faces that currently belong to a cluster."""
         if not face_ids:
