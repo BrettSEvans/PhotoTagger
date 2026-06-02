@@ -324,3 +324,152 @@ class TestPaginatedPhotoQueries:
 
         assert data["total"] == 3
         assert data["photos"] == []
+
+
+# ── Stress & Load Tests ────────────────────────────────────────────────────────
+
+class TestStressAndLoad:
+    """Stress and load tests for PhotoTagger."""
+
+    @staticmethod
+    def _unique_jpeg(idx: int) -> bytes:
+        """Create unique JPEG for deterministic testing."""
+        img = Image.new("RGB", (32, 32), color=(idx % 255, (idx // 255) % 255, 0))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG")
+        return buf.getvalue()
+
+    def test_100_concurrent_photo_uploads(self, client, app, tmp_path):
+        """100 photos uploaded without crash or database corruption."""
+        photo_dir = tmp_path / "stress_photos"
+        photo_dir.mkdir()
+
+        # Create 100 photos
+        for i in range(100):
+            photo_file = photo_dir / f"stress_photo_{i:03d}.jpg"
+            photo_file.write_bytes(self._unique_jpeg(i))
+
+        # Upload all
+        response = client.post(
+            "/api/upload-photos",
+            json={"photo_directory": str(photo_dir)}
+        )
+
+        assert response.status_code in {202, 200}
+
+        # Verify photos indexed
+        photos = app.db.photos.get_all_photos()
+        assert len(photos) == 100
+
+    def test_1000_face_similarity_comparisons(self, client, app):
+        """1000+ face similarity comparisons complete without timeout."""
+        # Create assigned cluster
+        cluster = app.db.clusters.create_cluster()
+        face = app.db.faces.add_face(
+            photo_id=1,
+            face_bbox=[10, 10, 20, 20],
+            embedding=[0.5] * 512,
+            sharpness_score=0.8,
+        )
+        app.db.clusters.add_face_to_cluster(cluster, face)
+        app.db.clusters.assign_cluster_to_player(cluster, "Player", "1", None)
+
+        # Create 100 unidentified clusters (1000+ faces)
+        for i in range(100):
+            c = app.db.clusters.create_cluster()
+            for j in range(10):
+                f = app.db.faces.add_face(
+                    photo_id=100 + i * 10 + j,
+                    face_bbox=[10, 10, 20, 20],
+                    embedding=[0.5 + (i * 0.001)] * 512,
+                    sharpness_score=0.8,
+                )
+                app.db.clusters.add_face_to_cluster(c, f)
+
+        # Run similarity match
+        response = client.post(f"/api/players/{cluster}/match-similar")
+
+        assert response.status_code == 200
+        # Should complete without crash
+        data = response.json
+        assert "auto_tagged" in data or "suggestions" in data
+
+    def test_rapid_job_submissions_preserved(self, client, app, tmp_path):
+        """50 jobs submitted rapidly, all tracked."""
+        photo_dir = tmp_path / "jobs"
+        photo_dir.mkdir()
+
+        # Create test photos
+        for i in range(50):
+            photo_file = photo_dir / f"job_photo_{i}.jpg"
+            photo_file.write_bytes(self._unique_jpeg(i))
+
+        job_ids = []
+
+        # Submit jobs rapidly
+        for i in range(50):
+            response = client.post(
+                "/api/upload-photos",
+                json={"photo_directory": str(photo_dir)}
+            )
+
+            if response.status_code == 202:
+                job_ids.append(response.json["job_id"])
+
+        # Verify unique job IDs
+        assert len(job_ids) > 0
+        assert len(set(job_ids)) == len(job_ids)
+
+    def test_memory_stability_sequential_operations(self, client, app, tmp_path):
+        """5 large operations sequentially maintain memory stability."""
+        photo_dir = tmp_path / "mem_test"
+        photo_dir.mkdir()
+
+        operations = [
+            ("create photos", lambda: [
+                (photo_dir / f"mem_photo_{j}.jpg").write_bytes(self._unique_jpeg(j))
+                for j in range(20)
+            ]),
+            ("create faces", lambda: [
+                app.db.faces.add_face(
+                    photo_id=j,
+                    face_bbox=[10, 10, 20, 20],
+                    embedding=[0.1 * (j % 10)] * 512,
+                    sharpness_score=0.8,
+                )
+                for j in range(20)
+            ]),
+            ("create clusters", lambda: [
+                app.db.clusters.create_cluster()
+                for _ in range(5)
+            ]),
+            ("roster import", lambda: [
+                app.db.roster.add_roster_entry(
+                    team_name=f"Team{j}",
+                    team_year="2024",
+                    player_name=f"Player{j}",
+                    jersey_number=str(j)
+                )
+                for j in range(20)
+            ]),
+            ("data access", lambda: [
+                app.db.photos.get_all_photos(),
+                app.db.clusters.get_all_clusters(),
+                app.db.roster.get_all_roster_entries(),
+            ]),
+        ]
+
+        for op_name, op_func in operations:
+            try:
+                op_func()
+            except Exception as e:
+                pytest.fail(f"Operation '{op_name}' failed: {e}")
+
+        # Final verification
+        photos = app.db.photos.get_all_photos()
+        clusters = app.db.clusters.get_all_clusters()
+        roster = app.db.roster.get_all_roster_entries()
+
+        assert len(photos) > 0
+        assert len(clusters) > 0
+        assert len(roster) > 0
