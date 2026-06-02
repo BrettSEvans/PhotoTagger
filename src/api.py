@@ -279,7 +279,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 tournament=data.get("tournament"),
             )
 
-            def crawl_with_batch():
+            def crawl_with_batch(job_id: int):
                 result = app.crawler.crawl(photo_dir, batch_id=batch_id)
                 # Update batch photo count
                 db.update_batch_photo_count(batch_id)
@@ -305,7 +305,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         photo_ids = data.get("photo_ids", None)
 
         try:
-            return enqueue_job("process_ocr", {"photo_ids": photo_ids}, lambda: app.ocr_engine.process_batch(photo_ids))
+            def run_ocr(job_id: int):
+                return app.ocr_engine.process_batch(photo_ids)
+
+            return enqueue_job("process_ocr", {"photo_ids": photo_ids}, run_ocr)
         except Exception as e:
             logger.error(f"OCR error: {e}")
             return jsonify({"error": str(e)}), 500
@@ -465,7 +468,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         photo_ids = data.get("photo_ids", None)
 
         try:
-            def run_detection():
+            def run_detection(job_id: int):
                 detector = FaceDetector()
                 photos = db.get_all_photos()
 
@@ -476,9 +479,11 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 errors = 0
                 skipped_existing = 0
 
-                for photo in photos:
+                for idx, photo in enumerate(photos):
                     photo_id = photo["id"]
                     file_path = photo.get("file_path", "")
+                    filename = Path(file_path).name if file_path else f"photo_{photo_id}"
+
                     if not file_path or not os.path.exists(file_path):
                         continue
                     if db.photo_has_faces(photo_id):
@@ -493,8 +498,19 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                                 embedding=emb_list,
                                 bbox=face["bbox"],
                                 confidence=face["confidence"],
+                                sharpness=face.get("sharpness"),
+                                face_size_ratio=face.get("face_size_ratio"),
                             )
                         total_faces += len(faces)
+
+                        # Update job with per-photo progress message
+                        progress = int((idx + 1) / max(len(photos), 1) * 95)  # 95% max, leave 100 for completion
+                        db.update_processing_job(
+                            job_id,
+                            progress=progress,
+                            result={"current_file": filename, "faces_detected": total_faces}
+                        )
+                        logger.info(f"Detected {len(faces)} face(s) in {filename}")
                     except Exception as e:
                         logger.error(f"Face detection error on photo {photo_id}: {e}")
                         errors += 1
@@ -524,7 +540,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"error": "threshold must be a number"}), 400
 
         try:
-            def run_clustering():
+            def run_clustering(job_id: int):
                 clusterer = FaceClusterer(db, similarity_threshold=threshold)
                 return clusterer.run()
 
@@ -1059,10 +1075,23 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 )
                 sim = _cosine_similarity(assigned_centroid, uc_centroid)
 
+                # Get photo_id and face bbox from thumbnail face for modal viewing
+                photo_id = None
+                face_bbox = None
+                if uc["thumbnail_face_id"]:
+                    cursor = db.conn.cursor()
+                    cursor.execute("SELECT photo_id, bbox_x0, bbox_y0, bbox_x1, bbox_y1 FROM faces WHERE id = ?", (uc["thumbnail_face_id"],))
+                    row = cursor.fetchone()
+                    if row:
+                        photo_id = row[0]
+                        face_bbox = [row[1], row[2], row[3], row[4]]
+
                 entry = {
                     "cluster_id":       uc["id"],
                     "face_count":       uc["face_count"],
                     "thumbnail_face_id": uc["thumbnail_face_id"],
+                    "photo_id":         photo_id,
+                    "face_bbox":        face_bbox,
                     "similarity":       round(float(sim), 3),
                 }
 

@@ -132,6 +132,15 @@ class Database:
             pass  # Column already exists
 
         try:
+            cursor.execute("ALTER TABLE faces ADD COLUMN sharpness REAL")
+        except Exception:
+            pass
+        try:
+            cursor.execute("ALTER TABLE faces ADD COLUMN face_size_ratio REAL")
+        except Exception:
+            pass
+
+        try:
             cursor.execute("ALTER TABLE ocr_results ADD COLUMN uniform_color TEXT")
         except Exception:
             pass
@@ -352,7 +361,8 @@ class Database:
                 "finished_at": row[9],
             }
 
-    def add_face(self, photo_id: int, embedding: List[float], bbox: List[int], confidence: float) -> int:
+    def add_face(self, photo_id: int, embedding: List[float], bbox: List[int], confidence: float,
+                 sharpness: Optional[float] = None, face_size_ratio: Optional[float] = None) -> int:
         """
         Add a detected face to the database.
 
@@ -361,6 +371,8 @@ class Database:
             embedding: 384-dim face embedding vector
             bbox: [x0, y0, x1, y1] bounding box
             confidence: Face detection confidence (0-1)
+            sharpness: Laplacian variance of face crop (higher = sharper)
+            face_size_ratio: Face bbox area / image area
 
         Returns:
             Face ID
@@ -368,9 +380,9 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence))
+                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, sharpness, face_size_ratio)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence, sharpness, face_size_ratio))
             self.conn.commit()
             return cursor.lastrowid
 
@@ -539,7 +551,7 @@ class Database:
         with self._lock:
             cursor = self.conn.cursor()
             cursor.execute("""
-                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id, sharpness, face_size_ratio
                 FROM faces
                 ORDER BY id
             """)
@@ -553,6 +565,8 @@ class Database:
                     "bbox": [row[3], row[4], row[5], row[6]],
                     "confidence": row[7],
                     "cluster_id": row[8],
+                    "sharpness": row[9],
+                    "face_size_ratio": row[10],
                 })
             return results
 

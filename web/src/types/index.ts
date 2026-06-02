@@ -359,6 +359,10 @@ export interface SimilarClusterMatch {
   cluster_id: number;
   face_count: number;
   thumbnail_face_id: number | null;
+  /** Photo ID for viewing full photo in modal */
+  photo_id?: number | null;
+  /** Face bbox [x0, y0, x1, y1] for highlighting in modal */
+  face_bbox?: (number | null)[] | null;
   /** Cosine similarity 0-1 */
   similarity: number;
   /** Present only on auto-tagged entries */

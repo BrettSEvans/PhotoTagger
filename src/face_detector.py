@@ -1,4 +1,5 @@
 import logging
+import cv2
 import numpy as np
 from typing import List, Dict, Tuple
 from pathlib import Path
@@ -68,6 +69,9 @@ class FaceDetector:
                 logger.debug(f"No faces detected in {image_path}")
                 return []
 
+            img_h, img_w = img_array.shape[:2]
+            img_area = img_w * img_h
+
             results = []
             for face in faces:
                 # Extract bounding box and confidence
@@ -75,10 +79,26 @@ class FaceDetector:
                 embedding = face.embedding  # 384-dim vector
                 confidence = face.det_score  # Detection confidence
 
+                # Sharpness: Laplacian variance on the face crop (higher = sharper)
+                x0, y0, x1, y1 = bbox
+                x0c, y0c = max(0, x0), max(0, y0)
+                x1c, y1c = min(img_w, x1), min(img_h, y1)
+                sharpness = 0.0
+                if x1c > x0c and y1c > y0c:
+                    crop = img_array[y0c:y1c, x0c:x1c]
+                    gray = cv2.cvtColor(crop, cv2.COLOR_RGB2GRAY)
+                    sharpness = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+
+                # Face size ratio: fraction of image area covered by bbox
+                face_area = max(0, x1 - x0) * max(0, y1 - y0)
+                face_size_ratio = face_area / img_area if img_area > 0 else 0.0
+
                 result = {
                     'embedding': embedding,
                     'bbox': bbox,
                     'confidence': float(confidence),
+                    'sharpness': sharpness,
+                    'face_size_ratio': face_size_ratio,
                     'age': int(face.age) if hasattr(face, 'age') and face.age is not None else None,
                     'gender': face.gender if hasattr(face, 'gender') else None,
                 }

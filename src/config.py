@@ -31,3 +31,12 @@ OCR_WORKER_TIMEOUT = 300  # 5 minutes per photo
 # Batch Processing
 BATCH_SIZE = 10
 QUEUE_MAX_SIZE = 100
+
+# Face quality filtering (applied before clustering)
+# Minimum Laplacian variance of the face crop. Lower = blurrier. 0 disables.
+# Note: photos are pre-downscaled (-sm), so sharpness values are lower than full-res.
+MIN_FACE_SHARPNESS = 10.0
+# Minimum face bbox area as a fraction of total image area.
+# Photos are already -sm (576x384). Average detected face is ~16px wide (ratio ≈ 0.001).
+# 0.0003 ≈ 8px-wide face in a 576px image — keeps foreground players, drops 4px noise.
+MIN_FACE_SIZE_RATIO = 0.0003

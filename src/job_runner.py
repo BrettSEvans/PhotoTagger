@@ -17,7 +17,7 @@ class LocalJobRunner:
         self._thread = threading.Thread(target=self._work_loop, daemon=True)
         self._thread.start()
 
-    def submit(self, job_type: str, payload: Optional[Dict], task: Callable[[], Dict]) -> int:
+    def submit(self, job_type: str, payload: Optional[Dict], task: Callable[[int], Dict]) -> int:
         job_id = self.db.create_processing_job(job_type, payload or {})
         self._tasks.put((job_id, task))
         return job_id
@@ -27,7 +27,7 @@ class LocalJobRunner:
             job_id, task = self._tasks.get()
             try:
                 self.db.update_processing_job(job_id, status="running", progress=5)
-                result = task()
+                result = task(job_id)  # Pass job_id to task so it can update progress
                 self.db.update_processing_job(job_id, status="succeeded", progress=100, result=result)
             except Exception as exc:
                 logger.exception("Processing job %s failed", job_id)

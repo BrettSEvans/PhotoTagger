@@ -45,6 +45,10 @@ export const ReviewPage: React.FC = () => {
   const [modalPhoto,  setModalPhoto]  = useState<PlayerPhotoItem | null>(null);
   const [modalDim,    setModalDim]    = useState<ImgDim | null>(null);
 
+  // ── Suggestion photo modal ───────────────────────────────────────────────
+  const [suggestionModalPhoto, setSuggestionModalPhoto] = useState<SimilarClusterMatch | null>(null);
+  const [suggestionModalDim,   setSuggestionModalDim]   = useState<ImgDim | null>(null);
+
   // ── Roster search ────────────────────────────────────────────────────────
   const [searchQuery,   setSearchQuery]   = useState('');
   const [searchResults, setSearchResults] = useState<RosterSearchResult[]>([]);
@@ -62,6 +66,7 @@ export const ReviewPage: React.FC = () => {
   // ── Detect + group pipeline ──────────────────────────────────────────────
   const [isDetecting, setIsDetecting] = useState(false);
   const [detectMsg,   setDetectMsg]   = useState<string | null>(null);
+  const [currentDetectFile, setCurrentDetectFile] = useState<string | null>(null);
 
   // ── Hover-zoom lens (spec Scen B) ────────────────────────────────────────
   const [lens, setLens] = useState<{ photo: PlayerPhotoItem; x: number; y: number } | null>(null);
@@ -113,12 +118,22 @@ export const ReviewPage: React.FC = () => {
   const handleDetectAndGroup = async () => {
     setIsDetecting(true);
     setError(null);
+    setCurrentDetectFile(null);
     try {
       setDetectMsg('Detecting faces in photos…');
       const det = await photoTaggerClient.detectFaces();
       const detJob = await photoTaggerClient.pollJob<FaceDetectionResult>(det.job_id, {
         onUpdate: job => {
-          if (job.status === 'running') setDetectMsg(`Detecting faces… ${job.progress}%`);
+          if (job.status === 'running') {
+            // Display current file if available, otherwise just percentage
+            const currentFile = (job.result as any)?.current_file;
+            if (currentFile) {
+              setDetectMsg(`Detected faces in ${currentFile}`);
+              setCurrentDetectFile(currentFile);
+            } else {
+              setDetectMsg(`Detecting faces… ${job.progress}%`);
+            }
+          }
         },
       });
       const detResult = detJob.result;
@@ -127,6 +142,7 @@ export const ReviewPage: React.FC = () => {
       }
 
       setDetectMsg('Grouping faces into players…');
+      setCurrentDetectFile(null);
       const clu = await photoTaggerClient.clusterPlayers();
       const cluJob = await photoTaggerClient.pollJob<ClusterPlayersResult>(clu.job_id, {
         onUpdate: job => {
@@ -139,10 +155,12 @@ export const ReviewPage: React.FC = () => {
       }
 
       setDetectMsg(`Built ${cluResult.clusters_created} groups from ${detResult.faces_detected} new faces`);
+      setCurrentDetectFile(null);
       await loadClusters();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Detection failed');
       setDetectMsg(null);
+      setCurrentDetectFile(null);
     } finally {
       setIsDetecting(false);
     }
@@ -352,36 +370,67 @@ export const ReviewPage: React.FC = () => {
       children={
         <div className="w-full h-screen flex flex-col bg-cream overflow-hidden">
           {/* Header with batch selector */}
-          <header className="border-b-2 border-foreground bg-white px-4 py-3 flex items-center justify-between flex-shrink-0">
-        <div>
-          <h1 className="font-outfit text-2xl font-extrabold text-foreground">Review & Assign</h1>
-          {currentBatch && (
-            <p className="font-jakarta text-xs text-muted-fg mt-1">
-              Batch: <span className="font-bold text-foreground">{currentBatch.source_folder}</span>
-              <span className="mx-2">·</span>
-              {unassignedClusters.length} unassigned • {assignedClusters.length} assigned
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {detectMsg && (
-            <span role="status" className="font-jakarta text-xs text-muted-fg">{detectMsg}</span>
-          )}
-          <button
-            onClick={handleDetectAndGroup}
-            disabled={isDetecting}
-            className="btn-candy bg-accent text-white font-jakarta font-bold text-xs px-3 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
-          >
-            {isDetecting ? (
-              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin block" />
-            ) : (
-              <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-                <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
-              </svg>
+          <header className="border-b-2 border-foreground bg-white px-4 py-3 flex flex-col gap-3 flex-shrink-0">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="font-outfit text-2xl font-extrabold text-foreground">Review & Assign</h1>
+            {currentBatch && (
+              <p className="font-jakarta text-xs text-muted-fg mt-1">
+                Batch: <span className="font-bold text-foreground">{currentBatch.source_folder}</span>
+                <span className="mx-2">·</span>
+                {unassignedClusters.length} unassigned • {assignedClusters.length} assigned
+              </p>
             )}
-            {isDetecting ? 'Working…' : 'Detect'}
-          </button>
+          </div>
+          <div className="flex items-center gap-2">
+            {detectMsg && (
+              <span role="status" className="font-jakarta text-xs text-muted-fg">{detectMsg}</span>
+            )}
+            <button
+              onClick={handleDetectAndGroup}
+              disabled={isDetecting}
+              className="btn-candy bg-accent text-white font-jakarta font-bold text-xs px-3 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 flex items-center gap-2 whitespace-nowrap"
+            >
+              {isDetecting ? (
+                <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin block" />
+              ) : (
+                <svg width="12" height="12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                  <circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3" />
+                </svg>
+              )}
+              {isDetecting ? 'Working…' : 'Detect'}
+            </button>
+          </div>
         </div>
+
+        {/* Global metadata writing setting */}
+        <label className="flex items-center gap-2 rounded border-2 border-frame bg-muted/20 px-3 py-2 w-fit group relative">
+          <input
+            type="checkbox"
+            checked={writeMetadata}
+            onChange={e => handleWriteMetadataChange(e.target.checked)}
+            className="h-3 w-3 accent-accent"
+          />
+          <span>
+            <span className="block font-jakarta text-xs font-bold text-foreground">Write clear data back to photo</span>
+          </span>
+          <button
+            type="button"
+            className="ml-2 flex-shrink-0 text-muted-fg hover:text-foreground transition-colors flex items-center justify-center"
+            aria-label="What gets written back to photos"
+            title="Player name, jersey number, and confidence metadata written to XMP sidecars"
+          >
+            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M12 16v-4" />
+              <circle cx="12" cy="8" r="0.5" fill="currentColor" />
+            </svg>
+          </button>
+          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-foreground text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap font-jakarta">
+            Writes player name, jersey, and confidence to XMP sidecars
+            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
+          </div>
+        </label>
       </header>
 
       {/* Main content area */}
@@ -601,19 +650,6 @@ export const ReviewPage: React.FC = () => {
                   <p className="font-jakarta text-xs text-secondary text-center py-2">No matches found</p>
                 )}
 
-                <label className="flex items-center gap-2 rounded border-2 border-frame bg-muted/20 px-2 py-2">
-                  <input
-                    type="checkbox"
-                    checked={writeMetadata}
-                    onChange={e => handleWriteMetadataChange(e.target.checked)}
-                    className="h-3 w-3 accent-accent"
-                  />
-                  <span>
-                    <span className="block font-jakarta text-xs font-bold text-foreground">Write metadata</span>
-                    <span className="block font-jakarta text-[10px] text-muted-fg">to XMP sidecars</span>
-                  </span>
-                </label>
-
                 {/* ── Similarity scan results ─────────────────────────────── */}
                 {isMatching && (
                   <div className="flex items-center gap-2 py-2">
@@ -686,6 +722,15 @@ export const ReviewPage: React.FC = () => {
                                 className="flex-1 btn-candy bg-accent text-white font-jakarta font-bold text-[10px] px-2 py-1 rounded-full border border-foreground shadow-pop-sm"
                               >
                                 Yes, tag
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setSuggestionModalPhoto(suggestion);
+                                  setSuggestionModalDim(null);
+                                }}
+                                className="flex-1 font-jakarta text-[10px] px-2 py-1 rounded-full border border-accent text-accent hover:bg-accent/10"
+                              >
+                                Enlarge
                               </button>
                               <button
                                 onClick={() => setDismissedSuggestions(prev => new Set([...prev, suggestion.cluster_id]))}
@@ -793,6 +838,64 @@ export const ReviewPage: React.FC = () => {
             <div className="mt-2 flex items-center justify-between px-1">
               <p className="font-jakarta text-white text-xs">{modalPhoto.filename}</p>
               <p className="font-jakarta text-white/60 text-xs">{Math.round(modalPhoto.face_confidence * 100)}% confidence</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Suggestion photo modal ──────────────────────────────────────────── */}
+      {suggestionModalPhoto && suggestionModalPhoto.photo_id && (
+        <div
+          className="fixed inset-0 z-50 bg-foreground/80 flex items-center justify-center p-4"
+          onClick={() => {
+            setSuggestionModalPhoto(null);
+            setSuggestionModalDim(null);
+          }}
+        >
+          <div className="relative" onClick={e => e.stopPropagation()}>
+            {/* Close */}
+            <button
+              onClick={() => {
+                setSuggestionModalPhoto(null);
+                setSuggestionModalDim(null);
+              }}
+              className="absolute -top-10 right-0 font-jakarta text-white font-bold text-sm flex items-center gap-1 hover:text-tertiary transition-colors"
+            >
+              <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" viewBox="0 0 14 14"><path d="M1 1l12 12M13 1L1 13"/></svg>
+              Close
+            </button>
+
+            {/* Photo + overlay */}
+            <div className="relative inline-block rounded-xl overflow-hidden border-2 border-white shadow-pop-lg">
+              <img
+                src={photoTaggerClient.getPhotoUrl(suggestionModalPhoto.photo_id)}
+                alt="suggestion photo"
+                className="block max-w-[90vw] max-h-[85vh]"
+                style={{ display: 'block' }}
+                onLoad={e => {
+                  const img = e.currentTarget;
+                  setSuggestionModalDim({ w: img.naturalWidth, h: img.naturalHeight });
+                }}
+              />
+
+              {/* Face bbox overlay with purple border and buffering */}
+              {suggestionModalDim && suggestionModalPhoto.face_bbox && (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    ...bboxStyle(suggestionModalPhoto.face_bbox as [number, number, number, number], suggestionModalDim, 8),
+                    border: '3px solid #A855F7',
+                    background: 'transparent',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              )}
+            </div>
+
+            {/* Caption */}
+            <div className="mt-2 flex items-center justify-between px-1">
+              <p className="font-jakarta text-white text-xs">Cluster #{suggestionModalPhoto.cluster_id}</p>
+              <p className="font-jakarta text-white/60 text-xs">{Math.round(suggestionModalPhoto.similarity * 100)}% match</p>
             </div>
           </div>
         </div>

@@ -2,6 +2,7 @@ import logging
 import numpy as np
 from typing import List, Dict, Tuple
 from src.db import Database
+from src.config import MIN_FACE_SHARPNESS, MIN_FACE_SIZE_RATIO
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,6 +55,20 @@ class FaceClusterer:
 
         logger.info(f"Clustering {len(all_faces)} faces...")
 
+        # Filter out blurry and small (background) faces
+        quality_faces = [
+            f for f in all_faces
+            if (f.get("sharpness") or 0) >= MIN_FACE_SHARPNESS
+            and (f.get("face_size_ratio") or 0) >= MIN_FACE_SIZE_RATIO
+        ]
+        logger.info(f"Quality filter: {len(all_faces)} → {len(quality_faces)} faces "
+                    f"(removed {len(all_faces) - len(quality_faces)} blurry/small faces)")
+        all_faces = quality_faces
+
+        if not all_faces:
+            logger.warning("No faces passed quality filter.")
+            return {"clusters_created": 0, "faces_clustered": 0, "error": "No faces passed quality filter"}
+
         # Clear existing clusters
         self.db.clear_clusters()
 
@@ -88,8 +103,8 @@ class FaceClusterer:
         # Persist clusters to database
         total_faces = 0
         for centroid, face_list, photo_ids in clusters:
-            # Pick the highest-confidence face as thumbnail
-            thumbnail_face = max(face_list, key=lambda f: f["confidence"])
+            # Pick the sharpest face as thumbnail (best identity representation)
+            thumbnail_face = max(face_list, key=lambda f: f.get("sharpness") or 0)
 
             cluster_id = self.db.add_player_cluster(
                 face_count=len(face_list),
