@@ -1,7 +1,9 @@
 import logging
 import os
+import tempfile
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file, send_from_directory
+from werkzeug.utils import secure_filename
 import requests
 from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
@@ -290,6 +292,102 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.error(f"Crawl error: {e}")
             return jsonify({"error": str(e)}), 500
 
+    # Upload photos endpoint (browser file picker + drag & drop)
+    @app.route("/api/upload-photos", methods=["POST"])
+    def upload_photos():
+        """
+        Handle photo file uploads via multipart form.
+
+        Files are stored in a temp directory and processed asynchronously.
+        """
+        if 'files' not in request.files:
+            return jsonify({"error": "No files provided"}), 400
+
+        files = request.files.getlist('files')
+        if not files or all(f.filename == '' for f in files):
+            return jsonify({"error": "No files selected"}), 400
+
+        # Supported image extensions
+        allowed_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.webp'}
+
+        # Validate and save files to temp directory
+        try:
+            temp_dir = tempfile.mkdtemp(prefix='phototagger_upload_')
+            saved_paths = []
+
+            for file in files:
+                if not file.filename:
+                    continue
+
+                # Validate file extension
+                ext = Path(file.filename).suffix.lower()
+                if ext not in allowed_extensions:
+                    return jsonify({
+                        "error": f"Unsupported file type: {file.filename} ({ext})"
+                    }), 400
+
+                # Save file with secure filename
+                secure_name = secure_filename(file.filename)
+                file_path = Path(temp_dir) / secure_name
+                file.save(str(file_path))
+                saved_paths.append(str(file_path))
+
+            if not saved_paths:
+                return jsonify({"error": "No valid files to upload"}), 400
+
+            # Create batch for this import
+            batch_id = db.create_batch(
+                source_folder=temp_dir,
+                team_name=request.form.get("team_name"),
+                team_year=int(request.form.get("team_year", "0")) or None,
+                tournament=request.form.get("tournament"),
+            )
+
+            def run_photo_ingestion(job_id: int):
+                """Ingest uploaded photo files."""
+                photos_ingested = 0
+                duplicates_skipped = 0
+                errors = 0
+
+                for i, file_path in enumerate(saved_paths):
+                    try:
+                        photo_id = app.crawler.ingest_single_file(file_path, batch_id=batch_id)
+                        if photo_id:
+                            photos_ingested += 1
+                        else:
+                            duplicates_skipped += 1
+                    except Exception as e:
+                        logger.error(f"Error ingesting {file_path}: {e}")
+                        errors += 1
+
+                    # Update job progress
+                    progress = int((i + 1) / len(saved_paths) * 100)
+                    app.job_runner.update_progress(job_id, progress)
+
+                # Update batch photo count
+                db.update_batch_photo_count(batch_id)
+
+                return {
+                    "photos_found": len(saved_paths),
+                    "photos_ingested": photos_ingested,
+                    "duplicates_skipped": duplicates_skipped,
+                    "errors": errors,
+                }
+
+            return enqueue_job(
+                "upload_photos",
+                {
+                    "file_paths": saved_paths,
+                    "temp_dir": temp_dir,
+                    "batch_id": batch_id,
+                },
+                run_photo_ingestion
+            )
+
+        except Exception as e:
+            logger.error(f"Upload error: {e}")
+            return jsonify({"error": str(e)}), 500
+
     # Process OCR endpoint
     @app.route("/api/process-ocr", methods=["POST"])
     def process_ocr():
@@ -354,43 +452,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         except Exception as e:
             logger.error(f"Error getting faces for photo {photo_id}: {e}")
             return jsonify({"error": str(e)}), 500
-
-    # Native OS directory picker endpoint
-    @app.route("/api/pick-directory", methods=["POST"])
-    def pick_directory():
-        """Open native macOS directory picker via AppleScript and return selected path."""
-        import platform
-        import subprocess
-
-        # Check if running on macOS
-        if platform.system() != "Darwin":
-            return jsonify({
-                "error": "Directory picker not available on this platform. Please enter the path manually.",
-                "path": None,
-                "cancelled": True
-            }), 400
-
-        try:
-            result = subprocess.run(
-                [
-                    "osascript", "-e",
-                    'POSIX path of (choose folder with prompt "Select Photo Directory")'
-                ],
-                capture_output=True,
-                text=True,
-                timeout=120,   # 2 min for user to pick a folder
-            )
-            if result.returncode == 0:
-                path = result.stdout.strip().rstrip("/")
-                return jsonify({"path": path, "cancelled": False}), 200
-            else:
-                # User hit Cancel (osascript exits non-zero)
-                return jsonify({"path": None, "cancelled": True}), 200
-        except subprocess.TimeoutExpired:
-            return jsonify({"path": None, "cancelled": True}), 200
-        except Exception as e:
-            logger.error(f"Error opening directory picker: {e}")
-            return jsonify({"error": f"osascript not available: {str(e)}", "path": None, "cancelled": True}), 400
 
     # Get all photos endpoint
     @app.route("/api/photos", methods=["GET"])
