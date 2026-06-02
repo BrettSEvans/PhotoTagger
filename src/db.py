@@ -45,6 +45,10 @@ class Database:
         """Delegation stub: get all faces via FaceRepository."""
         return self.faces.get_all_faces()
 
+    def add_ocr_result(self, photo_id: int, jersey_number: Optional[str], confidence: float, raw_text: str, uniform_color: Optional[str] = None):
+        """Delegation stub: add OCR result via PhotoRepository."""
+        return self.photos.add_ocr_result(photo_id, jersey_number, confidence, raw_text, uniform_color)
+
     def get_photos_by_face_ids(self, cluster_id: int, face_ids: List[int]) -> List[Dict]:
         """Return photo paths for selected faces that currently belong to a cluster."""
         if not face_ids:
