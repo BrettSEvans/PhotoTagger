@@ -52,6 +52,50 @@ class UniformDetector:
 
         return histograms
 
+    def sample_face_jersey(self, img_bgr: np.ndarray, bbox) -> Tuple[Optional[str], float, Dict]:
+        """
+        Classify the jersey color from the torso patch directly below a face bbox.
+
+        Unlike detect_uniform_color (which samples the whole image and assumes a
+        single subject), this isolates ONE person's torso so multi-player crowd
+        shots can be discriminated face-by-face.
+
+        Args:
+            img_bgr: Full image in BGR (as read by cv2.imread)
+            bbox: [x0, y0, x1, y1] face bounding box in pixels
+
+        Returns:
+            (color_name | None, confidence_0_to_1, raw_analysis_dict)
+        """
+        try:
+            h, w = img_bgr.shape[:2]
+            x0, y0, x1, y1 = [int(v) for v in bbox]
+            fw = max(1, x1 - x0)
+            fh = max(1, y1 - y0)
+            cx = (x0 + x1) // 2
+
+            # Torso patch: start just below the chin (small neck gap), extend ~1.9
+            # face-heights down, and ~0.9 face-widths to each side of the face center.
+            ty0 = min(h, y1 + int(0.15 * fh))
+            ty1 = min(h, y1 + int(1.9 * fh))
+            tx0 = max(0, cx - int(0.9 * fw))
+            tx1 = min(w, cx + int(0.9 * fw))
+
+            if ty1 <= ty0 or tx1 <= tx0:
+                return None, 0.0, {}
+
+            patch = img_bgr[ty0:ty1, tx0:tx1]
+            if patch.size == 0:
+                return None, 0.0, {}
+
+            hsv = cv2.cvtColor(patch, cv2.COLOR_BGR2HSV)
+            analysis = self._analyze_region(hsv)
+            color, conf = self._match_color(analysis)
+            return color, float(conf), analysis
+        except Exception as e:
+            logger.error(f"Error sampling jersey below face: {e}")
+            return None, 0.0, {}
+
     def detect_uniform_color(self, image_path: str) -> Optional[Dict]:
         """
         Detect team uniform colors using histogram matching.

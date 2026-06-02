@@ -24,6 +24,7 @@ def detect_faces_endpoint():
     }
     """
     from src.face_detector import FaceDetector
+    from src.uniform_detector import UniformDetector
 
     db = current_app.db
     app_job_runner = current_app.job_runner
@@ -34,6 +35,7 @@ def detect_faces_endpoint():
     try:
         def run_detection(job_id: int):
             detector = FaceDetector()
+            uniform = UniformDetector()
             photos = db.photos.get_all_photos()
 
             if photo_ids:
@@ -55,8 +57,13 @@ def detect_faces_endpoint():
                     continue
                 try:
                     faces = detector.detect_faces(file_path)
+                    # Load the image once (BGR) so we can sample each face's torso color
+                    img_bgr = cv2.imread(file_path) if faces else None
                     for face in faces:
                         emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]
+                        jersey_color, jersey_conf = (None, None)
+                        if img_bgr is not None:
+                            jersey_color, jersey_conf, _ = uniform.sample_face_jersey(img_bgr, face["bbox"])
                         db.faces.add_face(
                             photo_id=photo_id,
                             embedding=emb_list,
@@ -65,6 +72,8 @@ def detect_faces_endpoint():
                             sharpness=face.get("sharpness"),
                             face_size_ratio=face.get("face_size_ratio"),
                             quality_score=face.get("quality_score"),
+                            jersey_color=jersey_color,
+                            jersey_color_conf=jersey_conf,
                         )
                     total_faces += len(faces)
 
@@ -93,6 +102,61 @@ def detect_faces_endpoint():
 
     except Exception as e:
         logger.error(f"detect-faces error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/backfill-jersey-colors", methods=["POST"])
+def backfill_jersey_colors():
+    """
+    Sample the jersey color for every already-detected face from the image on disk.
+
+    Lets the new per-face color signal be applied to faces that were detected
+    before jersey sampling existed — no need to re-run the slow InsightFace pass.
+    Re-cluster afterwards for the colors to affect the player list.
+    """
+    from src.uniform_detector import UniformDetector
+
+    db = current_app.db
+    app_job_runner = current_app.job_runner
+
+    try:
+        def run_backfill(job_id: int):
+            uniform = UniformDetector()
+            faces = db.faces.get_faces_with_paths()
+            updated = 0
+            errors = 0
+            img_cache_path = None
+            img_bgr = None
+
+            for i, face in enumerate(faces):
+                file_path = face["file_path"]
+                if not file_path or not os.path.exists(file_path):
+                    continue
+                try:
+                    # Reuse the loaded image across consecutive faces in the same photo
+                    if file_path != img_cache_path:
+                        img_bgr = cv2.imread(file_path)
+                        img_cache_path = file_path
+                    if img_bgr is None:
+                        continue
+                    color, conf, _ = uniform.sample_face_jersey(img_bgr, face["bbox"])
+                    db.faces.set_jersey_color(face["id"], color, conf)
+                    updated += 1
+                except Exception as e:
+                    logger.error(f"jersey backfill error on face {face['id']}: {e}")
+                    errors += 1
+
+                if i % 25 == 0:
+                    progress = int((i + 1) / max(len(faces), 1) * 100)
+                    db.jobs.update_processing_job(job_id, progress=progress)
+
+            return {"faces_total": len(faces), "faces_updated": updated, "errors": errors}
+
+        job_id = app_job_runner.submit("backfill_jersey_colors", {}, run_backfill)
+        job = db.jobs.get_processing_job(job_id)
+        return jsonify({"success": True, "job_id": job_id, "job": job}), 202
+    except Exception as e:
+        logger.error(f"backfill-jersey-colors error: {e}")
         return jsonify({"error": str(e)}), 500
 
 
