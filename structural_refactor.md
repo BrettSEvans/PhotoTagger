@@ -1,8 +1,42 @@
 # PhotoTagger Structural Refactor Plan
 ## Blueprints + Repository Split
 
-**Branch:** `refactor/api-db-critical-fixes` (critical bugs fixed here first)  
-**Next branch:** `refactor/blueprints-repositories` (this work)  
+**Branch:** `refactor/blueprints-repositories` ✓ Active  
+**Test baseline:** 221 tests passing (212 original + 9 from schema/conftest/repos)
+
+---
+
+## Progress
+
+### Phase 0 — Setup ✅ COMPLETE
+- [x] Extract `src/schema.py` (freed 160 lines from db.py)
+- [x] Create `tests/conftest.py` with shared fixtures
+- [x] Add `tests/test_schema.py` and `tests/test_conftest_fixtures.py`
+- [x] Baseline: 215 tests → 221 tests
+
+### Phase 1 — Repository Split 🔄 IN PROGRESS
+- [x] **Phase 1.0:** Create `src/repositories/` with `_base.py` (BaseRepository)
+- [x] **Phase 1.1:** Extract JobRepository (3 methods, 3 tests, delegation stubs)
+- [ ] **Phase 1.2:** Extract GameContextRepository (2 methods, 2 tests)
+- [ ] **Phase 1.3:** Extract BatchRepository (8 methods, 8 tests)
+- [ ] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
+- [ ] **Phase 1.5:** Extract ClusterRepository (8 methods, 8 tests)
+- [ ] **Phase 1.6:** Extract RosterRepository (9 methods, 9 tests)
+- [ ] **Phase 1.7:** Extract PhotoRepository (18 methods, 18 tests)
+- [ ] **Phase 1.8:** Extract ReviewService (3 methods from Photo, new module)
+- [ ] **Phase 1.9:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests)
+- [ ] **Phase 1.10:** Delete delegation stubs, verify db.py ≤150 lines
+
+### Phase 2 — Blueprint Split ⏳ PENDING
+- [ ] Move routes to `src/blueprints/`
+- [ ] Extract helpers to `src/utils.py`, `src/job_runner.py`
+- [ ] Verify api.py ≤80 lines
+
+### Phase 3 — Test Reorganization ⏳ PENDING
+- [ ] Reorganize tests into `tests/test_repositories/` and `tests/test_blueprints/`
+
+---
+
 **Prerequisite:** All 212 tests passing before starting. Run `pytest tests/ -q` to confirm.
 
 ---
