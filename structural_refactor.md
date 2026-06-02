@@ -19,7 +19,7 @@
 - [x] **Phase 1.1:** Extract JobRepository (3 methods, 3 tests, delegation stubs)
 - [x] **Phase 1.2:** Extract GameContextRepository (2 methods, 2 tests)
 - [x] **Phase 1.3:** Extract BatchRepository (8 methods, 8 tests)
-- [ ] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
+- [x] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
 - [ ] **Phase 1.5:** Extract ClusterRepository (8 methods, 8 tests)
 - [ ] **Phase 1.6:** Extract RosterRepository (9 methods, 9 tests)
 - [ ] **Phase 1.7:** Extract PhotoRepository (18 methods, 18 tests)
