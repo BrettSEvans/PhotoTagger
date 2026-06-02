@@ -922,52 +922,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
     # ── Photo Batch (Import Group) Management ────────────────────────────────
 
-    @app.route("/api/batches", methods=["GET"])
-    def list_batches():
-        """List all photo batches."""
-        try:
-            batches = db.batches.get_all_batches()
-            return jsonify({"batches": batches}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.route("/api/batches/<int:batch_id>", methods=["GET"])
-    def get_batch(batch_id: int):
-        """Get a single batch by ID."""
-        try:
-            batch = db.batches.get_batch(batch_id)
-            if not batch:
-                return jsonify({"error": "Batch not found"}), 404
-            photos = db.batches.get_photos_by_batch(batch_id)
-            return jsonify({"batch": batch, "photos": photos}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.route("/api/batches/<int:batch_id>", methods=["PUT"])
-    def update_batch(batch_id: int):
-        """Update batch metadata (team_name, team_year, tournament)."""
-        data = request.get_json() or {}
-        try:
-            db.batches.update_batch(
-                batch_id,
-                team_name=data.get("team_name"),
-                team_year=data.get("team_year"),
-                tournament=data.get("tournament"),
-            )
-            batch = db.batches.get_batch(batch_id)
-            return jsonify({"success": True, "batch": batch}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
-    @app.route("/api/batches/<int:batch_id>", methods=["DELETE"])
-    def delete_batch(batch_id: int):
-        """Delete a batch (unpin photos from it)."""
-        try:
-            affected = db.batches.delete_batch(batch_id)
-            return jsonify({"success": True, "affected_photos": affected}), 200
-        except Exception as e:
-            return jsonify({"error": str(e)}), 500
-
     # ── Processing summary & review endpoints ─────────────────────────────────
 
     @app.route("/api/processing-summary", methods=["GET"])
@@ -1163,7 +1117,9 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
     # Register blueprints
     from src.blueprints.system import bp as system_bp
+    from src.blueprints.batches import bp as batches_bp
     app.register_blueprint(system_bp)
+    app.register_blueprint(batches_bp)
 
     return app
 
