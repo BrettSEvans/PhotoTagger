@@ -143,20 +143,21 @@ class FaceDetector:
         # Normalize confidence (already 0-1, just use it)
         conf_score = confidence
 
-        # Size score: be strict about small faces (background crowd)
-        # <2% = almost certainly background, 5-30% = main subject
+        # Size score: balance between background filtering and legitimate small subjects
+        # Players can be small in wide shots (~2-5%) or large in closeups (>15%)
+        # Tiny faces (<1%) are likely background crowd, not players
         if size_ratio < 0.01:
-            size_score = 0.0  # Definitely background
+            size_score = 0.2  # Tiny crowd faces (needs high confidence to pass)
         elif size_ratio < 0.02:
-            size_score = 0.15  # Very small, probably crowd
+            size_score = 0.4  # Very small - could be player or crowd
         elif size_ratio < 0.05:
-            size_score = 0.4  # Small, still background
-        elif size_ratio <= 0.30:
+            size_score = 0.7  # Small player at distance
+        elif size_ratio <= 0.35:
             size_score = 1.0  # Optimal range for main subjects
         elif size_ratio <= 0.50:
-            size_score = 0.7  # Getting large but okay
+            size_score = 0.85  # Getting large but still good
         else:
-            size_score = 0.2  # Too large, probably cropped
+            size_score = 0.5  # Too large, probably cropped
 
         # Sharpness score: normalize to 0-1
         # Typical values: blurry ~5-50, medium ~100-500, sharp >1000
@@ -169,7 +170,7 @@ class FaceDetector:
         else:
             sharp_score = 1.0  # Sharp
 
-        # Position score: penalize edges and corners (background)
+        # Position score: players can be off-center during action plays
         x0, y0, x1, y1 = bbox
         face_center_x = (x0 + x1) / 2.0 / img_width
         face_center_y = (y0 + y1) / 2.0 / img_height
@@ -177,14 +178,14 @@ class FaceDetector:
         # Distance from center (0 = center, 0.5 = edge)
         dist_from_center = abs(face_center_x - 0.5) + abs(face_center_y - 0.5)
 
-        if dist_from_center < 0.15:
+        if dist_from_center < 0.20:
             pos_score = 1.0  # Well centered
-        elif dist_from_center < 0.30:
-            pos_score = 0.8  # Off-center but acceptable
-        elif dist_from_center < 0.40:
-            pos_score = 0.5  # Near edge
+        elif dist_from_center < 0.35:
+            pos_score = 0.9  # Off-center (action play)
+        elif dist_from_center < 0.45:
+            pos_score = 0.7  # Near edge
         else:
-            pos_score = 0.15  # Edge/corner (likely background)
+            pos_score = 0.4  # Corner (still might be player in wide shot)
 
         # Weighted average: size and sharpness are critical for filtering background
         # Confidence alone is not enough (background faces can be sharp and confident)
