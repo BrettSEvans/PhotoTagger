@@ -12,6 +12,7 @@ import requests
 from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
 from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
+from src.utils import parse_float, parse_int_arg, configured_photo_roots, is_allowed_photo_path, is_allowed_photo_directory
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,37 +75,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         job_id = app.job_runner.submit(job_type, payload, task)
         job = db.jobs.get_processing_job(job_id)
         return jsonify({"success": True, "job_id": job_id, "job": job}), 202
-
-    def parse_float(value):
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    def parse_int_arg(value):
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return None
-
-    def configured_photo_roots() -> list[Path]:
-        raw = os.environ.get("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", "").strip()
-        if not raw:
-            return []
-        parts = [part.strip() for chunk in raw.split(os.pathsep) for part in chunk.split(",")]
-        return [Path(part).expanduser().resolve() for part in parts if part]
-
-    def is_allowed_photo_path(photo_path: str) -> bool:
-        path = Path(photo_path).expanduser().resolve()
-        if ".git" in path.parts:
-            return False
-        roots = configured_photo_roots()
-        if not roots:
-            return True
-        return any(path == root or root in path.parents for root in roots)
-
-    def is_allowed_photo_directory(photo_dir: str) -> bool:
-        return is_allowed_photo_path(photo_dir)
 
     def valid_agent_token() -> bool:
         expected = os.environ.get("PHOTOTAGGER_AGENT_TOKEN", "")
@@ -182,19 +152,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         }
 
     # Health check endpoint
-    @app.route("/health", methods=["GET"])
-    def health():
-        """Health check endpoint."""
-        return jsonify({"status": "ok", "mode": get_runtime_mode()}), 200
-
-    @app.route("/api/app-config", methods=["GET"])
-    def app_config():
-        return jsonify({
-            "mode": get_runtime_mode(),
-            "local_agent_default_url": "http://127.0.0.1:5001",
-            "requires_agent_token": bool(os.environ.get("PHOTOTAGGER_AGENT_TOKEN")),
-        }), 200
-
     # Search photos by jersey number
     @app.route("/api/search", methods=["GET"])
     def search():
@@ -437,14 +394,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             "total_photos": len(all_photos),
             "db_path": db.db_path,
         }), 200
-
-    @app.route("/api/jobs/<int:job_id>", methods=["GET"])
-    def get_job(job_id: int):
-        """Get processing job status."""
-        job = db.jobs.get_processing_job(job_id)
-        if not job:
-            return jsonify({"error": "Job not found"}), 404
-        return jsonify({"job": job}), 200
 
     # Get face data endpoint
     @app.route("/api/faces/<int:photo_id>", methods=["GET"])
@@ -1186,62 +1135,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             logger.exception("match-similar failed for cluster %s", cluster_id)
             return jsonify({"error": str(exc)}), 500
 
-    @app.route("/api/data/reset", methods=["POST"])
-    def reset_all_data():
-        """Delete every row from all user-data tables.
-
-        Requires { "confirm": true } in the request body as a safety gate.
-        """
-        data = request.get_json() or {}
-        if not data.get("confirm"):
-            return jsonify({"error": "confirm field must be true"}), 400
-        try:
-            deleted = db.reset_all_data()
-            logger.info("Database reset: %s", deleted)
-            return jsonify({"success": True, "deleted": deleted}), 200
-        except Exception as exc:
-            logger.exception("reset_all_data failed")
-            return jsonify({"error": str(exc)}), 500
-
-    # Get detection status
-    @app.route("/api/detection-status", methods=["GET"])
-    def detection_status():
-        """Return counts of faces and clusters in DB."""
-        try:
-            face_count = db.faces.get_face_count()
-            clusters = db.clusters.get_all_player_clusters()
-            return jsonify({
-                "face_count": face_count,
-                "cluster_count": len(clusters),
-            }), 200
-        except Exception as e:
-            logger.error(f"detection-status error: {e}")
-            return jsonify({"error": str(e)}), 500
-
-    @app.route("/", defaults={"asset_path": ""}, methods=["GET"])
-    @app.route("/<path:asset_path>", methods=["GET"])
-    def serve_cloud_ui(asset_path: str):
-        """Serve the built React app when deployed as a Railway cloud UI."""
-        if get_runtime_mode() != "cloud-ui":
-            return jsonify({"error": "cloud UI is not enabled"}), 404
-        dist = Path(__file__).resolve().parents[1] / "web" / "dist"
-
-        # Validate asset_path to prevent directory traversal
-        if asset_path:
-            try:
-                resolved = (dist / asset_path).resolve()
-                if not str(resolved).startswith(str(dist.resolve())):
-                    return jsonify({"error": "invalid asset path"}), 400
-                if resolved.is_file():
-                    return send_from_directory(dist, asset_path)
-            except (ValueError, OSError):
-                return jsonify({"error": "invalid asset path"}), 400
-
-        index = dist / "index.html"
-        if index.is_file():
-            return send_from_directory(dist, "index.html")
-        return jsonify({"error": "web build not found. Run npm run build in web/ before serving cloud-ui."}), 500
-
     # Add CORS support — restrict to an allowlist instead of "*" so arbitrary
     # websites cannot drive the local agent on 127.0.0.1.
     def allowed_cors_origins() -> set[str]:
@@ -1267,6 +1160,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-PhotoTagger-Agent-Token"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
         return response
+
+    # Register blueprints
+    from src.blueprints.system import bp as system_bp
+    app.register_blueprint(system_bp)
 
     return app
 
