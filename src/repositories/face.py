@@ -10,14 +10,15 @@ class FaceRepository(BaseRepository):
     """Repository for faces table."""
 
     def add_face(self, photo_id: int, embedding: List[float], bbox: List[int], confidence: float,
-                 sharpness: Optional[float] = None, face_size_ratio: Optional[float] = None) -> int:
+                 sharpness: Optional[float] = None, face_size_ratio: Optional[float] = None,
+                 quality_score: Optional[float] = None) -> int:
         """Add a detected face to the database."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
-                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, sharpness, face_size_ratio)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence, sharpness, face_size_ratio))
+                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, sharpness, face_size_ratio, quality_score)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence, sharpness, face_size_ratio, quality_score))
             self._conn.commit()
             return cursor.lastrowid
 
@@ -55,7 +56,7 @@ class FaceRepository(BaseRepository):
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
-                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id, sharpness, face_size_ratio
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id, sharpness, face_size_ratio, quality_score
                 FROM faces
                 ORDER BY id
             """)
@@ -70,6 +71,7 @@ class FaceRepository(BaseRepository):
                     "cluster_id": row[8],
                     "sharpness": row[9],
                     "face_size_ratio": row[10],
+                    "quality_score": row[11],
                 })
             return results
 

@@ -9,11 +9,14 @@ interface PhotoUploadProps {
 
 export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const folderInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
 
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [photoDirectory, setPhotoDirectory] = useState<string>('');
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [uploadMode, setUploadMode] = useState<'files' | 'directory'>('files');
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   // Validate that file is an image
@@ -76,6 +79,10 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
     fileInputRef.current?.click();
   };
 
+  const handleSelectFolder = () => {
+    folderInputRef.current?.click();
+  };
+
   const handleClearSelection = () => {
     setSelectedFiles([]);
     setMessage(null);
@@ -84,8 +91,13 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
   const handleUpload = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (selectedFiles.length === 0) {
+    if (uploadMode === 'files' && selectedFiles.length === 0) {
       setMessage({ type: 'error', text: 'Please select at least one photo' });
+      return;
+    }
+
+    if (uploadMode === 'directory' && !photoDirectory.trim()) {
+      setMessage({ type: 'error', text: 'Please enter a photo directory path' });
       return;
     }
 
@@ -93,14 +105,20 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
     setMessage(null);
 
     try {
-      // Create FormData with selected files
-      const formData = new FormData();
-      selectedFiles.forEach(file => {
-        formData.append('files', file);
-      });
+      let response;
 
-      // Upload files
-      const response = await photoTaggerClient.uploadPhotos(formData);
+      if (uploadMode === 'files') {
+        // Upload files
+        const formData = new FormData();
+        selectedFiles.forEach(file => {
+          formData.append('files', file);
+        });
+        response = await photoTaggerClient.uploadPhotos(formData);
+      } else {
+        // Upload from directory
+        response = await photoTaggerClient.crawlPhotos(photoDirectory.trim());
+      }
+
       setMessage({ type: 'success', text: 'Upload started. Processing photos…' });
 
       // Poll job status
@@ -124,6 +142,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
         text: `Added ${result.photos_ingested} photos · ${result.duplicates_skipped} duplicates skipped`,
       });
       setSelectedFiles([]);
+      setPhotoDirectory('');
       onUploadSuccess?.();
     } catch (error) {
       setMessage({ type: 'error', text: error instanceof Error ? error.message : 'Failed to upload photos' });
@@ -139,7 +158,36 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
 
       <h2 className="font-outfit text-xl font-bold text-foreground mb-5">Add Photos</h2>
 
+      {/* Upload mode toggle */}
+      <div className="flex gap-2 mb-4">
+        <button
+          type="button"
+          onClick={() => { setUploadMode('files'); setPhotoDirectory(''); }}
+          className={`px-4 py-2 rounded-full border-2 font-jakarta text-sm font-semibold transition-colors ${
+            uploadMode === 'files'
+              ? 'bg-accent text-white border-foreground'
+              : 'bg-white text-foreground border-frame hover:bg-quaternary/5'
+          }`}
+        >
+          📁 Upload Files
+        </button>
+        <button
+          type="button"
+          onClick={() => { setUploadMode('directory'); setSelectedFiles([]); }}
+          className={`px-4 py-2 rounded-full border-2 font-jakarta text-sm font-semibold transition-colors ${
+            uploadMode === 'directory'
+              ? 'bg-accent text-white border-foreground'
+              : 'bg-white text-foreground border-frame hover:bg-quaternary/5'
+          }`}
+        >
+          📂 From Directory
+        </button>
+      </div>
+
       <form onSubmit={handleUpload} className="space-y-4">
+        {/* File Upload Mode */}
+        {uploadMode === 'files' && (
+          <>
         {/* Drop zone */}
         <div
           ref={dropZoneRef}
@@ -157,22 +205,49 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
             <p className="font-jakarta text-sm font-semibold text-foreground">
               {isDragging ? 'Drop photos here' : 'Drag photos here or'}
             </p>
-            <button
-              type="button"
-              onClick={handleSelectPhotos}
-              disabled={isLoading}
-              className="btn-candy px-4 py-2 bg-accent text-white border-2 border-foreground rounded-full font-jakarta text-sm font-bold hover:opacity-90 disabled:opacity-50"
-            >
-              Click to select
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={handleSelectPhotos}
+                disabled={isLoading}
+                className="btn-candy px-4 py-2 bg-accent text-white border-2 border-foreground rounded-full font-jakarta text-sm font-bold hover:opacity-90 disabled:opacity-50"
+              >
+                Select Photos
+              </button>
+              <button
+                type="button"
+                onClick={handleSelectFolder}
+                disabled={isLoading}
+                className="btn-candy px-4 py-2 bg-tertiary text-white border-2 border-foreground rounded-full font-jakarta text-sm font-bold hover:opacity-90 disabled:opacity-50"
+              >
+                Select Folder
+              </button>
+            </div>
             <p className="font-jakarta text-xs text-muted-fg mt-2">
               Supports: JPG, PNG, TIFF, HEIC, WebP
             </p>
           </div>
 
-          {/* Hidden file input */}
+          {/* Hidden file input for individual files */}
           <input
             ref={fileInputRef}
+            type="file"
+            multiple
+            accept="image/*"
+            onChange={handleFileSelect}
+            className="hidden"
+            disabled={isLoading}
+          />
+          {/* Hidden file input for folder selection.
+              webkitdirectory must be set imperatively — React strips the bare JSX attribute. */}
+          <input
+            ref={(el) => {
+              folderInputRef.current = el;
+              if (el) {
+                el.setAttribute('webkitdirectory', '');
+                el.setAttribute('directory', '');
+              }
+            }}
             type="file"
             multiple
             accept="image/*"
@@ -208,7 +283,7 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
           </div>
         )}
 
-        {/* Upload button */}
+        {/* Upload button for files */}
         <button
           type="submit"
           disabled={isLoading || selectedFiles.length === 0}
@@ -221,6 +296,44 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
             </span>
           ) : 'Upload Photos'}
         </button>
+        </>
+        )}
+
+        {uploadMode === 'directory' && (
+        <>
+        {/* Directory path input */}
+        <div className="space-y-3">
+          <label className="block">
+            <p className="font-jakarta text-sm font-semibold text-foreground mb-2">Photo Directory Path</p>
+            <input
+              type="text"
+              value={photoDirectory}
+              onChange={(e) => setPhotoDirectory(e.target.value)}
+              placeholder="/path/to/your/photos"
+              disabled={isLoading}
+              className="w-full px-4 py-2 border-2 border-frame rounded-lg font-jakarta text-sm focus:outline-none focus:border-accent"
+            />
+            <p className="font-jakarta text-xs text-muted-fg mt-2">
+              Enter the absolute path to your photos directory
+            </p>
+          </label>
+        </div>
+
+        {/* Upload button */}
+        <button
+          type="submit"
+          disabled={isLoading || !photoDirectory.trim()}
+          className="btn-candy w-full bg-accent text-white font-jakarta font-bold px-6 py-3 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {isLoading ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Importing…
+            </span>
+          ) : 'Import Photos'}
+        </button>
+        </>
+        )}
       </form>
 
       {isLoading && (

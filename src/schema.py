@@ -139,6 +139,11 @@ def init_schema(conn: sqlite3.Connection) -> None:
     except Exception:
         pass
 
+    try:
+        cursor.execute("ALTER TABLE faces ADD COLUMN quality_score REAL")
+    except Exception:
+        pass
+
     # Add player_name / jersey_number to player_clusters if not present
     try:
         cursor.execute("ALTER TABLE player_clusters ADD COLUMN player_name TEXT")

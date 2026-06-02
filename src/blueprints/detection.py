@@ -64,6 +64,7 @@ def detect_faces_endpoint():
                             confidence=face["confidence"],
                             sharpness=face.get("sharpness"),
                             face_size_ratio=face.get("face_size_ratio"),
+                            quality_score=face.get("quality_score"),
                         )
                     total_faces += len(faces)
 

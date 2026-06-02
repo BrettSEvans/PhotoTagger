@@ -308,13 +308,16 @@ def test_roster_infer_url_returns_gracefully_on_fetch_failure(client):
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def test_upload_photos_rejects_txt_file(client):
+    # A selection containing only non-photo files is rejected (nothing to ingest).
+    # Unsupported files are skipped individually; the batch fails only when no
+    # supported image remains.
     resp = client.post(
         "/api/upload-photos",
         data={"files": (io.BytesIO(b"not an image"), "notes.txt")},
         content_type="multipart/form-data",
     )
     assert resp.status_code == 400
-    assert "Unsupported" in json.loads(resp.data)["error"]
+    assert "No supported image files" in json.loads(resp.data)["error"]
 
 
 def test_upload_photos_accepts_png(client):
@@ -344,3 +347,51 @@ def test_upload_photos_empty_filename_returns_400(client):
         content_type="multipart/form-data",
     )
     assert resp.status_code == 400
+
+
+def _png_bytes(color="blue"):
+    buf = io.BytesIO()
+    Image.new("RGB", (10, 10), color).save(buf, format="PNG")
+    buf.seek(0)
+    return buf
+
+
+def test_upload_photos_skips_unsupported_files_in_folder(client):
+    """A selected folder with non-photo files (e.g. a saved web page's .gif/.html)
+    should skip the junk and ingest the real photos, not fail the whole batch."""
+    gif = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(gif, format="GIF")
+    gif.seek(0)
+
+    resp = client.post(
+        "/api/upload-photos",
+        data={
+            "files": [
+                (_png_bytes("red"), "photo_1.png"),
+                (_png_bytes("green"), "photo_2.png"),
+                (gif, "ajax_loader.gif"),                  # unsupported → skipped
+                (io.BytesIO(b"<html></html>"), "index.html"),  # unsupported → skipped
+            ]
+        },
+        content_type="multipart/form-data",
+    )
+    # Batch is accepted (not rejected by the one .gif/.html)
+    assert resp.status_code == 202
+    payload = json.loads(resp.data)["job"]["payload"]
+    saved = [Path(p).name for p in payload["file_paths"]]
+    assert sorted(saved) == ["photo_1.png", "photo_2.png"]
+    assert not any(name.endswith((".gif", ".html")) for name in saved)
+
+
+def test_upload_photos_all_unsupported_returns_400(client):
+    """If nothing in the selection is a supported image, return a clear 400."""
+    gif = io.BytesIO()
+    Image.new("RGB", (8, 8)).save(gif, format="GIF")
+    gif.seek(0)
+    resp = client.post(
+        "/api/upload-photos",
+        data={"files": [(gif, "loader.gif"), (io.BytesIO(b"x"), "style.css")]},
+        content_type="multipart/form-data",
+    )
+    assert resp.status_code == 400
+    assert "No supported image files" in json.loads(resp.data)["error"]

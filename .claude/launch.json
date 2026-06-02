@@ -10,7 +10,7 @@
     {
       "name": "PhotoTagger Frontend",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev"],
+      "runtimeArgs": ["run", "dev", "--prefix", "web"],
       "port": 3000
     }
   ]

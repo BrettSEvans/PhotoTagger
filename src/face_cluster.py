@@ -2,7 +2,7 @@ import logging
 import numpy as np
 from typing import List, Dict, Tuple
 from src.db import Database
-from src.config import MIN_FACE_SHARPNESS, MIN_FACE_SIZE_RATIO
+from src.config import MIN_FACE_SHARPNESS, MIN_FACE_SIZE_RATIO, MIN_FACE_QUALITY_SCORE
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -55,14 +55,23 @@ class FaceClusterer:
 
         logger.info(f"Clustering {len(all_faces)} faces...")
 
-        # Filter out blurry and small (background) faces
-        quality_faces = [
-            f for f in all_faces
-            if (f.get("sharpness") or 0) >= MIN_FACE_SHARPNESS
-            and (f.get("face_size_ratio") or 0) >= MIN_FACE_SIZE_RATIO
-        ]
+        # Filter out low-quality faces (background, blurry, small, etc.)
+        # First try using quality_score if available, fall back to legacy thresholds
+        quality_faces = []
+        for f in all_faces:
+            quality_score = f.get("quality_score")
+            if quality_score is not None:
+                # Use the new composite quality score
+                if quality_score >= MIN_FACE_QUALITY_SCORE:
+                    quality_faces.append(f)
+            else:
+                # Fallback for faces without quality_score (legacy support)
+                if ((f.get("sharpness") or 0) >= MIN_FACE_SHARPNESS
+                    and (f.get("face_size_ratio") or 0) >= MIN_FACE_SIZE_RATIO):
+                    quality_faces.append(f)
+
         logger.info(f"Quality filter: {len(all_faces)} → {len(quality_faces)} faces "
-                    f"(removed {len(all_faces) - len(quality_faces)} blurry/small faces)")
+                    f"(removed {len(all_faces) - len(quality_faces)} background/low-quality faces)")
         all_faces = quality_faces
 
         if not all_faces:
