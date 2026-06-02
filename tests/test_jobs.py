@@ -8,7 +8,7 @@ from src.db import Database
 def wait_for_job(db, job_id: int, timeout: float = 5.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        job = db.get_processing_job(job_id)
+        job = db.jobs.get_processing_job(job_id)
         if job and job["status"] in {"succeeded", "failed"}:
             return job
         time.sleep(0.05)
@@ -30,8 +30,8 @@ def test_create_and_update_processing_job():
     db = Database(":memory:")
     db.init_schema()
     try:
-        job_id = db.create_processing_job("crawl", {"photo_dir": "/tmp/photos"})
-        job = db.get_processing_job(job_id)
+        job_id = db.jobs.create_processing_job("crawl", {"photo_dir": "/tmp/photos"})
+        job = db.jobs.get_processing_job(job_id)
 
         assert job is not None
         assert job["type"] == "crawl"
@@ -39,13 +39,13 @@ def test_create_and_update_processing_job():
         assert job["progress"] == 0
         assert job["payload"] == {"photo_dir": "/tmp/photos"}
 
-        db.update_processing_job(job_id, status="running", progress=25)
-        running = db.get_processing_job(job_id)
+        db.jobs.update_processing_job(job_id, status="running", progress=25)
+        running = db.jobs.get_processing_job(job_id)
         assert running["status"] == "running"
         assert running["progress"] == 25
 
-        db.update_processing_job(job_id, status="succeeded", progress=100, result={"photos_found": 2})
-        completed = db.get_processing_job(job_id)
+        db.jobs.update_processing_job(job_id, status="succeeded", progress=100, result={"photos_found": 2})
+        completed = db.jobs.get_processing_job(job_id)
         assert completed["status"] == "succeeded"
         assert completed["progress"] == 100
         assert completed["result"] == {"photos_found": 2}
@@ -58,8 +58,8 @@ def test_get_job_endpoint_returns_status():
     app = create_app(db_path=":memory:")
     app.config["TESTING"] = True
     client = app.test_client()
-    job_id = app.db.create_processing_job("detect_faces", {"photo_ids": [1, 2]})
-    app.db.update_processing_job(job_id, status="failed", progress=40, error="model unavailable")
+    job_id = app.db.jobs.create_processing_job("detect_faces", {"photo_ids": [1, 2]})
+    app.db.jobs.update_processing_job(job_id, status="failed", progress=40, error="model unavailable")
 
     response = client.get(f"/api/jobs/{job_id}")
 
@@ -126,7 +126,7 @@ def test_detect_faces_endpoint_returns_job(monkeypatch, tmp_path):
     client = app.test_client()
     photo_file = tmp_path / "one.jpg"
     photo_file.write_bytes(b"one")
-    photo_id = app.db.add_photo(str(photo_file))
+    photo_id = app.db.photos.add_photo(str(photo_file))
 
     class FakeDetector:
         def detect_faces(self, _file_path):
@@ -150,7 +150,7 @@ def test_detect_faces_endpoint_is_idempotent(monkeypatch, tmp_path):
     client = app.test_client()
     photo_file = tmp_path / "one.jpg"
     photo_file.write_bytes(b"one")
-    photo_id = app.db.add_photo(str(photo_file))
+    photo_id = app.db.photos.add_photo(str(photo_file))
 
     class FakeDetector:
         def detect_faces(self, _file_path):
@@ -169,7 +169,7 @@ def test_detect_faces_endpoint_is_idempotent(monkeypatch, tmp_path):
     assert second_job["status"] == "succeeded"
     assert second_job["result"]["faces_detected"] == 0
     assert second_job["result"]["photos_skipped_existing"] == 1
-    assert len(app.db.get_faces_by_photo(photo_id)) == 1
+    assert len(app.db.faces.get_faces_by_photo(photo_id)) == 1
 
 
 def test_cluster_players_endpoint_returns_job():

@@ -41,8 +41,8 @@ def test_search_with_confidence_filter(client, app_with_roster):
         f.write(b"fake jpg")
         photo_path = f.name
 
-    photo_id = db.add_photo(photo_path)
-    db.add_ocr_result(photo_id, "16", 0.95, "16")
+    photo_id = db.photos.add_photo(photo_path)
+    db.photos.add_ocr_result(photo_id, "16", 0.95, "16")
 
     # Search with high confidence
     response = client.get("/api/search?jersey=16&min_confidence=0.9")
@@ -64,18 +64,18 @@ def test_player_photos_support_min_face_confidence_filter(client, app_with_roste
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as low_file:
         low_file.write(b"fake low confidence jpg")
         low_file.flush()
-        low_photo_id = db.add_photo(low_file.name)
+        low_photo_id = db.photos.add_photo(low_file.name)
 
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as high_file:
         high_file.write(b"fake high confidence jpg")
         high_file.flush()
-        high_photo_id = db.add_photo(high_file.name)
+        high_photo_id = db.photos.add_photo(high_file.name)
 
-    low_face_id = db.add_face(low_photo_id, [0.1] * 384, [10, 20, 100, 150], 0.59)
-    high_face_id = db.add_face(high_photo_id, [0.2] * 384, [10, 20, 100, 150], 0.60)
-    cluster_id = db.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=high_face_id)
-    db.assign_face_to_cluster(low_face_id, cluster_id)
-    db.assign_face_to_cluster(high_face_id, cluster_id)
+    low_face_id = db.faces.add_face(low_photo_id, [0.1] * 384, [10, 20, 100, 150], 0.59)
+    high_face_id = db.faces.add_face(high_photo_id, [0.2] * 384, [10, 20, 100, 150], 0.60)
+    cluster_id = db.clusters.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=high_face_id)
+    db.clusters.assign_face_to_cluster(low_face_id, cluster_id)
+    db.clusters.assign_face_to_cluster(high_face_id, cluster_id)
 
     response = client.get(f"/api/players/{cluster_id}/photos?min_face_confidence=0.6")
 
@@ -88,9 +88,9 @@ def test_player_photos_support_min_face_confidence_filter(client, app_with_roste
 def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_with_roster, tmp_path):
     """Review metadata export should write sidecars only for explicitly selected faces."""
     db = app_with_roster.db
-    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
-    roster_entry = db.search_roster("Thomas")[0]
-    db.set_game_context([
+    db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.roster.search_roster("Thomas")[0]
+    db.context.set_game_context([
         {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
         {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
     ])
@@ -99,13 +99,13 @@ def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_
     excluded_photo = tmp_path / "excluded.jpg"
     selected_photo.write_bytes(b"selected")
     excluded_photo.write_bytes(b"excluded")
-    selected_photo_id = db.add_photo(str(selected_photo))
-    excluded_photo_id = db.add_photo(str(excluded_photo))
-    selected_face_id = db.add_face(selected_photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
-    excluded_face_id = db.add_face(excluded_photo_id, [0.2] * 384, [1, 2, 3, 4], 0.95)
-    cluster_id = db.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=selected_face_id)
-    db.assign_face_to_cluster(selected_face_id, cluster_id)
-    db.assign_face_to_cluster(excluded_face_id, cluster_id)
+    selected_photo_id = db.photos.add_photo(str(selected_photo))
+    excluded_photo_id = db.photos.add_photo(str(excluded_photo))
+    selected_face_id = db.faces.add_face(selected_photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    excluded_face_id = db.faces.add_face(excluded_photo_id, [0.2] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=selected_face_id)
+    db.clusters.assign_face_to_cluster(selected_face_id, cluster_id)
+    db.clusters.assign_face_to_cluster(excluded_face_id, cluster_id)
 
     response = client.post(
         f"/api/players/{cluster_id}/assign",
@@ -138,15 +138,15 @@ def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_
 def test_assign_cluster_metadata_missing_photo_reports_failure(client, app_with_roster, tmp_path):
     """Missing files should not block assignment, but they should be reported."""
     db = app_with_roster.db
-    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
-    roster_entry = db.search_roster("Thomas")[0]
+    db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.roster.search_roster("Thomas")[0]
     missing_photo = tmp_path / "missing.jpg"
     missing_photo.write_bytes(b"temporary")
-    photo_id = db.add_photo(str(missing_photo))
+    photo_id = db.photos.add_photo(str(missing_photo))
     missing_photo.unlink()
-    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
-    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
-    db.assign_face_to_cluster(face_id, cluster_id)
+    face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
 
     response = client.post(
         f"/api/players/{cluster_id}/assign",
@@ -174,14 +174,14 @@ def test_assign_cluster_metadata_rejects_outside_allowed_roots(client, app_with_
     allowed.mkdir()
     outside.mkdir()
     monkeypatch.setenv("PHOTOTAGGER_ALLOWED_PHOTO_ROOTS", str(allowed))
-    db.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
-    roster_entry = db.search_roster("Thomas")[0]
+    db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
+    roster_entry = db.roster.search_roster("Thomas")[0]
     photo = outside / "outside.jpg"
     photo.write_bytes(b"outside")
-    photo_id = db.add_photo(str(photo))
-    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
-    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
-    db.assign_face_to_cluster(face_id, cluster_id)
+    photo_id = db.photos.add_photo(str(photo))
+    face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
 
     response = client.post(
         f"/api/players/{cluster_id}/assign",
@@ -208,8 +208,8 @@ def test_search_returns_player_name(client, app_with_roster):
         f.write(b"fake jpg")
         photo_path = f.name
 
-    photo_id = db.add_photo(photo_path)
-    db.add_ocr_result(photo_id, "16", 0.95, "16")
+    photo_id = db.photos.add_photo(photo_path)
+    db.photos.add_ocr_result(photo_id, "16", 0.95, "16")
 
     response = client.get("/api/search?jersey=16&team=Test%20Team&year=2026")
     assert response.status_code == 200
@@ -229,11 +229,11 @@ def test_get_faces_endpoint(client, app_with_roster):
         f.write(b"fake jpg")
         photo_path = f.name
 
-    photo_id = db.add_photo(photo_path)
+    photo_id = db.photos.add_photo(photo_path)
 
     # Add a face
     embedding = [0.1] * 384
-    db.add_face(photo_id, embedding, [10, 20, 100, 150], 0.95)
+    db.faces.add_face(photo_id, embedding, [10, 20, 100, 150], 0.95)
 
     # Get faces
     response = client.get(f"/api/faces/{photo_id}")
@@ -270,7 +270,7 @@ def test_roster_import_file_inserts_entries(client, app_with_roster):
 
 def test_roster_import_skip_preserves_existing_entry(client, app_with_roster):
     db = app_with_roster.db
-    db.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
+    db.roster.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
 
     response = client.post(
         "/api/roster/import",
@@ -287,12 +287,12 @@ def test_roster_import_skip_preserves_existing_entry(client, app_with_roster):
     data = json.loads(response.data)
     assert data["imported"] == 0
     assert data["skipped"] == 1
-    assert db.get_player_name("Carleton CUT", 2026, "10") == "Original Player"
+    assert db.roster.get_player_name("Carleton CUT", 2026, "10") == "Original Player"
 
 
 def test_roster_import_replace_updates_existing_entry(client, app_with_roster):
     db = app_with_roster.db
-    db.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
+    db.roster.add_roster_entry("Carleton CUT", 2026, "10", "Original Player")
 
     response = client.post(
         "/api/roster/import",
@@ -309,7 +309,7 @@ def test_roster_import_replace_updates_existing_entry(client, app_with_roster):
     data = json.loads(response.data)
     assert data["imported"] == 1
     assert data["skipped"] == 0
-    assert db.get_player_name("Carleton CUT", 2026, "10") == "Updated Player"
+    assert db.roster.get_player_name("Carleton CUT", 2026, "10") == "Updated Player"
 
 
 def test_roster_import_url_inserts_entries(client, app_with_roster, monkeypatch):
@@ -347,12 +347,12 @@ def test_roster_response_includes_assigned_thumbnail_face(client, app_with_roste
     db = app_with_roster.db
     photo_file = tmp_path / "test.jpg"
     photo_file.write_bytes(b"fake jpg")
-    photo_id = db.add_photo(str(photo_file))
-    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
-    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
-    db.assign_face_to_cluster(face_id, cluster_id)
-    db.assign_cluster_to_player(cluster_id, "Will Troop", "06")
-    db.add_roster_entry("Carleton CUT", 2026, "06", "Will Troop")
+    photo_id = db.photos.add_photo(str(photo_file))
+    face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
+    db.clusters.assign_cluster_to_player(cluster_id, "Will Troop", "06")
+    db.roster.add_roster_entry("Carleton CUT", 2026, "06", "Will Troop")
 
     response = client.get("/api/roster")
 
@@ -382,14 +382,14 @@ def test_game_context_api_round_trip(client):
 
 def test_assign_cluster_accepts_roster_entry_id_for_stable_roster_face(client, app_with_roster, tmp_path):
     db = app_with_roster.db
-    db.add_roster_entry("Carleton CUT", 2026, "22", "Will Troop")
-    roster_entry = db.search_roster("Will Troop")[0]
+    db.roster.add_roster_entry("Carleton CUT", 2026, "22", "Will Troop")
+    roster_entry = db.roster.search_roster("Will Troop")[0]
     photo_file = tmp_path / "test.jpg"
     photo_file.write_bytes(b"fake jpg")
-    photo_id = db.add_photo(str(photo_file))
-    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
-    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
-    db.assign_face_to_cluster(face_id, cluster_id)
+    photo_id = db.photos.add_photo(str(photo_file))
+    face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
 
     response = client.post(
         f"/api/players/{cluster_id}/assign",
@@ -410,10 +410,10 @@ def test_deassign_faces_response_includes_deleted_cluster(client, app_with_roste
     db = app_with_roster.db
     photo_file = tmp_path / "test.jpg"
     photo_file.write_bytes(b"fake jpg")
-    photo_id = db.add_photo(str(photo_file))
-    face_id = db.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
-    cluster_id = db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
-    db.assign_face_to_cluster(face_id, cluster_id)
+    photo_id = db.photos.add_photo(str(photo_file))
+    face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 30, 40], 0.95)
+    cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
 
     response = client.post("/api/faces/deassign", json={"face_ids": [face_id]})
 

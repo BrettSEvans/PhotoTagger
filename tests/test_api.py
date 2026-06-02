@@ -9,7 +9,7 @@ from src.db import Database
 def wait_for_job(db, job_id: int, timeout: float = 5.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        job = db.get_processing_job(job_id)
+        job = db.jobs.get_processing_job(job_id)
         if job and job["status"] in {"succeeded", "failed"}:
             return job
         time.sleep(0.05)
@@ -73,8 +73,8 @@ def test_search_with_results(client, app):
         f.write(b"fake jpg")
         photo_path = f.name
 
-    photo_id = db.add_photo(photo_path)
-    db.add_ocr_result(photo_id, "23", 0.95, "23 visible")
+    photo_id = db.photos.add_photo(photo_path)
+    db.photos.add_ocr_result(photo_id, "23", 0.95, "23 visible")
 
     # Search for jersey 23
     response = client.get("/api/search?jersey=23")

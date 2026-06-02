@@ -18,23 +18,23 @@ class LocalJobRunner:
         self._thread.start()
 
     def submit(self, job_type: str, payload: Optional[Dict], task: Callable[[int], Dict]) -> int:
-        job_id = self.db.create_processing_job(job_type, payload or {})
+        job_id = self.db.jobs.create_processing_job(job_type, payload or {})
         self._tasks.put((job_id, task))
         return job_id
 
     def update_progress(self, job_id: int, progress: int) -> None:
         """Update the progress percentage (0-100) for a running job."""
-        self.db.update_processing_job(job_id, progress=progress)
+        self.db.jobs.update_processing_job(job_id, progress=progress)
 
     def _work_loop(self):
         while True:
             job_id, task = self._tasks.get()
             try:
-                self.db.update_processing_job(job_id, status="running", progress=5)
+                self.db.jobs.update_processing_job(job_id, status="running", progress=5)
                 result = task(job_id)  # Pass job_id to task so it can update progress
-                self.db.update_processing_job(job_id, status="succeeded", progress=100, result=result)
+                self.db.jobs.update_processing_job(job_id, status="succeeded", progress=100, result=result)
             except Exception as exc:
                 logger.exception("Processing job %s failed", job_id)
-                self.db.update_processing_job(job_id, status="failed", error=str(exc))
+                self.db.jobs.update_processing_job(job_id, status="failed", error=str(exc))
             finally:
                 self._tasks.task_done()

@@ -24,12 +24,12 @@ def test_add_photo(test_db, tmp_path):
     photo_file = tmp_path / "test.jpg"
     photo_file.write_bytes(b"fake jpg data")
 
-    photo_id = test_db.add_photo(str(photo_file))
+    photo_id = test_db.photos.add_photo(str(photo_file))
     assert photo_id is not None
     assert photo_id > 0
 
     # Verify it was stored
-    photos = test_db.get_all_photos()
+    photos = test_db.photos.get_all_photos()
     assert len(photos) == 1
     assert photos[0]["file_path"] == str(photo_file)
 
@@ -41,23 +41,23 @@ def test_photo_exists(test_db, tmp_path):
     file_hash = Database._compute_file_hash(str(photo_file))
 
     # Should not exist yet
-    assert not test_db.photo_exists(file_hash)
+    assert not test_db.photos.photo_exists(file_hash)
 
     # Add it
-    test_db.add_photo(str(photo_file), file_hash)
+    test_db.photos.add_photo(str(photo_file), file_hash)
 
     # Should exist now
-    assert test_db.photo_exists(file_hash)
+    assert test_db.photos.photo_exists(file_hash)
 
 def test_add_ocr_result(test_db, tmp_path):
     """Test adding OCR results for a photo."""
     photo_file = tmp_path / "test.jpg"
     photo_file.write_bytes(b"fake jpg data")
 
-    photo_id = test_db.add_photo(str(photo_file))
-    test_db.add_ocr_result(photo_id, "23", 0.95, "23 in white text")
+    photo_id = test_db.photos.add_photo(str(photo_file))
+    test_db.photos.add_ocr_result(photo_id, "23", 0.95, "23 in white text")
 
-    result = test_db.get_photo_ocr(photo_id)
+    result = test_db.photos.get_photo_ocr(photo_id)
     assert result["jersey_number"] == "23"
     assert result["confidence"] == 0.95
 
@@ -70,15 +70,15 @@ def test_get_photo_by_jersey(test_db, tmp_path):
     photo2.write_bytes(b"fake jpg 2")
 
     # Add both
-    id1 = test_db.add_photo(str(photo1))
-    id2 = test_db.add_photo(str(photo2))
+    id1 = test_db.photos.add_photo(str(photo1))
+    id2 = test_db.photos.add_photo(str(photo2))
 
     # Add OCR results: both have jersey 23
-    test_db.add_ocr_result(id1, "23", 0.95, "23")
-    test_db.add_ocr_result(id2, "23", 0.88, "23")
+    test_db.photos.add_ocr_result(id1, "23", 0.95, "23")
+    test_db.photos.add_ocr_result(id2, "23", 0.88, "23")
 
     # Search for jersey 23
-    results = test_db.get_photo_by_jersey("23")
+    results = test_db.photos.get_photo_by_jersey("23")
     assert len(results) == 2
     assert results[0]["file_path"] == str(photo1)  # Higher confidence first
 
@@ -91,9 +91,9 @@ def test_duplicate_detection(test_db, tmp_path):
     file_hash = Database._compute_file_hash(str(photo))
 
     # Add it once
-    photo_id = test_db.add_photo(str(photo), file_hash)
+    photo_id = test_db.photos.add_photo(str(photo), file_hash)
     assert photo_id is not None
 
     # Try to add again - should raise error due to UNIQUE constraint
     with pytest.raises(Exception):
-        test_db.add_photo(str(photo), file_hash)
+        test_db.photos.add_photo(str(photo), file_hash)

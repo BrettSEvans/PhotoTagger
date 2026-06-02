@@ -47,7 +47,7 @@ class FaceClusterer:
             Dict with clustering statistics
         """
         logger.info("Loading all faces from database...")
-        all_faces = self.db.get_all_faces()
+        all_faces = self.db.faces.get_all_faces()
 
         if not all_faces:
             logger.warning("No faces in database. Run face detection first.")
@@ -70,7 +70,7 @@ class FaceClusterer:
             return {"clusters_created": 0, "faces_clustered": 0, "error": "No faces passed quality filter"}
 
         # Clear existing clusters
-        self.db.clear_clusters()
+        self.db.clusters.clear_clusters()
 
         # Greedy nearest-centroid clustering
         # clusters: List of (centroid np.ndarray, List[face_dict], set of photo_ids)
@@ -106,14 +106,14 @@ class FaceClusterer:
             # Pick the sharpest face as thumbnail (best identity representation)
             thumbnail_face = max(face_list, key=lambda f: f.get("sharpness") or 0)
 
-            cluster_id = self.db.add_player_cluster(
+            cluster_id = self.db.clusters.add_player_cluster(
                 face_count=len(face_list),
                 photo_count=len(photo_ids),
                 thumbnail_face_id=thumbnail_face["id"],
             )
 
             for face in face_list:
-                self.db.assign_face_to_cluster(face["id"], cluster_id)
+                self.db.clusters.assign_face_to_cluster(face["id"], cluster_id)
                 total_faces += 1
 
         # Auto-match clusters to roster players
@@ -139,7 +139,7 @@ class FaceClusterer:
         """
         matched_count = 0
         try:
-            clusters = self.db.get_all_player_clusters()
+            clusters = self.db.clusters.get_all_player_clusters()
 
             for cluster in clusters:
                 if cluster.get("player_name"):
@@ -149,13 +149,13 @@ class FaceClusterer:
                 cluster_id = cluster["id"]
 
                 # Get all photos in this cluster
-                photos = self.db.get_photos_by_cluster(cluster_id, min_face_confidence=0.0)
+                photos = self.db.clusters.get_photos_by_cluster(cluster_id, min_face_confidence=0.0)
                 if not photos:
                     continue
 
                 # Fetch the latest OCR row for every photo in the cluster in one query
                 # (avoids an N+1 lookup per photo).
-                ocr_by_photo = self.db.get_latest_ocr_by_photo_ids([p["id"] for p in photos])
+                ocr_by_photo = self.db.photos.get_latest_ocr_by_photo_ids([p["id"] for p in photos])
 
                 # Collect jersey numbers and colors from OCR results
                 jersey_candidates = {}  # jersey -> count
@@ -191,7 +191,7 @@ class FaceClusterer:
                 most_common_color = max(color_samples, key=color_samples.count) if color_samples else None
 
                 # Resolve roster candidates
-                candidates = self.db.resolve_roster_candidates(most_common_jersey, most_common_color)
+                candidates = self.db.roster.resolve_roster_candidates(most_common_jersey, most_common_color)
 
                 if not candidates:
                     logger.debug(f"Cluster {cluster_id}: no roster match for jersey #{most_common_jersey}")
@@ -209,7 +209,7 @@ class FaceClusterer:
                 # Auto-assign the cluster to the matched player
                 candidate = candidates[0]
                 try:
-                    self.db.assign_cluster_to_player(
+                    self.db.clusters.assign_cluster_to_player(
                         cluster_id,
                         candidate["player_name"],
                         candidate["jersey_number"],

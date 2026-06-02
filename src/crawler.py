@@ -62,13 +62,13 @@ class PhotoCrawler:
                 file_hash = Database._compute_file_hash(str(file_path))
 
                 # Skip if already in database
-                if self.db.photo_exists(file_hash):
+                if self.db.photos.photo_exists(file_hash):
                     logger.debug(f"Skipping duplicate: {file_path}")
                     results["duplicates_skipped"] += 1
                     continue
 
                 # Ingest the photo with source folder and batch
-                photo_id = self.db.add_photo(
+                photo_id = self.db.photos.add_photo(
                     str(file_path),
                     file_hash,
                     source_folder=str(photo_dir.resolve()),
@@ -114,13 +114,13 @@ class PhotoCrawler:
         file_hash = Database._compute_file_hash(str(path))
 
         # Check for duplicate
-        if self.db.photo_exists(file_hash):
+        if self.db.photos.photo_exists(file_hash):
             logger.info(f"Duplicate detected: {path.name} (hash: {file_hash})")
             return None
 
         # Add photo to database
         file_size = path.stat().st_size
-        photo_id = self.db.add_photo(
+        photo_id = self.db.photos.add_photo(
             file_path=str(path.resolve()),
             file_hash=file_hash,
             source_folder=None,
