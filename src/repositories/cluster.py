@@ -38,19 +38,20 @@ class ClusterRepository(BaseRepository):
             self._conn.commit()
 
     def get_all_player_clusters(self) -> List[Dict]:
-        """Get all player clusters with stats. Filters out empty clusters (no quality faces)."""
-        from src.config import MIN_FACE_QUALITY_SCORE
+        """Get all player clusters with stats.
+
+        Subject detection gates faces before they're assigned a cluster_id, so every
+        persisted cluster already contains only real (player) faces — no empty-cluster
+        filtering needed here.
+        """
         with self._lock:
             cursor = self._conn.cursor()
-            # Count actual quality faces assigned to each cluster
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
-                       player_name, jersey_number, roster_entry_id,
-                       (SELECT COUNT(*) FROM faces f
-                        WHERE f.cluster_id = pc.id AND (f.quality_score IS NULL OR f.quality_score >= ?)) as actual_faces
-                FROM player_clusters pc
+                       player_name, jersey_number, roster_entry_id
+                FROM player_clusters
                 ORDER BY photo_count DESC
-            """, (MIN_FACE_QUALITY_SCORE,))
+            """)
             return [
                 {
                     "id": row[0],
@@ -63,12 +64,14 @@ class ClusterRepository(BaseRepository):
                     "roster_entry_id": row[7],
                 }
                 for row in cursor.fetchall()
-                if row[8] > 0  # Only include clusters with at least 1 quality face
             ]
 
     def get_photos_by_cluster(self, cluster_id: int, min_face_confidence: float = 0.0) -> List[Dict]:
-        """Get all photos that contain a quality face in this cluster."""
-        from src.config import MIN_FACE_QUALITY_SCORE
+        """Get all photos that contain a face in this cluster.
+
+        Faces are gated by subject detection at clustering time, so cluster
+        membership alone determines what shows here.
+        """
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
@@ -78,9 +81,8 @@ class ClusterRepository(BaseRepository):
                 JOIN faces f ON f.photo_id = p.id
                 WHERE f.cluster_id = ?
                   AND f.confidence >= ?
-                  AND (f.quality_score IS NULL OR f.quality_score >= ?)
                 ORDER BY p.id
-            """, (cluster_id, min_face_confidence, MIN_FACE_QUALITY_SCORE))
+            """, (cluster_id, min_face_confidence))
             return [
                 {
                     "id": row[0],

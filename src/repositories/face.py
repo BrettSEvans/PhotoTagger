@@ -11,16 +11,47 @@ class FaceRepository(BaseRepository):
 
     def add_face(self, photo_id: int, embedding: List[float], bbox: List[int], confidence: float,
                  sharpness: Optional[float] = None, face_size_ratio: Optional[float] = None,
-                 quality_score: Optional[float] = None) -> int:
+                 quality_score: Optional[float] = None,
+                 jersey_color: Optional[str] = None, jersey_color_conf: Optional[float] = None) -> int:
         """Add a detected face to the database."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
-                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, sharpness, face_size_ratio, quality_score)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence, sharpness, face_size_ratio, quality_score))
+                INSERT INTO faces (photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, sharpness, face_size_ratio, quality_score, jersey_color, jersey_color_conf)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (photo_id, json.dumps(embedding), bbox[0], bbox[1], bbox[2], bbox[3], confidence, sharpness, face_size_ratio, quality_score, jersey_color, jersey_color_conf))
             self._conn.commit()
             return cursor.lastrowid
+
+    def set_jersey_color(self, face_id: int, jersey_color: Optional[str], jersey_color_conf: Optional[float]) -> None:
+        """Update a face's sampled jersey color (used by the backfill pass)."""
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute(
+                "UPDATE faces SET jersey_color = ?, jersey_color_conf = ? WHERE id = ?",
+                (jersey_color, jersey_color_conf, face_id),
+            )
+            self._conn.commit()
+
+    def get_faces_with_paths(self) -> List[Dict]:
+        """Get every face joined to its photo's file_path (for jersey-color backfill)."""
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                SELECT f.id, f.photo_id, f.bbox_x0, f.bbox_y0, f.bbox_x1, f.bbox_y1, p.file_path
+                FROM faces f
+                JOIN photos p ON p.id = f.photo_id
+                ORDER BY f.photo_id, f.id
+            """)
+            return [
+                {
+                    "id": row[0],
+                    "photo_id": row[1],
+                    "bbox": [row[2], row[3], row[4], row[5]],
+                    "file_path": row[6],
+                }
+                for row in cursor.fetchall()
+            ]
 
     def get_faces_by_photo(self, photo_id: int) -> List[Dict]:
         """Get all faces detected in a photo."""
@@ -56,7 +87,7 @@ class FaceRepository(BaseRepository):
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
-                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id, sharpness, face_size_ratio, quality_score
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence, cluster_id, sharpness, face_size_ratio, quality_score, jersey_color, jersey_color_conf
                 FROM faces
                 ORDER BY id
             """)
@@ -72,6 +103,8 @@ class FaceRepository(BaseRepository):
                     "sharpness": row[9],
                     "face_size_ratio": row[10],
                     "quality_score": row[11],
+                    "jersey_color": row[12],
+                    "jersey_color_conf": row[13],
                 })
             return results
 

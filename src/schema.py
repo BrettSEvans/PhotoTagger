@@ -144,6 +144,17 @@ def init_schema(conn: sqlite3.Connection) -> None:
     except Exception:
         pass
 
+    # Per-face jersey color sampled from the torso patch below the face bbox.
+    # Used (with face size) to separate foreground players from background spectators.
+    try:
+        cursor.execute("ALTER TABLE faces ADD COLUMN jersey_color TEXT")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE faces ADD COLUMN jersey_color_conf REAL")
+    except Exception:
+        pass
+
     # Add player_name / jersey_number to player_clusters if not present
     try:
         cursor.execute("ALTER TABLE player_clusters ADD COLUMN player_name TEXT")

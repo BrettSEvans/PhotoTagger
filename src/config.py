@@ -44,3 +44,29 @@ MIN_FACE_SIZE_RATIO = 0.0003
 # Filters background crowd faces while allowing legitimate players at distance
 # <0.45 = background crowd, 0.45-0.65 = players, >0.65 = high confidence players
 MIN_FACE_QUALITY_SCORE = 0.50
+
+# ── Jersey-color subject detection ─────────────────────────────────────────
+# Per-game (per-folder) the two teams wear known jersey colors. A face wearing a
+# team color is far more likely to be a player than a spectator. We sample the
+# torso below each face, infer the two dominant team colors for the folder, then
+# gate faces on (jersey color match) AND (foreground size).
+#
+# Minimum confidence for a sampled jersey color to count.
+MIN_JERSEY_COLOR_CONF = 0.45
+# "Foreground" is RELATIVE within each photo: a player in a wide shot is the same
+# pixel-size as a spectator in a close shot, so absolute size alone can't separate
+# them. We normalize each face against the largest team-jersey face in ITS photo.
+# A team-colored face is kept if its size is at least this fraction of that max.
+SUBJECT_REL_FRAC = 0.35
+# Absolute size floor so a photo full of only tiny crowd faces doesn't keep noise,
+# while still allowing genuine players in far/wide shots (faces ~0.0002 of frame).
+SUBJECT_ABS_FLOOR = 0.00015
+# A face NOT in a team color (spectator, ref, or a mis-sampled/occluded torso) must
+# be a clearly large foreground subject to be kept.
+NONTEAM_MIN_SIZE = 0.004
+# Faces smaller than this are ignored when inferring the folder's team colors
+# (tiny background torsos give unreliable color reads).
+TEAM_INFER_MIN_SIZE = 0.01
+# Colors that are usually shadows/shorts/skin rather than a distinguishing jersey
+# color — excluded when inferring team colors.
+TEAM_INFER_EXCLUDE_COLORS = {"black"}
