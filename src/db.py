@@ -40,6 +40,10 @@ class Database:
         """Create database tables if they don't exist."""
         init_schema(self.conn)
 
+    # Legacy delegation stubs for backward compatibility with tests
+    def get_all_faces(self) -> List[Dict]:
+        """Delegation stub: get all faces via FaceRepository."""
+        return self.faces.get_all_faces()
 
     def get_photos_by_face_ids(self, cluster_id: int, face_ids: List[int]) -> List[Dict]:
         """Return photo paths for selected faces that currently belong to a cluster."""
