@@ -129,31 +129,6 @@ class PhotoTaggerClient {
   }
 
   /**
-   * Open native OS directory picker dialog
-   * POST /api/pick-directory
-   *
-   * @returns Selected directory path, or null if cancelled
-   * @throws Error if directory picker not available (e.g., on server deployments)
-   */
-  async pickDirectory(): Promise<string | null> {
-    try {
-      const response = await this.client.post<{ path: string | null; cancelled: boolean; error?: string }>(
-        '/api/pick-directory'
-      );
-      if (response.data.error) {
-        throw new Error(response.data.error);
-      }
-      return response.data.path;
-    } catch (error) {
-      // Re-throw with helpful context
-      if (error instanceof Error) {
-        throw new Error(error.message);
-      }
-      throw error;
-    }
-  }
-
-  /**
    * Crawl photos - Ingest photos from local directory
    * POST /api/crawl
    *
@@ -163,6 +138,22 @@ class PhotoTaggerClient {
   async crawlPhotos(photoDir: string): Promise<CrawlResponse> {
     const response = await this.client.post<CrawlResponse>('/api/crawl', {
       photo_dir: photoDir,
+    });
+    return response.data;
+  }
+
+  /**
+   * Upload photos - Upload photo files via browser file picker or drag & drop
+   * POST /api/upload-photos (multipart/form-data)
+   *
+   * @param formData FormData containing files
+   * @returns Upload results with job ID for polling
+   */
+  async uploadPhotos(formData: FormData): Promise<CrawlResponse> {
+    const response = await this.client.post<CrawlResponse>('/api/upload-photos', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data;
   }
