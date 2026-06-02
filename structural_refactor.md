@@ -2,7 +2,7 @@
 ## Blueprints + Repository Split
 
 **Branch:** `refactor/blueprints-repositories` ✓ Active  
-**Test baseline:** 249 tests passing (212 original + 37 from repositories/schema/conftest)
+**Test baseline:** 261 tests passing (212 original + 49 from repositories/schema/conftest)
 
 ---
 
@@ -21,7 +21,7 @@
 - [x] **Phase 1.3:** Extract BatchRepository (8 methods, 8 tests)
 - [x] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
 - [x] **Phase 1.5:** Extract ClusterRepository (9 methods, 9 tests)
-- [ ] **Phase 1.6:** Extract RosterRepository (9 methods, 9 tests)
+- [x] **Phase 1.6:** Extract RosterRepository (9 methods, 12 tests)
 - [ ] **Phase 1.7:** Extract PhotoRepository (18 methods, 18 tests)
 - [ ] **Phase 1.8:** Extract ReviewService (3 methods from Photo, new module)
 - [ ] **Phase 1.9:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests)
