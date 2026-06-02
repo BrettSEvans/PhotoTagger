@@ -200,3 +200,69 @@ def test_duplicate_jersey_with_matching_uniform_color_confirms_player(test_db, t
     assert confirmed[0]["player_name"] == "Thomas Shope"
     assert confirmed[0]["team_name"] == "Carleton CUT"
     assert confirmed[0]["uniform_color"] == "red"
+
+
+# ── Quality signal storage (sharpness + face_size_ratio) ────────────────────
+
+def test_add_face_stores_sharpness(test_db, tmp_path):
+    """add_face should persist the sharpness value."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    face_id = test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9, sharpness=75.3)
+
+    cursor = test_db.conn.cursor()
+    cursor.execute("SELECT sharpness FROM faces WHERE id = ?", (face_id,))
+    assert cursor.fetchone()[0] == pytest.approx(75.3)
+
+def test_add_face_stores_face_size_ratio(test_db, tmp_path):
+    """add_face should persist the face_size_ratio value."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    face_id = test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9, face_size_ratio=0.045)
+
+    cursor = test_db.conn.cursor()
+    cursor.execute("SELECT face_size_ratio FROM faces WHERE id = ?", (face_id,))
+    assert cursor.fetchone()[0] == pytest.approx(0.045)
+
+def test_add_face_allows_null_sharpness(test_db, tmp_path):
+    """add_face should accept None sharpness (pre-migration rows)."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    face_id = test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9)
+
+    cursor = test_db.conn.cursor()
+    cursor.execute("SELECT sharpness FROM faces WHERE id = ?", (face_id,))
+    assert cursor.fetchone()[0] is None
+
+def test_get_all_faces_returns_sharpness(test_db, tmp_path):
+    """get_all_faces should include 'sharpness' in each row."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9, sharpness=42.0)
+
+    faces = test_db.get_all_faces()
+    assert "sharpness" in faces[0]
+
+def test_get_all_faces_returns_face_size_ratio(test_db, tmp_path):
+    """get_all_faces should include 'face_size_ratio' in each row."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9, face_size_ratio=0.01)
+
+    faces = test_db.get_all_faces()
+    assert "face_size_ratio" in faces[0]
+
+def test_get_all_faces_sharpness_value_roundtrips(test_db, tmp_path):
+    """Sharpness stored via add_face must come back unchanged via get_all_faces."""
+    photo_file = tmp_path / "p.jpg"
+    photo_file.write_bytes(b"fake")
+    photo_id = test_db.add_photo(str(photo_file))
+    test_db.add_face(photo_id, [0.1] * 384, [10, 20, 100, 150], 0.9, sharpness=123.456)
+
+    faces = test_db.get_all_faces()
+    assert faces[0]["sharpness"] == pytest.approx(123.456)
