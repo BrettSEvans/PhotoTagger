@@ -254,4 +254,10 @@ if __name__ == "__main__":
     deployment_env = get_deployment_env()
     logger.info(f"Starting PhotoTagger API on http://{host}:{port}")
     logger.info(f"Deployment environment: {deployment_env}")
-    app.run(debug=debug, port=port, host=host, use_reloader=False)
+    # threaded=True: the dev server must serve the dashboard's concurrent polling
+    # (health, roster, summaries, etc.) at the same time as a long multi-file
+    # upload. Single-threaded (the Werkzeug default) serializes requests, so a
+    # large upload starves polling connections — the browser sees ERR_EMPTY_RESPONSE
+    # / ERR_CONNECTION_RESET, surfaced in the UI as "Network Error". The DB layer
+    # is thread-safe (single connection, check_same_thread=False, guarded by a lock).
+    app.run(debug=debug, port=port, host=host, use_reloader=False, threaded=True)

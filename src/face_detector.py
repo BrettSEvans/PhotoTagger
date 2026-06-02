@@ -102,6 +102,10 @@ class FaceDetector:
                     'age': int(face.age) if hasattr(face, 'age') and face.age is not None else None,
                     'gender': face.gender if hasattr(face, 'gender') else None,
                 }
+
+                # Compute quality score (filters background faces)
+                result['quality_score'] = self.compute_face_quality_score(result, img_w, img_h)
+
                 results.append(result)
 
             logger.info(f"Detected {len(faces)} face(s) in {path.name}")
@@ -110,6 +114,85 @@ class FaceDetector:
         except Exception as e:
             logger.error(f"Error detecting faces in {image_path}: {e}")
             return []
+
+    @staticmethod
+    def compute_face_quality_score(face: Dict, img_width: int, img_height: int) -> float:
+        """
+        Compute a quality score (0-1) for a detected face to filter background/low-quality faces.
+
+        Higher score = better quality / more likely to be main subject.
+        Factors considered:
+        - Detection confidence (higher is better)
+        - Face size relative to image (larger is better, but huge is weird)
+        - Sharpness (higher variance = sharper)
+        - Position (centered faces score higher)
+
+        Args:
+            face: Face dict with 'confidence', 'sharpness', 'face_size_ratio', 'bbox'
+            img_width: Image width in pixels
+            img_height: Image height in pixels
+
+        Returns:
+            Quality score 0-1 (0.5+ is good quality)
+        """
+        confidence = face.get('confidence', 0.0)
+        sharpness = face.get('sharpness', 0.0)
+        size_ratio = face.get('face_size_ratio', 0.0)
+        bbox = face.get('bbox', [0, 0, 0, 0])
+
+        # Normalize confidence (already 0-1, just use it)
+        conf_score = confidence
+
+        # Size score: optimal range is 5-25% of image
+        # <1% = probably background, >50% = weird crop
+        if size_ratio < 0.01:
+            size_score = 0.1  # Too small, probably background
+        elif size_ratio < 0.05:
+            size_score = 0.5  # Small but visible
+        elif size_ratio <= 0.25:
+            size_score = 1.0  # Optimal range
+        elif size_ratio <= 0.50:
+            size_score = 0.8  # Getting large but okay
+        else:
+            size_score = 0.3  # Too large, probably cropped
+
+        # Sharpness score: normalize to 0-1
+        # Typical values: blurry ~5-50, medium ~100-500, sharp >1000
+        if sharpness < 10:
+            sharp_score = 0.1  # Very blurry
+        elif sharpness < 50:
+            sharp_score = 0.4  # Blurry (background)
+        elif sharpness < 200:
+            sharp_score = 0.7  # Decent
+        else:
+            sharp_score = 1.0  # Sharp
+
+        # Position score: faces closer to center are better
+        x0, y0, x1, y1 = bbox
+        face_center_x = (x0 + x1) / 2.0 / img_width
+        face_center_y = (y0 + y1) / 2.0 / img_height
+
+        # Distance from center (0 = center, 0.5 = edge)
+        dist_from_center = abs(face_center_x - 0.5) + abs(face_center_y - 0.5)
+
+        if dist_from_center < 0.2:
+            pos_score = 1.0  # Centered
+        elif dist_from_center < 0.35:
+            pos_score = 0.85  # Off-center but visible
+        elif dist_from_center < 0.45:
+            pos_score = 0.6  # Near edge
+        else:
+            pos_score = 0.3  # Edge/corner (background)
+
+        # Weighted average (confidence and size are most important)
+        quality_score = (
+            conf_score * 0.35 +
+            size_score * 0.35 +
+            sharp_score * 0.20 +
+            pos_score * 0.10
+        )
+
+        return min(1.0, max(0.0, quality_score))
 
     @staticmethod
     def embedding_distance(emb1: np.ndarray, emb2: np.ndarray) -> float:

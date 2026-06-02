@@ -92,15 +92,37 @@ class PhotoTaggerClient {
    * Handle API errors with proper typing
    */
   private handleError(error: AxiosError<APIError>): Promise<never> {
+    // 1. Server responded with a structured error → surface it directly.
     if (error.response?.data?.error) {
       const message = error.response.data.error;
-      console.error(`API Error: ${message}`);
+      console.error(`API Error (${error.response.status}): ${message}`);
       return Promise.reject(new Error(message));
     }
 
+    // 2. Server responded with a non-JSON error (e.g. 413/502) → include the status.
+    if (error.response) {
+      const msg = `Server responded ${error.response.status} ${error.response.statusText || ''}`.trim();
+      console.error(`API Error: ${msg}`);
+      return Promise.reject(new Error(msg));
+    }
+
+    // 3. No response at all → classify the transport failure so the UI shows
+    //    something actionable instead of a bare "Network Error".
+    const url = error.config?.url ?? 'the server';
+    if (error.code === 'ECONNABORTED' || /timeout/i.test(error.message)) {
+      return Promise.reject(new Error(
+        `Request to ${url} timed out. The upload may be too large or the backend is busy.`
+      ));
+    }
+    if (error.code === 'ERR_NETWORK') {
+      return Promise.reject(new Error(
+        `Could not reach the backend (${this.baseURL || 'local agent'}). ` +
+        `It may have stopped, crashed, or be blocked by CORS. Original: ${error.message}`
+      ));
+    }
     if (error.message) {
-      console.error(`Request Error: ${error.message}`);
-      return Promise.reject(error);
+      console.error(`Request Error [${error.code ?? 'no-code'}]: ${error.message}`);
+      return Promise.reject(new Error(`${error.message}${error.code ? ` (${error.code})` : ''}`));
     }
 
     return Promise.reject(new Error('Unknown API error'));
@@ -152,7 +174,7 @@ class PhotoTaggerClient {
   async uploadPhotos(formData: FormData): Promise<CrawlResponse> {
     const response = await this.client.post<CrawlResponse>('/api/upload-photos', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
+        'Content-Type': undefined,
       },
     });
     return response.data;

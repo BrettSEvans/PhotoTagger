@@ -382,10 +382,7 @@ export const ReviewPage: React.FC = () => {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            {detectMsg && (
-              <span role="status" className="font-jakarta text-xs text-muted-fg">{detectMsg}</span>
-            )}
+          <div className="flex flex-col items-end gap-2">
             <button
               onClick={handleDetectAndGroup}
               disabled={isDetecting}
@@ -400,6 +397,9 @@ export const ReviewPage: React.FC = () => {
               )}
               {isDetecting ? 'Working…' : 'Detect'}
             </button>
+            {detectMsg && (
+              <span role="status" className="font-jakarta text-xs text-muted-fg text-right max-w-md truncate">{detectMsg}</span>
+            )}
           </div>
         </div>
 

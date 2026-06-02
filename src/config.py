@@ -40,3 +40,6 @@ MIN_FACE_SHARPNESS = 10.0
 # Photos are already -sm (576x384). Average detected face is ~16px wide (ratio ≈ 0.001).
 # 0.0003 ≈ 8px-wide face in a 576px image — keeps foreground players, drops 4px noise.
 MIN_FACE_SIZE_RATIO = 0.0003
+# Minimum composite quality score (0-1) combining confidence, size, sharpness, and position
+# Filters background faces: <0.5 = background, 0.5-0.7 = acceptable, >0.7 = good
+MIN_FACE_QUALITY_SCORE = 0.45
