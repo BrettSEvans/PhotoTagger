@@ -43,7 +43,7 @@ def _make_jpeg_bytes(color: str = "red") -> bytes:
 def wait_for_job(db: Database, job_id: int, timeout: float = 5.0):
     deadline = time.time() + timeout
     while time.time() < deadline:
-        job = db.get_processing_job(job_id)
+        job = db.jobs.get_processing_job(job_id)
         if job and job["status"] in {"succeeded", "failed"}:
             return job
         time.sleep(0.05)
@@ -96,9 +96,9 @@ def test_detection_status_returns_correct_counts(client, app, tmp_path):
     # Add a photo + face + cluster so counts > 0
     img = tmp_path / "det.jpg"
     img.write_bytes(_make_jpeg_bytes())
-    photo_id = app.db.add_photo(str(img))
-    app.db.add_face(photo_id=photo_id, embedding=[0.1] * 512, bbox=[0, 0, 10, 10], confidence=0.9)
-    app.db.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=None)
+    photo_id = app.db.photos.add_photo(str(img))
+    app.db.faces.add_face(photo_id=photo_id, embedding=[0.1] * 512, bbox=[0, 0, 10, 10], confidence=0.9)
+    app.db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=None)
 
     resp = client.get("/api/detection-status")
     assert resp.status_code == 200
@@ -125,13 +125,13 @@ def test_data_reset_requires_confirm_true(client):
 def test_data_reset_clears_photos(client, app, tmp_path):
     img = tmp_path / "to_delete.jpg"
     img.write_bytes(_make_jpeg_bytes())
-    app.db.add_photo(str(img))
-    assert app.db.count_photos() == 1
+    app.db.photos.add_photo(str(img))
+    assert app.db.photos.count_photos() == 1
 
     resp = client.post("/api/data/reset", json={"confirm": True})
     assert resp.status_code == 200
     assert json.loads(resp.data)["success"] is True
-    assert app.db.count_photos() == 0
+    assert app.db.photos.count_photos() == 0
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -186,7 +186,7 @@ def test_image_404_for_missing_photo(client):
 def test_image_404_when_file_missing_from_disk(client, app, tmp_path):
     img = tmp_path / "gone.jpg"
     img.write_bytes(_make_jpeg_bytes())
-    photo_id = app.db.add_photo(str(img))
+    photo_id = app.db.photos.add_photo(str(img))
     img.unlink()  # delete the actual file
 
     resp = client.get(f"/api/image/{photo_id}")
@@ -196,7 +196,7 @@ def test_image_404_when_file_missing_from_disk(client, app, tmp_path):
 def test_image_serves_jpeg(client, app, tmp_path):
     img = tmp_path / "real.jpg"
     img.write_bytes(_make_jpeg_bytes("green"))
-    photo_id = app.db.add_photo(str(img))
+    photo_id = app.db.photos.add_photo(str(img))
 
     resp = client.get(f"/api/image/{photo_id}")
     assert resp.status_code == 200
@@ -214,7 +214,7 @@ def test_list_batches_empty(client):
 
 
 def test_list_batches_returns_created_batch(client, app, tmp_path):
-    app.db.create_batch(source_folder=str(tmp_path), team_name="Team A", team_year=2026)
+    app.db.batches.create_batch(source_folder=str(tmp_path), team_name="Team A", team_year=2026)
     resp = client.get("/api/batches")
     assert resp.status_code == 200
     data = json.loads(resp.data)
@@ -228,10 +228,10 @@ def test_get_batch_404_for_missing(client):
 
 
 def test_get_batch_returns_batch_and_photos(client, app, tmp_path):
-    batch_id = app.db.create_batch(source_folder=str(tmp_path))
+    batch_id = app.db.batches.create_batch(source_folder=str(tmp_path))
     img = tmp_path / "b.jpg"
     img.write_bytes(_make_jpeg_bytes())
-    app.db.add_photo(str(img), batch_id=batch_id)
+    app.db.photos.add_photo(str(img), batch_id=batch_id)
 
     resp = client.get(f"/api/batches/{batch_id}")
     assert resp.status_code == 200
@@ -241,7 +241,7 @@ def test_get_batch_returns_batch_and_photos(client, app, tmp_path):
 
 
 def test_update_batch_team_name(client, app, tmp_path):
-    batch_id = app.db.create_batch(source_folder=str(tmp_path), team_name="Old Name")
+    batch_id = app.db.batches.create_batch(source_folder=str(tmp_path), team_name="Old Name")
     resp = client.put(f"/api/batches/{batch_id}", json={"team_name": "New Name"})
     assert resp.status_code == 200
     data = json.loads(resp.data)
@@ -249,10 +249,10 @@ def test_update_batch_team_name(client, app, tmp_path):
 
 
 def test_delete_batch_unpins_photos(client, app, tmp_path):
-    batch_id = app.db.create_batch(source_folder=str(tmp_path))
+    batch_id = app.db.batches.create_batch(source_folder=str(tmp_path))
     img = tmp_path / "del.jpg"
     img.write_bytes(_make_jpeg_bytes())
-    app.db.add_photo(str(img), batch_id=batch_id)
+    app.db.photos.add_photo(str(img), batch_id=batch_id)
 
     resp = client.delete(f"/api/batches/{batch_id}")
     assert resp.status_code == 200
@@ -260,8 +260,8 @@ def test_delete_batch_unpins_photos(client, app, tmp_path):
     assert data["affected_photos"] == 1
 
     # Batch gone, photo still in DB but batch_id is NULL
-    assert app.db.get_batch(batch_id) is None
-    photos = app.db.get_all_photos()
+    assert app.db.batches.get_batch(batch_id) is None
+    photos = app.db.photos.get_all_photos()
     assert all(p.get("batch_id") is None for p in photos)
 
 

@@ -2,15 +2,15 @@
 Tests for the three critical bugs fixed in the refactor/api-db-critical-fixes branch.
 
 Critical Issue 1: Concurrency bug — match_similar_clusters bypassed db._lock via
-    raw db.conn.cursor(); replaced with db.get_face_photo_location().
+    raw db.conn.cursor(); replaced with db.faces.get_face_photo_location().
 
 Critical Issue 2: Temp directory leak — upload_photos created the temp dir before
     validating all files, so a bad extension caused an early return that left orphaned
     directories and partially-saved files on disk.
 
 Critical Issue 3: Pagination OOM — GET /api/photos loaded every photo row into Python
-    memory before slicing; replaced with SQL LIMIT/OFFSET via db.get_all_photos(limit,
-    offset) + db.count_photos().
+    memory before slicing; replaced with SQL LIMIT/OFFSET via db.photos.get_all_photos(limit,
+    offset) + db.photos.count_photos().
 """
 
 import io
@@ -62,25 +62,25 @@ def _make_jpeg_bytes(color: str = "red") -> bytes:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestGetFacePhotoLocation:
-    """db.get_face_photo_location() must use _lock and return correct data."""
+    """db.faces.get_face_photo_location() must use _lock and return correct data."""
 
     def test_returns_none_for_nonexistent_face(self, db, tmp_path):
-        assert db.get_face_photo_location(99999) is None
+        assert db.faces.get_face_photo_location(99999) is None
 
     def test_returns_photo_id_and_bbox(self, db, tmp_path):
         # Arrange: create a real photo file so add_photo doesn't raise
         img_path = tmp_path / "face_test.jpg"
         img_path.write_bytes(_make_jpeg_bytes())
 
-        photo_id = db.add_photo(str(img_path))
-        face_id = db.add_face(
+        photo_id = db.photos.add_photo(str(img_path))
+        face_id = db.faces.add_face(
             photo_id=photo_id,
             embedding=[0.1] * 512,
             bbox=[10, 20, 50, 80],
             confidence=0.9,
         )
 
-        result = db.get_face_photo_location(face_id)
+        result = db.faces.get_face_photo_location(face_id)
 
         assert result is not None
         assert result["photo_id"] == photo_id
@@ -91,8 +91,8 @@ class TestGetFacePhotoLocation:
         img_path = tmp_path / "concurrent.jpg"
         img_path.write_bytes(_make_jpeg_bytes("blue"))
 
-        photo_id = db.add_photo(str(img_path))
-        face_id = db.add_face(
+        photo_id = db.photos.add_photo(str(img_path))
+        face_id = db.faces.add_face(
             photo_id=photo_id,
             embedding=[0.5] * 512,
             bbox=[0, 0, 10, 10],
@@ -103,7 +103,7 @@ class TestGetFacePhotoLocation:
 
         def reader():
             try:
-                db.get_face_photo_location(face_id)
+                db.faces.get_face_photo_location(face_id)
             except Exception as exc:
                 errors.append(exc)
 
@@ -216,7 +216,7 @@ class TestUploadTempDirCleanup:
 # ═══════════════════════════════════════════════════════════════════════════════
 
 class TestPaginatedPhotoQueries:
-    """db.get_all_photos(limit, offset) and db.count_photos() must push work into SQL."""
+    """db.photos.get_all_photos(limit, offset) and db.photos.count_photos() must push work into SQL."""
 
     def _create_photos(self, db, tmp_path, count: int):
         """Insert *count* real photo files and return their IDs.
@@ -236,24 +236,24 @@ class TestPaginatedPhotoQueries:
             buf = io.BytesIO()
             img.save(buf, format="JPEG")
             p.write_bytes(buf.getvalue())
-            ids.append(db.add_photo(str(p)))
+            ids.append(db.photos.add_photo(str(p)))
         return ids
 
     def test_count_photos_returns_correct_total(self, db, tmp_path):
         self._create_photos(db, tmp_path, 5)
-        assert db.count_photos() == 5
+        assert db.photos.count_photos() == 5
 
     def test_count_photos_empty_database(self, db):
-        assert db.count_photos() == 0
+        assert db.photos.count_photos() == 0
 
     def test_get_all_photos_with_limit(self, db, tmp_path):
         self._create_photos(db, tmp_path, 10)
-        page = db.get_all_photos(limit=3, offset=0)
+        page = db.photos.get_all_photos(limit=3, offset=0)
         assert len(page) == 3
 
     def test_get_all_photos_with_offset(self, db, tmp_path):
         ids = self._create_photos(db, tmp_path, 5)
-        page = db.get_all_photos(limit=2, offset=2)
+        page = db.photos.get_all_photos(limit=2, offset=2)
         assert len(page) == 2
         # offset=2 → starts at the 3rd row (index 2)
         assert page[0]["id"] == ids[2]
@@ -261,18 +261,18 @@ class TestPaginatedPhotoQueries:
     def test_get_all_photos_last_page_partial(self, db, tmp_path):
         """Last page may have fewer rows than limit."""
         self._create_photos(db, tmp_path, 5)
-        last_page = db.get_all_photos(limit=3, offset=3)
+        last_page = db.photos.get_all_photos(limit=3, offset=3)
         assert len(last_page) == 2
 
     def test_get_all_photos_beyond_total_returns_empty(self, db, tmp_path):
         self._create_photos(db, tmp_path, 3)
-        page = db.get_all_photos(limit=10, offset=100)
+        page = db.photos.get_all_photos(limit=10, offset=100)
         assert page == []
 
     def test_get_all_photos_no_limit_returns_all(self, db, tmp_path):
         """Calling without limit still works (for internal callers like detection)."""
         self._create_photos(db, tmp_path, 5)
-        all_rows = db.get_all_photos()
+        all_rows = db.photos.get_all_photos()
         assert len(all_rows) == 5
 
     def _unique_jpeg(self, index: int) -> bytes:
@@ -288,7 +288,7 @@ class TestPaginatedPhotoQueries:
         for i in range(5):
             p = tmp_path / f"ep_{i}.jpg"
             p.write_bytes(self._unique_jpeg(i))
-            app.db.add_photo(str(p))
+            app.db.photos.add_photo(str(p))
 
         response = client.get("/api/photos?page=1&per_page=2")
         assert response.status_code == 200
@@ -303,7 +303,7 @@ class TestPaginatedPhotoQueries:
         for i in range(7):
             p = tmp_path / f"tot_{i}.jpg"
             p.write_bytes(self._unique_jpeg(i + 100))
-            app.db.add_photo(str(p))
+            app.db.photos.add_photo(str(p))
 
         response = client.get("/api/photos?page=2&per_page=3")
         assert response.status_code == 200
@@ -316,7 +316,7 @@ class TestPaginatedPhotoQueries:
         for i in range(3):
             p = tmp_path / f"beyond_{i}.jpg"
             p.write_bytes(self._unique_jpeg(i + 200))
-            app.db.add_photo(str(p))
+            app.db.photos.add_photo(str(p))
 
         response = client.get("/api/photos?page=99&per_page=10")
         assert response.status_code == 200

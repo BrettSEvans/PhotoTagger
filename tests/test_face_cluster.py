@@ -17,8 +17,8 @@ def _add_face(db, tmp_path, name, embedding, sharpness, face_size_ratio, confide
     photo_file = tmp_path / f"{name}.jpg"
     # Unique bytes per photo so the hash constraint is never violated
     photo_file.write_bytes(f"fake-{name}".encode())
-    photo_id = db.add_photo(str(photo_file))
-    return db.add_face(photo_id, embedding, [10, 20, 100, 120], confidence,
+    photo_id = db.photos.add_photo(str(photo_file))
+    return db.faces.add_face(photo_id, embedding, [10, 20, 100, 120], confidence,
                        sharpness=sharpness, face_size_ratio=face_size_ratio)
 
 
@@ -121,6 +121,6 @@ def test_thumbnail_is_sharpest_face_in_cluster(db, tmp_path, monkeypatch):
 
     FaceClusterer(db, similarity_threshold=0.40).run()
 
-    clusters = db.get_all_player_clusters()
+    clusters = db.clusters.get_all_player_clusters()
     assert len(clusters) == 1
     assert clusters[0]["thumbnail_face_id"] == sharp_id

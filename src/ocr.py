@@ -107,7 +107,7 @@ class OCREngine:
             # Calculate confidence as average confidence of all detections
             confidence = sum([conf for (_, _, conf) in results]) / len(results) if results else 0.0
 
-            self.db.add_ocr_result(
+            self.db.photos.add_ocr_result(
                 photo_id=photo_id,
                 jersey_number=primary_jersey,
                 confidence=confidence,
@@ -137,7 +137,7 @@ class OCREngine:
             Dict with processing statistics
         """
         # Load the photo table once and index by id (avoids an O(N²) reload per photo).
-        photos_by_id = {p["id"]: p for p in self.db.get_all_photos()}
+        photos_by_id = {p["id"]: p for p in self.db.photos.get_all_photos()}
         if photo_ids is None:
             photo_ids = list(photos_by_id.keys())
 
@@ -183,7 +183,7 @@ class OCREngine:
             max_workers = get_optimal_worker_count()
 
         # Load the photo table once and index by id (avoids an O(N²) reload per photo).
-        photos_by_id = {p["id"]: p for p in self.db.get_all_photos()}
+        photos_by_id = {p["id"]: p for p in self.db.photos.get_all_photos()}
         if photo_ids is None:
             photo_ids = list(photos_by_id.keys())
 
@@ -269,7 +269,7 @@ class OCREngine:
             faces = detector.detect_faces(photo_path)
 
             # Store OCR result
-            self.db.add_ocr_result(
+            self.db.photos.add_ocr_result(
                 photo_id=photo_id,
                 jersey_number=primary_jersey,
                 confidence=ocr_confidence,
@@ -278,7 +278,7 @@ class OCREngine:
 
             # Store faces
             for face in faces:
-                self.db.add_face(
+                self.db.faces.add_face(
                     photo_id=photo_id,
                     embedding=face['embedding'],
                     bbox=face['bbox'],

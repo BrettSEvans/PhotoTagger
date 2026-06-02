@@ -37,7 +37,7 @@ def test_crawl_with_photos(test_crawler):
     assert results["photos_ingested"] == 3
 
     # Verify they're in the database
-    all_photos = db.get_all_photos()
+    all_photos = db.photos.get_all_photos()
     assert len(all_photos) == 3
 
 def test_duplicate_detection(test_crawler):

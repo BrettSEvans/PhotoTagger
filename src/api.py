@@ -72,7 +72,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
     def enqueue_job(job_type: str, payload: dict, task):
         job_id = app.job_runner.submit(job_type, payload, task)
-        job = db.get_processing_job(job_id)
+        job = db.jobs.get_processing_job(job_id)
         return jsonify({"success": True, "job_id": job_id, "job": job}), 202
 
     def parse_float(value):
@@ -129,7 +129,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         return None
 
     def write_assignment_metadata(cluster_id: int, roster_entry_id: int, face_ids: list[int]):
-        roster_entry = db.get_roster_entry_by_id(roster_entry_id)
+        roster_entry = db.roster.get_roster_entry_by_id(roster_entry_id)
         if not roster_entry:
             return {
                 "requested": True,
@@ -140,7 +140,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 "errors": ["Roster entry not found"],
             }
 
-        context = db.get_game_context()
+        context = db.context.get_game_context()
         opponents = [
             team for team in context
             if team["team_name"] != roster_entry["team_name"] or int(team["team_year"]) != int(roster_entry["team_year"])
@@ -221,14 +221,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"error": "min_confidence must be a number"}), 400
 
         # Get raw results
-        all_results = db.get_photo_by_jersey(jersey)
+        all_results = db.photos.get_photo_by_jersey(jersey)
 
         # Filter by confidence
         results = [r for r in all_results if r["confidence"] >= min_confidence]
 
         # Add assigned player names from cluster assignments
         for result in results:
-            assigned_name = db.get_assigned_player_for_photo(result["id"])
+            assigned_name = db.photos.get_assigned_player_for_photo(result["id"])
             if assigned_name:
                 result["player_name"] = assigned_name
             elif team and year:
@@ -278,7 +278,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         try:
             # Create batch for this import
-            batch_id = db.create_batch(
+            batch_id = db.batches.create_batch(
                 source_folder=photo_dir,
                 team_name=data.get("team_name"),
                 team_year=data.get("team_year"),
@@ -288,7 +288,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             def crawl_with_batch(job_id: int):
                 result = app.crawler.crawl(photo_dir, batch_id=batch_id)
                 # Update batch photo count
-                db.update_batch_photo_count(batch_id)
+                db.batches.update_batch_photo_count(batch_id)
                 return result
 
             return enqueue_job("crawl", {"photo_dir": photo_dir, "batch_id": batch_id}, crawl_with_batch)
@@ -347,7 +347,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 raise
 
             # Create batch for this import
-            batch_id = db.create_batch(
+            batch_id = db.batches.create_batch(
                 source_folder=temp_dir,
                 team_name=request.form.get("team_name"),
                 team_year=int(request.form.get("team_year", "0")) or None,
@@ -377,7 +377,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                         app.job_runner.update_progress(job_id, progress)
 
                     # Update batch photo count
-                    db.update_batch_photo_count(batch_id)
+                    db.batches.update_batch_photo_count(batch_id)
                 finally:
                     # Always clean up temp dir regardless of success or failure
                     shutil.rmtree(temp_dir, ignore_errors=True)
@@ -431,7 +431,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/info", methods=["GET"])
     def info():
         """Get database statistics."""
-        all_photos = db.get_all_photos()
+        all_photos = db.photos.get_all_photos()
 
         return jsonify({
             "total_photos": len(all_photos),
@@ -441,7 +441,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/jobs/<int:job_id>", methods=["GET"])
     def get_job(job_id: int):
         """Get processing job status."""
-        job = db.get_processing_job(job_id)
+        job = db.jobs.get_processing_job(job_id)
         if not job:
             return jsonify({"error": "Job not found"}), 404
         return jsonify({"job": job}), 200
@@ -451,7 +451,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def get_faces(photo_id):
         """Get all detected faces for a photo."""
         try:
-            faces = db.get_faces_by_photo(photo_id)
+            faces = db.faces.get_faces_by_photo(photo_id)
             return jsonify({
                 "photo_id": photo_id,
                 "face_count": len(faces),
@@ -490,8 +490,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
             # Push LIMIT/OFFSET into SQL — never load all rows into memory
             offset = (page - 1) * per_page
-            paginated = db.get_all_photos(limit=per_page, offset=offset)
-            total = db.count_photos()
+            paginated = db.photos.get_all_photos(limit=per_page, offset=offset)
+            total = db.photos.count_photos()
 
             return jsonify({
                 "photos": [
@@ -517,7 +517,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def serve_image(photo_id: int):
         """Serve an image file from disk by its database ID."""
         try:
-            photo = db.get_photo_by_id(photo_id)
+            photo = db.photos.get_photo_by_id(photo_id)
             if not photo:
                 return jsonify({"error": "Photo not found"}), 404
 
@@ -553,7 +553,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         try:
             def run_detection(job_id: int):
                 detector = FaceDetector()
-                photos = db.get_all_photos()
+                photos = db.photos.get_all_photos()
 
                 if photo_ids:
                     photos = [p for p in photos if p["id"] in set(photo_ids)]
@@ -569,14 +569,14 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
                     if not file_path or not os.path.exists(file_path):
                         continue
-                    if db.photo_has_faces(photo_id):
+                    if db.photos.photo_has_faces(photo_id):
                         skipped_existing += 1
                         continue
                     try:
                         faces = detector.detect_faces(file_path)
                         for face in faces:
                             emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]
-                            db.add_face(
+                            db.faces.add_face(
                                 photo_id=photo_id,
                                 embedding=emb_list,
                                 bbox=face["bbox"],
@@ -588,7 +588,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
                         # Update job with per-photo progress message
                         progress = int((idx + 1) / max(len(photos), 1) * 95)  # 95% max, leave 100 for completion
-                        db.update_processing_job(
+                        db.jobs.update_processing_job(
                             job_id,
                             progress=progress,
                             result={"current_file": filename, "faces_detected": total_faces}
@@ -637,7 +637,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def get_players():
         """Get all player clusters with stats."""
         try:
-            clusters = db.get_all_player_clusters()
+            clusters = db.clusters.get_all_player_clusters()
             return jsonify({
                 "players": clusters,
                 "total": len(clusters),
@@ -655,7 +655,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"error": "min_face_confidence must be a number"}), 400
 
         try:
-            photos = db.get_photos_by_cluster(cluster_id, min_face_confidence)
+            photos = db.clusters.get_photos_by_cluster(cluster_id, min_face_confidence)
             return jsonify({
                 "cluster_id": cluster_id,
                 "photos": [
@@ -683,11 +683,11 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         try:
             import cv2
 
-            face = db.get_face_by_id(face_id)
+            face = db.faces.get_face_by_id(face_id)
             if not face:
                 return jsonify({"error": "Face not found"}), 404
 
-            photo = db.get_photo_by_id(face["photo_id"])
+            photo = db.photos.get_photo_by_id(face["photo_id"])
             if not photo:
                 return jsonify({"error": "Photo not found"}), 404
 
@@ -734,7 +734,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/roster", methods=["GET"])
     def get_roster():
         try:
-            entries = db.get_all_roster_entries()
+            entries = db.roster.get_all_roster_entries()
             return jsonify({"entries": entries, "total": len(entries)}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -742,7 +742,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/game-context", methods=["GET"])
     def get_game_context():
         try:
-            teams = db.get_game_context()
+            teams = db.context.get_game_context()
             return jsonify({"teams": teams}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -771,8 +771,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             })
 
         try:
-            db.set_game_context(normalized)
-            return jsonify({"success": True, "teams": db.get_game_context()}), 200
+            db.context.set_game_context(normalized)
+            return jsonify({"success": True, "teams": db.context.get_game_context()}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
@@ -790,7 +790,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if not jersey or not name:
             return jsonify({"error": "jersey_number and player_name are required"}), 400
         try:
-            db.add_roster_entry(team, year, jersey, name, uniform_color=uniform_color)
+            db.roster.add_roster_entry(team, year, jersey, name, uniform_color=uniform_color)
             return jsonify({"success": True}), 201
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -841,7 +841,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         try:
             rows = parse_roster_file(uploaded.filename, uploaded.read())
-            result = db.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
+            result = db.roster.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
             return jsonify(result), 200
         except RosterImportError as e:
             return jsonify({"error": str(e)}), 400
@@ -902,7 +902,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
         try:
             rows = RosterImporter.fetch_url(url)
-            result = db.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
+            result = db.roster.import_roster_entries(team, year, rows, duplicate_policy, uniform_color=uniform_color)
             return jsonify(result), 200
         except RosterImportError as e:
             return jsonify({"error": str(e)}), 400
@@ -913,7 +913,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/roster/<int:entry_id>", methods=["DELETE"])
     def delete_roster(entry_id: int):
         try:
-            db.delete_roster_entry(entry_id)
+            db.roster.delete_roster_entry(entry_id)
             return jsonify({"success": True}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -950,7 +950,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 updates["uniform_color"] = str(data["uniform_color"]).strip() if data["uniform_color"] else None
 
             # Call database update
-            updated_entry = db.update_roster_entry(entry_id, **updates)
+            updated_entry = db.roster.update_roster_entry(entry_id, **updates)
             return jsonify(updated_entry), 200
 
         except ValueError as e:
@@ -966,7 +966,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if not q:
             return jsonify({"results": []}), 200
         try:
-            results = db.search_roster(q)
+            results = db.roster.search_roster(q)
             return jsonify({"results": results}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -977,7 +977,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def list_batches():
         """List all photo batches."""
         try:
-            batches = db.get_all_batches()
+            batches = db.batches.get_all_batches()
             return jsonify({"batches": batches}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -986,10 +986,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def get_batch(batch_id: int):
         """Get a single batch by ID."""
         try:
-            batch = db.get_batch(batch_id)
+            batch = db.batches.get_batch(batch_id)
             if not batch:
                 return jsonify({"error": "Batch not found"}), 404
-            photos = db.get_photos_by_batch(batch_id)
+            photos = db.batches.get_photos_by_batch(batch_id)
             return jsonify({"batch": batch, "photos": photos}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -999,13 +999,13 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         """Update batch metadata (team_name, team_year, tournament)."""
         data = request.get_json() or {}
         try:
-            db.update_batch(
+            db.batches.update_batch(
                 batch_id,
                 team_name=data.get("team_name"),
                 team_year=data.get("team_year"),
                 tournament=data.get("tournament"),
             )
-            batch = db.get_batch(batch_id)
+            batch = db.batches.get_batch(batch_id)
             return jsonify({"success": True, "batch": batch}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1014,7 +1014,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def delete_batch(batch_id: int):
         """Delete a batch (unpin photos from it)."""
         try:
-            affected = db.delete_batch(batch_id)
+            affected = db.batches.delete_batch(batch_id)
             return jsonify({"success": True, "affected_photos": affected}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1024,7 +1024,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/processing-summary", methods=["GET"])
     def processing_summary():
         try:
-            summary = db.get_processing_summary()
+            summary = db.review.get_processing_summary()
             return jsonify(summary), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1036,7 +1036,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if limit is None or offset is None:
             return jsonify({"error": "limit and offset must be integers"}), 400
         try:
-            photos = db.get_confirmed_photos(limit, offset)
+            photos = db.review.get_confirmed_photos(limit, offset)
             return jsonify({"photos": photos, "total": len(photos)}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1048,7 +1048,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if limit is None or offset is None:
             return jsonify({"error": "limit and offset must be integers"}), 400
         try:
-            photos = db.get_review_photos(limit, offset)
+            photos = db.review.get_review_photos(limit, offset)
             return jsonify({"photos": photos, "total": len(photos)}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1058,7 +1058,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         data = request.get_json() or {}
         face_ids = [int(x) for x in data.get("face_ids", [])]
         try:
-            result = db.deassign_faces(face_ids)
+            result = db.faces.deassign_faces(face_ids)
             return jsonify({"success": True, **result}), 200
         except Exception as e:
             return jsonify({"error": str(e)}), 500
@@ -1076,7 +1076,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if not player_name:
             return jsonify({"error": "player_name is required"}), 400
         try:
-            db.assign_cluster_to_player(cluster_id, player_name, jersey_number, roster_entry_id)
+            db.clusters.assign_cluster_to_player(cluster_id, player_name, jersey_number, roster_entry_id)
             metadata_result = {
                 "requested": False,
                 "written": 0,
@@ -1126,7 +1126,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return float(np.dot(a, b) / (na * nb))
 
         try:
-            cluster = db.get_cluster_by_id(cluster_id)
+            cluster = db.clusters.get_cluster_by_id(cluster_id)
             if not cluster or not cluster.get("player_name"):
                 return jsonify({"error": "cluster is not assigned to a player"}), 400
 
@@ -1135,7 +1135,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             roster_entry_id = cluster["roster_entry_id"]
 
             # Centroid of the newly-assigned cluster
-            assigned_embs = db.get_cluster_face_embeddings(cluster_id)
+            assigned_embs = db.clusters.get_cluster_face_embeddings(cluster_id)
             if not assigned_embs:
                 return jsonify({"auto_tagged": [], "suggestions": []}), 200
 
@@ -1146,7 +1146,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             auto_tagged: list = []
             suggestions: list = []
 
-            for uc in db.get_unidentified_clusters_with_embeddings():
+            for uc in db.clusters.get_unidentified_clusters_with_embeddings():
                 if not uc["embeddings"]:
                     continue
                 uc_centroid = np.mean(
@@ -1158,7 +1158,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 photo_id = None
                 face_bbox = None
                 if uc["thumbnail_face_id"]:
-                    loc = db.get_face_photo_location(uc["thumbnail_face_id"])
+                    loc = db.faces.get_face_photo_location(uc["thumbnail_face_id"])
                     if loc:
                         photo_id = loc["photo_id"]
                         face_bbox = loc["face_bbox"]
@@ -1173,7 +1173,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 }
 
                 if sim >= AUTO_TAG_THRESHOLD:
-                    db.assign_cluster_to_player(
+                    db.clusters.assign_cluster_to_player(
                         uc["id"], player_name, jersey_number, roster_entry_id
                     )
                     auto_tagged.append({**entry, "player_name": player_name, "jersey_number": jersey_number})
@@ -1208,8 +1208,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     def detection_status():
         """Return counts of faces and clusters in DB."""
         try:
-            face_count = db.get_face_count()
-            clusters = db.get_all_player_clusters()
+            face_count = db.faces.get_face_count()
+            clusters = db.clusters.get_all_player_clusters()
             return jsonify({
                 "face_count": face_count,
                 "cluster_count": len(clusters),
