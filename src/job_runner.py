@@ -22,6 +22,10 @@ class LocalJobRunner:
         self._tasks.put((job_id, task))
         return job_id
 
+    def update_progress(self, job_id: int, progress: int) -> None:
+        """Update the progress percentage (0-100) for a running job."""
+        self.db.update_processing_job(job_id, progress=progress)
+
     def _work_loop(self):
         while True:
             job_id, task = self._tasks.get()
