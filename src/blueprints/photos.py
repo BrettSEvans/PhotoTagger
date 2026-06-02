@@ -3,8 +3,6 @@
 import io
 import logging
 import os
-import shutil
-import tempfile
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, send_from_directory, current_app
 from werkzeug.utils import secure_filename
@@ -148,71 +146,80 @@ def upload_photos():
     allowed_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.webp'}
 
     try:
-        # ── Phase 1: validate ALL files before touching the filesystem ──
+        # ── Phase 1: filter to supported image files ──
+        # A selected folder commonly contains non-photo files — e.g. a saved web
+        # page brings along .gif loaders, .html, .css, .js. Skip anything that
+        # isn't a supported image rather than failing the whole upload.
         valid_files = []
+        skipped_files = []
         for file in files:
             if not file.filename:
                 continue
             ext = Path(file.filename).suffix.lower()
             if ext not in allowed_extensions:
-                return jsonify({
-                    "error": f"Unsupported file type: {file.filename} ({ext})"
-                }), 400
+                skipped_files.append(file.filename)
+                continue
             valid_files.append(file)
 
-        if not valid_files:
-            return jsonify({"error": "No valid files to upload"}), 400
+        if skipped_files:
+            logger.info(
+                f"Skipping {len(skipped_files)} unsupported file(s) in upload "
+                f"(e.g. {skipped_files[0]})"
+            )
 
-        # ── Phase 2: save to temp dir now that all files are validated ──
-        temp_dir = tempfile.mkdtemp(prefix='phototagger_upload_')
+        if not valid_files:
+            return jsonify({
+                "error": "No supported image files found in the selection",
+                "skipped": len(skipped_files),
+            }), 400
+
+        # ── Phase 2: save to permanent uploads directory ──
+        # Use a permanent directory to avoid deleting photos that are referenced in the database
+        uploads_dir = Path("uploads")
+        uploads_dir.mkdir(exist_ok=True)
+
         saved_paths = []
         try:
             for file in valid_files:
                 secure_name = secure_filename(file.filename)
-                file_path = Path(temp_dir) / secure_name
+                file_path = uploads_dir / secure_name
                 file.save(str(file_path))
-                saved_paths.append(str(file_path))
-        except Exception:
-            # Clean up partial saves immediately on write failure
-            shutil.rmtree(temp_dir, ignore_errors=True)
+                saved_paths.append(str(file_path.resolve()))
+        except Exception as e:
+            logger.error(f"Error saving files to uploads directory: {e}")
             raise
 
         # Create batch for this import
         batch_id = db.batches.create_batch(
-            source_folder=temp_dir,
+            source_folder=str(uploads_dir.resolve()),
             team_name=request.form.get("team_name"),
             team_year=int(request.form.get("team_year", "0")) or None,
             tournament=request.form.get("tournament"),
         )
 
         def run_photo_ingestion(job_id: int):
-            """Ingest uploaded photo files, then clean up the temp directory."""
+            """Ingest uploaded photo files into the database."""
             photos_ingested = 0
             duplicates_skipped = 0
             errors = 0
 
-            try:
-                for i, file_path in enumerate(saved_paths):
-                    try:
-                        photo_id = crawler.ingest_single_file(file_path, batch_id=batch_id)
-                        if photo_id:
-                            photos_ingested += 1
-                        else:
-                            duplicates_skipped += 1
-                    except Exception as e:
-                        logger.error(f"Error ingesting {file_path}: {e}")
-                        errors += 1
+            for i, file_path in enumerate(saved_paths):
+                try:
+                    photo_id = crawler.ingest_single_file(file_path, batch_id=batch_id)
+                    if photo_id:
+                        photos_ingested += 1
+                    else:
+                        duplicates_skipped += 1
+                except Exception as e:
+                    logger.error(f"Error ingesting {file_path}: {e}")
+                    errors += 1
 
-                    # Update job progress
-                    progress = int((i + 1) / len(saved_paths) * 100)
-                    app_job_runner.update_progress(job_id, progress)
+                # Update job progress
+                progress = int((i + 1) / len(saved_paths) * 100)
+                app_job_runner.update_progress(job_id, progress)
 
-                # Update batch photo count
-                db.batches.update_batch_photo_count(batch_id)
-            finally:
-                # Always clean up temp dir regardless of success or failure
-                shutil.rmtree(temp_dir, ignore_errors=True)
-                logger.info(f"Cleaned up upload temp dir: {temp_dir}")
+            # Update batch photo count
+            db.batches.update_batch_photo_count(batch_id)
 
             return {
                 "photos_found": len(saved_paths),
@@ -225,7 +232,7 @@ def upload_photos():
             "upload_photos",
             {
                 "file_paths": saved_paths,
-                "temp_dir": temp_dir,
+                "uploads_dir": str(uploads_dir.resolve()),
                 "batch_id": batch_id,
             },
             run_photo_ingestion
