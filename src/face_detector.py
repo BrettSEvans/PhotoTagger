@@ -143,18 +143,20 @@ class FaceDetector:
         # Normalize confidence (already 0-1, just use it)
         conf_score = confidence
 
-        # Size score: optimal range is 5-25% of image
-        # <1% = probably background, >50% = weird crop
+        # Size score: be strict about small faces (background crowd)
+        # <2% = almost certainly background, 5-30% = main subject
         if size_ratio < 0.01:
-            size_score = 0.1  # Too small, probably background
+            size_score = 0.0  # Definitely background
+        elif size_ratio < 0.02:
+            size_score = 0.15  # Very small, probably crowd
         elif size_ratio < 0.05:
-            size_score = 0.5  # Small but visible
-        elif size_ratio <= 0.25:
-            size_score = 1.0  # Optimal range
+            size_score = 0.4  # Small, still background
+        elif size_ratio <= 0.30:
+            size_score = 1.0  # Optimal range for main subjects
         elif size_ratio <= 0.50:
-            size_score = 0.8  # Getting large but okay
+            size_score = 0.7  # Getting large but okay
         else:
-            size_score = 0.3  # Too large, probably cropped
+            size_score = 0.2  # Too large, probably cropped
 
         # Sharpness score: normalize to 0-1
         # Typical values: blurry ~5-50, medium ~100-500, sharp >1000
@@ -167,7 +169,7 @@ class FaceDetector:
         else:
             sharp_score = 1.0  # Sharp
 
-        # Position score: faces closer to center are better
+        # Position score: penalize edges and corners (background)
         x0, y0, x1, y1 = bbox
         face_center_x = (x0 + x1) / 2.0 / img_width
         face_center_y = (y0 + y1) / 2.0 / img_height
@@ -175,19 +177,20 @@ class FaceDetector:
         # Distance from center (0 = center, 0.5 = edge)
         dist_from_center = abs(face_center_x - 0.5) + abs(face_center_y - 0.5)
 
-        if dist_from_center < 0.2:
-            pos_score = 1.0  # Centered
-        elif dist_from_center < 0.35:
-            pos_score = 0.85  # Off-center but visible
-        elif dist_from_center < 0.45:
-            pos_score = 0.6  # Near edge
+        if dist_from_center < 0.15:
+            pos_score = 1.0  # Well centered
+        elif dist_from_center < 0.30:
+            pos_score = 0.8  # Off-center but acceptable
+        elif dist_from_center < 0.40:
+            pos_score = 0.5  # Near edge
         else:
-            pos_score = 0.3  # Edge/corner (background)
+            pos_score = 0.15  # Edge/corner (likely background)
 
-        # Weighted average (confidence and size are most important)
+        # Weighted average: size and sharpness are critical for filtering background
+        # Confidence alone is not enough (background faces can be sharp and confident)
         quality_score = (
-            conf_score * 0.35 +
-            size_score * 0.35 +
+            conf_score * 0.25 +
+            size_score * 0.45 +
             sharp_score * 0.20 +
             pos_score * 0.10
         )

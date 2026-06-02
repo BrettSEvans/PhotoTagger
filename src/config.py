@@ -41,5 +41,6 @@ MIN_FACE_SHARPNESS = 10.0
 # 0.0003 ≈ 8px-wide face in a 576px image — keeps foreground players, drops 4px noise.
 MIN_FACE_SIZE_RATIO = 0.0003
 # Minimum composite quality score (0-1) combining confidence, size, sharpness, and position
-# Filters background faces: <0.5 = background, 0.5-0.7 = acceptable, >0.7 = good
-MIN_FACE_QUALITY_SCORE = 0.45
+# Filters background faces: <0.5 = background, 0.5-0.6 = borderline, >0.6 = good
+# Set to 0.55 to be aggressive about filtering crowd/background faces
+MIN_FACE_QUALITY_SCORE = 0.55
