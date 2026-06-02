@@ -2,7 +2,7 @@
 ## Blueprints + Repository Split
 
 **Branch:** `refactor/blueprints-repositories` ✓ Active  
-**Test baseline:** 261 tests passing (212 original + 49 from repositories/schema/conftest)
+**Test baseline:** 272 tests passing (212 original + 60 from repositories/schema/conftest/review)
 
 ---
 
@@ -14,7 +14,7 @@
 - [x] Add `tests/test_schema.py` and `tests/test_conftest_fixtures.py`
 - [x] Baseline: 215 tests → 221 tests
 
-### Phase 1 — Repository Split 🔄 IN PROGRESS
+### Phase 1 — Repository Split ✅ COMPLETE
 - [x] **Phase 1.0:** Create `src/repositories/` with `_base.py` (BaseRepository)
 - [x] **Phase 1.1:** Extract JobRepository (3 methods, 3 tests, delegation stubs)
 - [x] **Phase 1.2:** Extract GameContextRepository (2 methods, 2 tests)
@@ -22,10 +22,10 @@
 - [x] **Phase 1.4:** Extract FaceRepository (8 methods, 8 tests)
 - [x] **Phase 1.5:** Extract ClusterRepository (9 methods, 9 tests)
 - [x] **Phase 1.6:** Extract RosterRepository (9 methods, 12 tests)
-- [ ] **Phase 1.7:** Extract PhotoRepository (18 methods, 18 tests)
-- [ ] **Phase 1.8:** Extract ReviewService (3 methods from Photo, new module)
-- [ ] **Phase 1.9:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests)
-- [ ] **Phase 1.10:** Delete delegation stubs, verify db.py ≤150 lines
+- [x] **Phase 1.7:** Extract PhotoRepository (10 methods, 11 tests)
+- [x] **Phase 1.8:** Extract ReviewService (3 methods, composes repos)
+- [x] **Phase 1.9:** All delegation stubs added to Database
+- [ ] **Phase 1.10:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests)
 
 ### Phase 2 — Blueprint Split ⏳ PENDING
 - [ ] Move routes to `src/blueprints/`
