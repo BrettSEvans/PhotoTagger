@@ -39,17 +39,18 @@ class ClusterRepository(BaseRepository):
 
     def get_all_player_clusters(self) -> List[Dict]:
         """Get all player clusters with stats. Filters out empty clusters (no quality faces)."""
+        from src.config import MIN_FACE_QUALITY_SCORE
         with self._lock:
             cursor = self._conn.cursor()
-            # Count actual quality faces assigned to each cluster (quality_score > 0.45)
+            # Count actual quality faces assigned to each cluster
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
                        player_name, jersey_number, roster_entry_id,
                        (SELECT COUNT(*) FROM faces f
-                        WHERE f.cluster_id = pc.id AND (f.quality_score IS NULL OR f.quality_score >= 0.45)) as actual_faces
+                        WHERE f.cluster_id = pc.id AND (f.quality_score IS NULL OR f.quality_score >= ?)) as actual_faces
                 FROM player_clusters pc
                 ORDER BY photo_count DESC
-            """)
+            """, (MIN_FACE_QUALITY_SCORE,))
             return [
                 {
                     "id": row[0],
@@ -67,6 +68,7 @@ class ClusterRepository(BaseRepository):
 
     def get_photos_by_cluster(self, cluster_id: int, min_face_confidence: float = 0.0) -> List[Dict]:
         """Get all photos that contain a quality face in this cluster."""
+        from src.config import MIN_FACE_QUALITY_SCORE
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
@@ -76,9 +78,9 @@ class ClusterRepository(BaseRepository):
                 JOIN faces f ON f.photo_id = p.id
                 WHERE f.cluster_id = ?
                   AND f.confidence >= ?
-                  AND (f.quality_score IS NULL OR f.quality_score >= 0.45)
+                  AND (f.quality_score IS NULL OR f.quality_score >= ?)
                 ORDER BY p.id
-            """, (cluster_id, min_face_confidence))
+            """, (cluster_id, min_face_confidence, MIN_FACE_QUALITY_SCORE))
             return [
                 {
                     "id": row[0],
