@@ -2,7 +2,7 @@
 ## Blueprints + Repository Split
 
 **Branch:** `refactor/blueprints-repositories` ✓ Active  
-**Test baseline:** 272 tests passing (212 original + 60 from repositories/schema/conftest/review)
+**Test baseline:** 261 tests passing (Phase 1 complete, all delegation stubs deleted)
 
 ---
 
@@ -25,7 +25,7 @@
 - [x] **Phase 1.7:** Extract PhotoRepository (10 methods, 11 tests)
 - [x] **Phase 1.8:** Extract ReviewService (3 methods, composes repos)
 - [x] **Phase 1.9:** All delegation stubs added to Database
-- [ ] **Phase 1.10:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests)
+- [x] **Phase 1.10:** Migrate all callers (api.py, crawler.py, ocr.py, face_cluster.py, tests) + DELETE stubs
 
 ### Phase 2 — Blueprint Split ⏳ PENDING
 - [ ] Move routes to `src/blueprints/`
