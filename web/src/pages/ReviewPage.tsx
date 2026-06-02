@@ -398,7 +398,7 @@ export const ReviewPage: React.FC = () => {
               {isDetecting ? 'Working…' : 'Detect'}
             </button>
             {detectMsg && (
-              <span role="status" className="font-jakarta text-xs text-muted-fg text-right max-w-md truncate">{detectMsg}</span>
+              <span role="status" className="font-jakarta text-xs text-muted-fg text-right break-words whitespace-normal">{detectMsg}</span>
             )}
           </div>
         </div>
