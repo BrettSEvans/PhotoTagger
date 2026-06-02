@@ -10,11 +10,13 @@ class ClusterRepository(BaseRepository):
     """Repository for player_clusters table."""
 
     def clear_clusters(self):
-        """Remove all cluster assignments (reset before re-clustering)."""
+        """Remove all cluster assignments and reset ID sequence (reset before re-clustering)."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("UPDATE faces SET cluster_id = NULL")
             cursor.execute("DELETE FROM player_clusters")
+            # Reset auto-increment so next cluster starts at ID 1 (fresh session)
+            cursor.execute("DELETE FROM sqlite_sequence WHERE name='player_clusters'")
             self._conn.commit()
 
     def add_player_cluster(self, face_count: int, photo_count: int, thumbnail_face_id: Optional[int]) -> int:
@@ -36,13 +38,16 @@ class ClusterRepository(BaseRepository):
             self._conn.commit()
 
     def get_all_player_clusters(self) -> List[Dict]:
-        """Get all player clusters with stats."""
+        """Get all player clusters with stats. Filters out empty clusters (no quality faces)."""
         with self._lock:
             cursor = self._conn.cursor()
+            # Count actual quality faces assigned to each cluster (quality_score > 0.45)
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
-                       player_name, jersey_number, roster_entry_id
-                FROM player_clusters
+                       player_name, jersey_number, roster_entry_id,
+                       (SELECT COUNT(*) FROM faces f
+                        WHERE f.cluster_id = pc.id AND (f.quality_score IS NULL OR f.quality_score >= 0.45)) as actual_faces
+                FROM player_clusters pc
                 ORDER BY photo_count DESC
             """)
             return [
@@ -57,10 +62,11 @@ class ClusterRepository(BaseRepository):
                     "roster_entry_id": row[7],
                 }
                 for row in cursor.fetchall()
+                if row[8] > 0  # Only include clusters with at least 1 quality face
             ]
 
     def get_photos_by_cluster(self, cluster_id: int, min_face_confidence: float = 0.0) -> List[Dict]:
-        """Get all photos that contain a face in this cluster."""
+        """Get all photos that contain a quality face in this cluster."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
@@ -70,6 +76,7 @@ class ClusterRepository(BaseRepository):
                 JOIN faces f ON f.photo_id = p.id
                 WHERE f.cluster_id = ?
                   AND f.confidence >= ?
+                  AND (f.quality_score IS NULL OR f.quality_score >= 0.45)
                 ORDER BY p.id
             """, (cluster_id, min_face_confidence))
             return [
