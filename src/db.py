@@ -233,11 +233,30 @@ class Database:
 
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_all_photos(self) -> List[Dict]:
-        """Get all photos in the database."""
+    def count_photos(self) -> int:
+        """Return the total number of photos in the database (fast COUNT query)."""
         with self._lock:
             cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM photos")
+            cursor.execute("SELECT COUNT(*) FROM photos")
+            return cursor.fetchone()[0]
+
+    def get_all_photos(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
+        """Get photos in the database.
+
+        When *limit* is ``None`` (default) all rows are returned — suitable for
+        internal use (detection, clustering).  The HTTP endpoint should always
+        supply *limit* and *offset* so that the SQL engine handles pagination
+        rather than loading every row into Python memory.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            if limit is not None:
+                cursor.execute(
+                    "SELECT * FROM photos ORDER BY id LIMIT ? OFFSET ?",
+                    (limit, offset),
+                )
+            else:
+                cursor.execute("SELECT * FROM photos ORDER BY id")
             return [dict(row) for row in cursor.fetchall()]
 
     def get_photo_by_id(self, photo_id: int) -> Optional[Dict]:
@@ -1101,6 +1120,27 @@ class Database:
                 "player_name": row[5],
                 "jersey_number": row[6],
                 "roster_entry_id": row[7],
+            }
+
+    def get_face_photo_location(self, face_id: int) -> Optional[Dict]:
+        """Return photo_id and bbox for a single face — used for thumbnail modal links.
+
+        Uses ``_lock`` so callers never need to touch ``db.conn`` directly.
+        Returns a dict with keys ``photo_id`` and ``face_bbox``, or ``None`` if
+        the face does not exist.
+        """
+        with self._lock:
+            cursor = self.conn.cursor()
+            cursor.execute(
+                "SELECT photo_id, bbox_x0, bbox_y0, bbox_x1, bbox_y1 FROM faces WHERE id = ?",
+                (face_id,),
+            )
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "photo_id": row[0],
+                "face_bbox": [row[1], row[2], row[3], row[4]],
             }
 
     def get_cluster_face_embeddings(self, cluster_id: int) -> List[List[float]]:

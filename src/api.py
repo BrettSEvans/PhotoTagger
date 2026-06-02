@@ -1,9 +1,13 @@
+import io
 import logging
 import os
+import shutil
 import tempfile
+import traceback
 from pathlib import Path
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from werkzeug.utils import secure_filename
+import numpy as np
 import requests
 from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
@@ -298,7 +302,9 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         """
         Handle photo file uploads via multipart form.
 
-        Files are stored in a temp directory and processed asynchronously.
+        Files are validated first, then stored in a temp directory and processed
+        asynchronously.  The temp directory is removed after the job completes
+        (success or failure) to prevent disk leaks.
         """
         if 'files' not in request.files:
             return jsonify({"error": "No files provided"}), 400
@@ -310,30 +316,35 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         # Supported image extensions
         allowed_extensions = {'.jpg', '.jpeg', '.png', '.tiff', '.tif', '.heic', '.webp'}
 
-        # Validate and save files to temp directory
         try:
-            temp_dir = tempfile.mkdtemp(prefix='phototagger_upload_')
-            saved_paths = []
-
+            # ── Phase 1: validate ALL files before touching the filesystem ──
+            valid_files = []
             for file in files:
                 if not file.filename:
                     continue
-
-                # Validate file extension
                 ext = Path(file.filename).suffix.lower()
                 if ext not in allowed_extensions:
                     return jsonify({
                         "error": f"Unsupported file type: {file.filename} ({ext})"
                     }), 400
+                valid_files.append(file)
 
-                # Save file with secure filename
-                secure_name = secure_filename(file.filename)
-                file_path = Path(temp_dir) / secure_name
-                file.save(str(file_path))
-                saved_paths.append(str(file_path))
-
-            if not saved_paths:
+            if not valid_files:
                 return jsonify({"error": "No valid files to upload"}), 400
+
+            # ── Phase 2: save to temp dir now that all files are validated ──
+            temp_dir = tempfile.mkdtemp(prefix='phototagger_upload_')
+            saved_paths = []
+            try:
+                for file in valid_files:
+                    secure_name = secure_filename(file.filename)
+                    file_path = Path(temp_dir) / secure_name
+                    file.save(str(file_path))
+                    saved_paths.append(str(file_path))
+            except Exception:
+                # Clean up partial saves immediately on write failure
+                shutil.rmtree(temp_dir, ignore_errors=True)
+                raise
 
             # Create batch for this import
             batch_id = db.create_batch(
@@ -344,28 +355,33 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             )
 
             def run_photo_ingestion(job_id: int):
-                """Ingest uploaded photo files."""
+                """Ingest uploaded photo files, then clean up the temp directory."""
                 photos_ingested = 0
                 duplicates_skipped = 0
                 errors = 0
 
-                for i, file_path in enumerate(saved_paths):
-                    try:
-                        photo_id = app.crawler.ingest_single_file(file_path, batch_id=batch_id)
-                        if photo_id:
-                            photos_ingested += 1
-                        else:
-                            duplicates_skipped += 1
-                    except Exception as e:
-                        logger.error(f"Error ingesting {file_path}: {e}")
-                        errors += 1
+                try:
+                    for i, file_path in enumerate(saved_paths):
+                        try:
+                            photo_id = app.crawler.ingest_single_file(file_path, batch_id=batch_id)
+                            if photo_id:
+                                photos_ingested += 1
+                            else:
+                                duplicates_skipped += 1
+                        except Exception as e:
+                            logger.error(f"Error ingesting {file_path}: {e}")
+                            errors += 1
 
-                    # Update job progress
-                    progress = int((i + 1) / len(saved_paths) * 100)
-                    app.job_runner.update_progress(job_id, progress)
+                        # Update job progress
+                        progress = int((i + 1) / len(saved_paths) * 100)
+                        app.job_runner.update_progress(job_id, progress)
 
-                # Update batch photo count
-                db.update_batch_photo_count(batch_id)
+                    # Update batch photo count
+                    db.update_batch_photo_count(batch_id)
+                finally:
+                    # Always clean up temp dir regardless of success or failure
+                    shutil.rmtree(temp_dir, ignore_errors=True)
+                    logger.info(f"Cleaned up upload temp dir: {temp_dir}")
 
                 return {
                     "photos_found": len(saved_paths),
@@ -472,12 +488,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             if per_page > 100:
                 per_page = 100  # Cap maximum per_page to prevent abuse
 
-            all_photos = db.get_all_photos()
-
-            # Simple pagination
-            start = (page - 1) * per_page
-            end = start + per_page
-            paginated = all_photos[start:end]
+            # Push LIMIT/OFFSET into SQL — never load all rows into memory
+            offset = (page - 1) * per_page
+            paginated = db.get_all_photos(limit=per_page, offset=offset)
+            total = db.count_photos()
 
             return jsonify({
                 "photos": [
@@ -489,13 +503,12 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                     }
                     for p in paginated
                 ],
-                "total": len(all_photos),
+                "total": total,
                 "page": page,
                 "per_page": per_page,
             }), 200
         except Exception as e:
             logger.error(f"Error getting photos: {e}")
-            import traceback
             logger.error(traceback.format_exc())
             return jsonify({"error": str(e)}), 500
 
@@ -533,7 +546,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         }
         """
         from src.face_detector import FaceDetector
-        import json as _json
 
         data = request.get_json() or {}
         photo_ids = data.get("photo_ids", None)
@@ -668,10 +680,8 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/face-crop/<int:face_id>", methods=["GET"])
     def serve_face_crop(face_id: int):
         """Serve a cropped face image (with padding) as JPEG."""
-        import io
         try:
             import cv2
-            import numpy as np
 
             face = db.get_face_by_id(face_id)
             if not face:
@@ -1104,8 +1114,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         - similarity >= 0.60  → auto-tag with the same player
         - 0.40 <= similarity < 0.60 → return as user suggestions
         """
-        import numpy as np
-
         # Calibrated for InsightFace buffalo_l (same-person mean ≈ 0.40,
         # cross-cluster p90 ≈ 0.39, cluster-build threshold = 0.40).
         AUTO_TAG_THRESHOLD = 0.60
@@ -1150,12 +1158,10 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
                 photo_id = None
                 face_bbox = None
                 if uc["thumbnail_face_id"]:
-                    cursor = db.conn.cursor()
-                    cursor.execute("SELECT photo_id, bbox_x0, bbox_y0, bbox_x1, bbox_y1 FROM faces WHERE id = ?", (uc["thumbnail_face_id"],))
-                    row = cursor.fetchone()
-                    if row:
-                        photo_id = row[0]
-                        face_bbox = [row[1], row[2], row[3], row[4]]
+                    loc = db.get_face_photo_location(uc["thumbnail_face_id"])
+                    if loc:
+                        photo_id = loc["photo_id"]
+                        face_bbox = loc["face_bbox"]
 
                 entry = {
                     "cluster_id":       uc["id"],
