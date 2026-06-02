@@ -256,3 +256,87 @@ class RosterRepository(BaseRepository):
                 "player_name": row[4],
                 "uniform_color": row[5],
             }
+
+    def resolve_roster_candidates(self, jersey_number: str, uniform_color: Optional[str] = None, context: Optional[List[Dict]] = None) -> List[Dict]:
+        """Resolve roster candidates for a jersey within active game context and optional uniform color.
+
+        Pass a pre-fetched ``context`` (from ``get_game_context()``) when calling this in a loop
+        to avoid re-querying the game context for every row.
+        """
+        cursor = self._conn.cursor()
+        if context is None:
+            # Need to get context from somewhere — for now, return empty list
+            # In practice, ReviewService will always pass context
+            context = []
+
+        if context:
+            candidates = []
+            for team in context:
+                cursor.execute("""
+                    SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                    FROM rosters
+                    WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+                """, (team["team_name"], team["team_year"], str(jersey_number)))
+                for row in cursor.fetchall():
+                    roster_color = team.get("uniform_color") or row[5]
+                    candidates.append({
+                        "id": row[0],
+                        "team_name": row[1],
+                        "team_year": row[2],
+                        "jersey_number": row[3],
+                        "player_name": row[4],
+                        "uniform_color": roster_color,
+                    })
+        else:
+            cursor.execute("""
+                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                FROM rosters
+                WHERE jersey_number = ?
+            """, (str(jersey_number),))
+            candidates = [
+                {
+                    "id": row[0],
+                    "team_name": row[1],
+                    "team_year": row[2],
+                    "jersey_number": row[3],
+                    "player_name": row[4],
+                    "uniform_color": row[5],
+                }
+                for row in cursor.fetchall()
+            ]
+
+        if not uniform_color:
+            return candidates
+
+        matched = []
+        for candidate in candidates:
+            score = self._color_match_score(uniform_color, candidate.get("uniform_color"))
+            if score > 0:
+                matched.append({**candidate, "match_score": score})
+        return matched
+
+    @staticmethod
+    def _color_match_score(detected: Optional[str], roster: Optional[str]) -> float:
+        """Score whether two uniform color labels are compatible."""
+        if not detected or not roster:
+            return 0.0
+
+        detected = detected.lower().strip()
+        roster = roster.lower().strip()
+        if detected == roster:
+            return 1.0
+
+        color_families = {
+            "red": {"red", "crimson", "dark red", "maroon", "burgundy"},
+            "white": {"white", "light gray", "off-white", "cream"},
+            "blue": {"blue", "navy", "royal blue", "dark blue"},
+            "black": {"black", "dark gray", "charcoal"},
+            "yellow": {"yellow", "gold", "orange-yellow"},
+            "green": {"green", "dark green", "forest green"},
+        }
+
+        detected_family = next((family for family, colors in color_families.items() if detected in colors), None)
+        roster_family = next((family for family, colors in color_families.items() if roster in colors), None)
+        if detected_family and detected_family == roster_family:
+            return 0.9
+        return 0.0
