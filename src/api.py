@@ -359,8 +359,18 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     @app.route("/api/pick-directory", methods=["POST"])
     def pick_directory():
         """Open native macOS directory picker via AppleScript and return selected path."""
+        import platform
+        import subprocess
+
+        # Check if running on macOS
+        if platform.system() != "Darwin":
+            return jsonify({
+                "error": "Directory picker not available on this platform. Please enter the path manually.",
+                "path": None,
+                "cancelled": True
+            }), 400
+
         try:
-            import subprocess
             result = subprocess.run(
                 [
                     "osascript", "-e",
@@ -380,7 +390,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
             return jsonify({"path": None, "cancelled": True}), 200
         except Exception as e:
             logger.error(f"Error opening directory picker: {e}")
-            return jsonify({"error": str(e)}), 500
+            return jsonify({"error": f"osascript not available: {str(e)}", "path": None, "cancelled": True}), 400
 
     # Get all photos endpoint
     @app.route("/api/photos", methods=["GET"])
