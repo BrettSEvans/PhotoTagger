@@ -13,6 +13,8 @@ from src.repositories.batch import BatchRepository
 from src.repositories.face import FaceRepository
 from src.repositories.cluster import ClusterRepository
 from src.repositories.roster import RosterRepository
+from src.repositories.photo import PhotoRepository
+from src.review_service import ReviewService
 
 class Database:
     def __init__(self, db_path: str = "photo_catalog.db"):
@@ -29,35 +31,18 @@ class Database:
         self.faces = FaceRepository(self.conn, self._lock)
         self.clusters = ClusterRepository(self.conn, self._lock)
         self.roster = RosterRepository(self.conn, self._lock)
+        self.photos = PhotoRepository(self.conn, self._lock)
+
+        # ReviewService composes photo, roster, and context repos for cross-domain queries
+        self.review = ReviewService(self.photos, self.roster, self.context)
 
     def init_schema(self):
         """Create database tables if they don't exist."""
         init_schema(self.conn)
 
     def add_photo(self, file_path: str, file_hash: Optional[str] = None, source_folder: Optional[str] = None, batch_id: Optional[int] = None) -> int:
-        """
-        Add a photo to the database.
-        Returns the photo ID.
-        """
-        path = Path(file_path)
-        if not path.exists():
-            raise FileNotFoundError(f"Photo not found: {file_path}")
-
-        # Generate file hash if not provided
-        if file_hash is None:
-            file_hash = self._compute_file_hash(file_path)
-
-        file_size = path.stat().st_size
-
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                INSERT INTO photos (file_path, file_hash, file_size, source_folder, batch_id)
-                VALUES (?, ?, ?, ?, ?)
-            """, (str(file_path), file_hash, file_size, source_folder, batch_id))
-            self.conn.commit()
-
-            return cursor.lastrowid
+        """Delegation stub: add photo via PhotoRepository."""
+        return self.photos.add_photo(file_path, file_hash, source_folder, batch_id)
 
     def add_ocr_result(
         self,
@@ -67,101 +52,36 @@ class Database:
         raw_text: str,
         uniform_color: Optional[str] = None,
     ):
-        """Add OCR extraction results for a photo."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                INSERT INTO ocr_results (photo_id, jersey_number, uniform_color, confidence, raw_text)
-                VALUES (?, ?, ?, ?, ?)
-            """, (photo_id, jersey_number, uniform_color, confidence, raw_text))
-            self.conn.commit()
+        """Delegation stub: add OCR result via PhotoRepository."""
+        return self.photos.add_ocr_result(photo_id, jersey_number, confidence, raw_text, uniform_color)
 
     def get_photo_by_jersey(self, jersey_number: str) -> List[Dict]:
-        """Find all photos matching a jersey number."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT p.id, p.file_path, o.jersey_number, o.confidence, o.raw_text
-                FROM photos p
-                JOIN ocr_results o ON p.id = o.photo_id
-                WHERE o.jersey_number = ?
-                ORDER BY o.confidence DESC
-            """, (jersey_number,))
-
-            return [dict(row) for row in cursor.fetchall()]
+        """Delegation stub: get photos by jersey via PhotoRepository."""
+        return self.photos.get_photo_by_jersey(jersey_number)
 
     def count_photos(self) -> int:
-        """Return the total number of photos in the database (fast COUNT query)."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM photos")
-            return cursor.fetchone()[0]
+        """Delegation stub: count photos via PhotoRepository."""
+        return self.photos.count_photos()
 
     def get_all_photos(self, limit: Optional[int] = None, offset: int = 0) -> List[Dict]:
-        """Get photos in the database.
-
-        When *limit* is ``None`` (default) all rows are returned — suitable for
-        internal use (detection, clustering).  The HTTP endpoint should always
-        supply *limit* and *offset* so that the SQL engine handles pagination
-        rather than loading every row into Python memory.
-        """
-        with self._lock:
-            cursor = self.conn.cursor()
-            if limit is not None:
-                cursor.execute(
-                    "SELECT * FROM photos ORDER BY id LIMIT ? OFFSET ?",
-                    (limit, offset),
-                )
-            else:
-                cursor.execute("SELECT * FROM photos ORDER BY id")
-            return [dict(row) for row in cursor.fetchall()]
+        """Delegation stub: get all photos via PhotoRepository."""
+        return self.photos.get_all_photos(limit, offset)
 
     def get_photo_by_id(self, photo_id: int) -> Optional[Dict]:
-        """Get a single photo by its ID."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT * FROM photos WHERE id = ?", (photo_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        """Delegation stub: get photo by ID via PhotoRepository."""
+        return self.photos.get_photo_by_id(photo_id)
 
     def get_photo_ocr(self, photo_id: int) -> Optional[Dict]:
-        """Get OCR results for a specific photo."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("""
-                SELECT * FROM ocr_results WHERE photo_id = ? ORDER BY processed_at DESC LIMIT 1
-            """, (photo_id,))
-            row = cursor.fetchone()
-            return dict(row) if row else None
+        """Delegation stub: get photo OCR via PhotoRepository."""
+        return self.photos.get_photo_ocr(photo_id)
 
     def get_latest_ocr_by_photo_ids(self, photo_ids: List[int]) -> Dict[int, Dict]:
-        """Return the latest OCR row for each given photo id, keyed by photo_id.
-
-        Single query instead of one lookup per photo (avoids N+1 in clustering auto-match).
-        """
-        if not photo_ids:
-            return {}
-        with self._lock:
-            cursor = self.conn.cursor()
-            placeholders = ",".join("?" for _ in photo_ids)
-            cursor.execute(f"""
-                SELECT o.*
-                FROM ocr_results o
-                WHERE o.photo_id IN ({placeholders})
-                  AND o.id = (
-                      SELECT MAX(o2.id)
-                      FROM ocr_results o2
-                      WHERE o2.photo_id = o.photo_id
-                  )
-            """, list(photo_ids))
-            return {row["photo_id"]: dict(row) for row in cursor.fetchall()}
+        """Delegation stub: get latest OCR by photo IDs via PhotoRepository."""
+        return self.photos.get_latest_ocr_by_photo_ids(photo_ids)
 
     def photo_exists(self, file_hash: str) -> bool:
-        """Check if a photo with this hash already exists."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT id FROM photos WHERE file_hash = ?", (file_hash,))
-            return cursor.fetchone() is not None
+        """Delegation stub: check if photo exists via PhotoRepository."""
+        return self.photos.photo_exists(file_hash)
 
     def create_processing_job(self, job_type: str, payload: Optional[Dict] = None) -> int:
         """Delegation stub: create a processing job via JobRepository."""
@@ -329,168 +249,29 @@ class Database:
     # ── Processing summary ───────────────────────────────────────────────────────
 
     def get_processing_summary(self) -> Dict:
-        """Return counts: total photos, auto-tagged (jersey→roster match), needs review."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            cursor.execute("SELECT COUNT(*) FROM photos")
-            total = cursor.fetchone()[0]
-
-            tagged = 0
-            needs_review = 0
-            context = self.get_game_context()
-            for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(
-                    row["jersey_number"], row.get("uniform_color"), context=context
-                )
-                if len(matches) == 1:
-                    tagged += 1
-                else:
-                    needs_review += 1
-
-            return {"total_photos": total, "tagged": tagged, "needs_review": needs_review}
+        """Delegation stub: get processing summary via ReviewService."""
+        return self.review.get_processing_summary()
 
     def get_confirmed_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
-        """Photos where OCR jersey and game context resolve to one roster player."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            confirmed = []
-            context = self.get_game_context()
-            for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(
-                    row["jersey_number"], row.get("uniform_color"), context=context
-                )
-                if len(matches) == 1:
-                    match = matches[0]
-                    confirmed.append({
-                        "id": row["id"],
-                        "file_path": row["file_path"],
-                        "jersey_number": row["jersey_number"],
-                        "player_name": match["player_name"],
-                        "team_name": match["team_name"],
-                        "uniform_color": match["uniform_color"],
-                        "confidence": row["confidence"],
-                    })
-            return confirmed[offset:offset + limit]
+        """Delegation stub: get confirmed photos via ReviewService."""
+        return self.review.get_confirmed_photos(limit, offset)
 
     def get_review_photos(self, limit: int = 60, offset: int = 0) -> List[Dict]:
-        """Photos where OCR found a jersey but roster context is missing or ambiguous."""
-        with self._lock:
-            cursor = self.conn.cursor()
-            review = []
-            context = self.get_game_context()
-            for row in self._get_latest_ocr_rows(cursor):
-                matches = self.resolve_roster_candidates(
-                    row["jersey_number"], row.get("uniform_color"), context=context
-                )
-                if len(matches) != 1:
-                    review.append({
-                        "id": row["id"],
-                        "file_path": row["file_path"],
-                        "jersey_number": row["jersey_number"],
-                        "uniform_color": row.get("uniform_color"),
-                        "confidence": row["confidence"],
-                        "roster_candidates": matches,
-                    })
-            return review[offset:offset + limit]
+        """Delegation stub: get review photos via ReviewService."""
+        return self.review.get_review_photos(limit, offset)
 
     def _get_latest_ocr_rows(self, cursor) -> List[Dict]:
-        """Return latest non-empty OCR row per photo, ordered by confidence."""
-        cursor.execute("""
-            SELECT p.id, p.file_path, o.jersey_number, o.uniform_color, o.confidence, o.raw_text
-            FROM photos p
-            JOIN ocr_results o ON o.photo_id = p.id
-            WHERE o.jersey_number IS NOT NULL
-              AND o.id = (
-                  SELECT MAX(o2.id)
-                  FROM ocr_results o2
-                  WHERE o2.photo_id = p.id
-                    AND o2.jersey_number IS NOT NULL
-              )
-            ORDER BY o.confidence DESC
-        """)
-        return [dict(row) for row in cursor.fetchall()]
+        """Delegation stub: get latest OCR rows via ReviewService."""
+        return self.review._get_latest_ocr_rows(cursor)
 
     def resolve_roster_candidates(self, jersey_number: str, uniform_color: Optional[str] = None, context: Optional[List[Dict]] = None) -> List[Dict]:
-        """Resolve roster candidates for a jersey within active game context and optional uniform color.
-
-        Pass a pre-fetched ``context`` (from ``get_game_context()``) when calling this in a loop
-        to avoid re-querying the game context for every row.
-        """
-        cursor = self.conn.cursor()
-        if context is None:
-            context = self.get_game_context()
-
-        if context:
-            candidates = []
-            for team in context:
-                cursor.execute("""
-                    SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
-                    FROM rosters
-                    WHERE team_name = ? AND team_year = ? AND jersey_number = ?
-                """, (team["team_name"], team["team_year"], str(jersey_number)))
-                for row in cursor.fetchall():
-                    roster_color = team.get("uniform_color") or row[5]
-                    candidates.append({
-                        "id": row[0],
-                        "team_name": row[1],
-                        "team_year": row[2],
-                        "jersey_number": row[3],
-                        "player_name": row[4],
-                        "uniform_color": roster_color,
-                    })
-        else:
-            cursor.execute("""
-                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
-                FROM rosters
-                WHERE jersey_number = ?
-            """, (str(jersey_number),))
-            candidates = [
-                {
-                    "id": row[0],
-                    "team_name": row[1],
-                    "team_year": row[2],
-                    "jersey_number": row[3],
-                    "player_name": row[4],
-                    "uniform_color": row[5],
-                }
-                for row in cursor.fetchall()
-            ]
-
-        if not uniform_color:
-            return candidates
-
-        matched = []
-        for candidate in candidates:
-            score = self._color_match_score(uniform_color, candidate.get("uniform_color"))
-            if score > 0:
-                matched.append({**candidate, "match_score": score})
-        return matched
+        """Delegation stub: resolve roster candidates via RosterRepository."""
+        return self.roster.resolve_roster_candidates(jersey_number, uniform_color, context)
 
     @staticmethod
     def _color_match_score(detected: Optional[str], roster: Optional[str]) -> float:
-        """Score whether two uniform color labels are compatible."""
-        if not detected or not roster:
-            return 0.0
-
-        detected = detected.lower().strip()
-        roster = roster.lower().strip()
-        if detected == roster:
-            return 1.0
-
-        color_families = {
-            "red": {"red", "crimson", "dark red", "maroon", "burgundy"},
-            "white": {"white", "light gray", "off-white", "cream"},
-            "blue": {"blue", "navy", "royal blue", "dark blue"},
-            "black": {"black", "dark gray", "charcoal"},
-            "yellow": {"yellow", "gold", "orange-yellow"},
-            "green": {"green", "dark green", "forest green"},
-        }
-
-        detected_family = next((family for family, colors in color_families.items() if detected in colors), None)
-        roster_family = next((family for family, colors in color_families.items() if roster in colors), None)
-        if detected_family and detected_family == roster_family:
-            return 0.9
-        return 0.0
+        """Delegation stub: color match score via RosterRepository."""
+        return RosterRepository._color_match_score(detected, roster)
 
     def deassign_faces(self, face_ids: List[int]):
         """Delegation stub: deassign faces via FaceRepository."""
