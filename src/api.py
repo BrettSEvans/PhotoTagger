@@ -518,7 +518,7 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
 
                     if not file_path or not os.path.exists(file_path):
                         continue
-                    if db.photos.photo_has_faces(photo_id):
+                    if db.faces.photo_has_faces(photo_id):
                         skipped_existing += 1
                         continue
                     try:
