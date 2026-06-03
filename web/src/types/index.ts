@@ -254,6 +254,9 @@ export interface PlayerCluster {
   thumbnail_face_id: number | null;
   created_at: string;
   roster_entry_id?: number | null;
+  /** Set once the cluster is assigned to a roster player (e.g. from Review or the Players tab). */
+  player_name?: string | null;
+  jersey_number?: string | null;
 }
 
 /**
