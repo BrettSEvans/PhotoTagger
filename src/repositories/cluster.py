@@ -53,7 +53,10 @@ class ClusterRepository(BaseRepository):
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
                        player_name, jersey_number, roster_entry_id,
-                       (SELECT MAX(f.face_size_ratio) FROM faces f WHERE f.cluster_id = pc.id) as max_face_size
+                       (SELECT MAX(f.face_size_ratio) FROM faces f WHERE f.cluster_id = pc.id) as max_face_size,
+                       (SELECT COUNT(*) FROM faces f WHERE f.cluster_id = pc.id
+                        AND f.jersey_color IS NOT NULL AND f.jersey_color != 'black'
+                        AND (f.jersey_color_conf IS NULL OR f.jersey_color_conf >= 0.45)) as team_jersey_faces
                 FROM player_clusters pc
                 ORDER BY photo_count DESC
             """)
@@ -62,9 +65,12 @@ class ClusterRepository(BaseRepository):
                 player_name = row[5]
                 photo_count = row[2] or 0
                 max_face_size = row[8] or 0.0
+                team_jersey_faces = row[9] or 0
                 # Always surface clusters the user has already assigned
                 if player_name is None:
-                    if photo_count < min_photos:
+                    # Singletons: keep if at least one face has a confident team jersey
+                    # (a player may only appear clearly in one photo — don't discard them)
+                    if photo_count < min_photos and team_jersey_faces == 0:
                         continue
                     if min_prominence > 0 and max_face_size < min_prominence:
                         continue
