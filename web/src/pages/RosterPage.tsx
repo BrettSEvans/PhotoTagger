@@ -723,37 +723,41 @@ export const RosterPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Team name input for import */}
-            <div>
-              <label htmlFor="importTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Team Name
-              </label>
-              <input
-                id="importTeam"
-                type="text"
-                value={importTeam}
-                onChange={e => setImportTeam(e.target.value)}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-              />
+            {/* Team name and year stacked */}
+            <div className="col-span-2 space-y-3">
+              {/* Team name input for import */}
+              <div>
+                <label htmlFor="importTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Team Name
+                </label>
+                <input
+                  id="importTeam"
+                  type="text"
+                  value={importTeam}
+                  onChange={e => setImportTeam(e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              {/* Year input for import */}
+              <div>
+                <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Year
+                </label>
+                <input
+                  id="importTeamYear"
+                  type="number"
+                  value={importTeamYear ?? ''}
+                  onChange={e => setImportTeamYear(e.target.value ? Number(e.target.value) : null)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
               {importMsg && importMsg.type === 'success' && (
-                <div className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-3 mt-3">
+                <div className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-3">
                   <p className="font-jakarta text-xs text-quaternary font-bold">{importMsg.text}</p>
                 </div>
               )}
-            </div>
-
-            {/* Year input for import */}
-            <div>
-              <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Year
-              </label>
-              <input
-                id="importTeamYear"
-                type="number"
-                value={importTeamYear ?? ''}
-                onChange={e => setImportTeamYear(e.target.value ? Number(e.target.value) : null)}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-              />
             </div>
           </div>
 
