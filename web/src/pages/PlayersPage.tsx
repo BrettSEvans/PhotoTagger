@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
+import AssignPlayerPanel, { AssignedInfo } from '../components/AssignPlayerPanel';
 import photoTaggerClient from '../api/photoTaggerClient';
 import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem } from '../types/index';
 
@@ -27,7 +28,29 @@ export const PlayersPage: React.FC = () => {
   const [detectResult, setDetectResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // ── Tagging ─────────────────────────────────────────────────────────────
+  const [taggingPlayer, setTaggingPlayer] = useState<PlayerCluster | null>(null);
+  const [assignMsg, setAssignMsg] = useState<string | null>(null);
+
   useEffect(() => { loadStatus(); }, []);
+
+  /**
+   * Reflect an assignment in local state: name the tagged cluster, plus any
+   * clusters the similarity scan auto-tagged as the same player.
+   */
+  const applyAssignment = (clusterId: number, info: AssignedInfo) => {
+    const autoTagged = new Set((info.matches?.auto_tagged ?? []).map(m => m.cluster_id));
+    const tag = (c: PlayerCluster): PlayerCluster =>
+      (c.id === clusterId || autoTagged.has(c.id))
+        ? { ...c, player_name: info.playerName, jersey_number: info.jerseyNumber, roster_entry_id: info.rosterEntryId }
+        : c;
+
+    setPlayers(prev => prev.map(tag));
+    setSelectedPlayer(prev => (prev ? tag(prev) : prev));
+
+    const extra = autoTagged.size > 0 ? ` · also tagged ${autoTagged.size} more from other photos` : '';
+    setAssignMsg(`Tagged as ${info.playerName} #${info.jerseyNumber}${extra}`);
+  };
 
   const loadStatus = async () => {
     setIsLoadingStatus(true);
@@ -101,6 +124,7 @@ export const PlayersPage: React.FC = () => {
   const handlePlayerClick = async (player: PlayerCluster) => {
     setSelectedPlayer(player);
     setView('player-detail');
+    setAssignMsg(null);
     setIsLoadingPhotos(true);
     setPlayerPhotos([]);
     try {
@@ -116,6 +140,7 @@ export const PlayersPage: React.FC = () => {
     setSelectedPlayer(null);
     setPlayerPhotos([]);
     setError(null);
+    setAssignMsg(null);
   };
 
   if (isLoadingStatus) {
@@ -147,12 +172,31 @@ export const PlayersPage: React.FC = () => {
               />
             </div>
           )}
-          <div>
-            <h1 className="font-outfit text-4xl font-extrabold text-foreground">Player {selectedPlayer.id}</h1>
+          <div className="flex-1">
+            <h1 className="font-outfit text-4xl font-extrabold text-foreground">
+              {selectedPlayer.player_name || `Player ${selectedPlayer.id}`}
+              {selectedPlayer.jersey_number && (
+                <span className="ml-3 align-middle text-2xl text-accent">#{selectedPlayer.jersey_number}</span>
+              )}
+            </h1>
             <p className="font-jakarta text-muted-fg mt-1">
               {selectedPlayer.photo_count} photos · {selectedPlayer.face_count} appearances
             </p>
           </div>
+        </div>
+
+        {/* Inline tagging — reuses the shared assign + match-similar workflow */}
+        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop p-4 space-y-2">
+          <p className="font-outfit font-bold text-foreground text-sm">
+            {selectedPlayer.player_name ? 'Re-tag this player' : 'Tag this player'}
+          </p>
+          <AssignPlayerPanel
+            clusterId={selectedPlayer.id}
+            onAssigned={(info) => applyAssignment(selectedPlayer.id, info)}
+          />
+          {assignMsg && (
+            <p role="status" className="font-jakarta text-xs text-foreground bg-quaternary/20 rounded-lg px-2 py-1">✅ {assignMsg}</p>
+          )}
         </div>
 
         {error && (
@@ -296,6 +340,13 @@ export const PlayersPage: React.FC = () => {
         </div>
       )}
 
+      {assignMsg && !taggingPlayer && (
+        <div role="status" aria-live="polite" className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-4 flex items-center justify-between">
+          <p className="font-jakarta text-sm font-medium text-foreground">✅ {assignMsg}</p>
+          <button onClick={() => setAssignMsg(null)} className="font-jakarta text-xs text-muted-fg hover:text-foreground underline">Dismiss</button>
+        </div>
+      )}
+
       {/* Player grid */}
       {isLoadingPlayers ? (
         <div className="flex justify-center py-12"><LoadingSpinner message="Loading players…" /></div>
@@ -304,36 +355,53 @@ export const PlayersPage: React.FC = () => {
           <p className="font-jakarta text-sm text-muted-fg">{players.length} unique players identified</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
             {players.map((player, i) => (
-              <button
+              <div
                 key={player.id}
-                onClick={() => handlePlayerClick(player)}
                 className={`group sticker-card bg-white border-2 border-foreground rounded-2xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} p-3 flex flex-col items-center gap-2 text-center`}
               >
-                <div className={`w-20 h-20 rounded-full overflow-hidden border-2 ${ACCENT_RINGS[i % ACCENT_RINGS.length]} bg-muted`}>
-                  {player.thumbnail_face_id ? (
-                    <img
-                      src={photoTaggerClient.getFaceCropUrl(player.thumbnail_face_id)}
-                      alt={`Player ${player.id}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none';
-                        const p = e.currentTarget.parentElement;
-                        if (p) p.innerHTML = `<div class="w-full h-full flex items-center justify-center"><svg class="w-5 h-5 text-muted-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div>`;
-                      }}
-                    />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-muted-fg">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                      </svg>
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <p className="font-outfit font-bold text-foreground text-sm">Player {player.id}</p>
-                  <p className="font-jakarta text-xs text-muted-fg">{player.photo_count} photo{player.photo_count !== 1 ? 's' : ''}</p>
-                </div>
-              </button>
+                <button
+                  onClick={() => handlePlayerClick(player)}
+                  className="flex flex-col items-center gap-2 w-full"
+                >
+                  <div className={`relative w-20 h-20 rounded-full overflow-hidden border-2 ${ACCENT_RINGS[i % ACCENT_RINGS.length]} bg-muted`}>
+                    {player.thumbnail_face_id ? (
+                      <img
+                        src={photoTaggerClient.getFaceCropUrl(player.thumbnail_face_id)}
+                        alt={player.player_name || `Player ${player.id}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.style.display = 'none';
+                          const p = e.currentTarget.parentElement;
+                          if (p) p.innerHTML = `<div class="w-full h-full flex items-center justify-center"><svg class="w-5 h-5 text-muted-fg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div>`;
+                        }}
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center text-muted-fg">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                      </div>
+                    )}
+                    {player.jersey_number && (
+                      <span className="absolute -bottom-0.5 -right-0.5 bg-accent text-white font-jakarta text-[10px] font-bold px-1.5 py-0.5 rounded-full border-2 border-foreground">
+                        #{player.jersey_number}
+                      </span>
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-outfit font-bold text-foreground text-sm truncate max-w-[8rem]">
+                      {player.player_name || `Player ${player.id}`}
+                    </p>
+                    <p className="font-jakarta text-xs text-muted-fg">{player.photo_count} photo{player.photo_count !== 1 ? 's' : ''}</p>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { setTaggingPlayer(player); setAssignMsg(null); }}
+                  className="btn-candy w-full bg-tertiary text-white font-jakarta font-bold text-xs px-3 py-1.5 rounded-full border-2 border-foreground shadow-pop hover:opacity-90"
+                >
+                  {player.player_name ? '✎ Re-tag' : '+ Tag'}
+                </button>
+              </div>
             ))}
           </div>
         </>
@@ -352,6 +420,58 @@ export const PlayersPage: React.FC = () => {
           </p>
         </div>
       ) : null}
+
+      {/* Tag modal — same assign + match-similar workflow as the detail page */}
+      {taggingPlayer && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setTaggingPlayer(null)}
+        >
+          <div
+            className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg w-full max-w-md p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              {taggingPlayer.thumbnail_face_id && (
+                <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-foreground flex-shrink-0">
+                  <img
+                    src={photoTaggerClient.getFaceCropUrl(taggingPlayer.thumbnail_face_id)}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                  />
+                </div>
+              )}
+              <div className="flex-1">
+                <h3 className="font-outfit font-bold text-foreground">
+                  {taggingPlayer.player_name ? 'Re-tag player' : 'Tag player'}
+                </h3>
+                <p className="font-jakarta text-xs text-muted-fg">
+                  {taggingPlayer.player_name || `Player ${taggingPlayer.id}`} · {taggingPlayer.photo_count} photos
+                </p>
+              </div>
+              <button
+                onClick={() => setTaggingPlayer(null)}
+                aria-label="Close"
+                className="text-muted-fg hover:text-foreground text-xl leading-none px-1"
+              >
+                ×
+              </button>
+            </div>
+
+            <AssignPlayerPanel
+              clusterId={taggingPlayer.id}
+              autoFocus
+              onAssigned={(info) => {
+                applyAssignment(taggingPlayer.id, info);
+                setTaggingPlayer(null);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };
