@@ -16,6 +16,7 @@ export default {
         tertiary:    '#FBBF24',
         quaternary:  '#34D399',
         frame:       '#E2E8F0',
+        'fluorescent-orange': '#FF6600',
       },
       fontFamily: {
         outfit:  ['Outfit', 'system-ui', 'sans-serif'],

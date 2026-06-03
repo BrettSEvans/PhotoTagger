@@ -6,6 +6,20 @@ import os
 FACE_DETECTION_CONFIDENCE_THRESHOLD = 0.5
 FACE_EMBEDDING_DIM = 384  # InsightFace default
 
+# ── Jersey Number OCR Detection ────────────────────────────────────────────
+# EasyOCR confidence threshold for accepting a detected digit. Lower values = more
+# false positives (words/signs), higher = may miss faint/worn numbers.
+OCR_MIN_CONFIDENCE = 0.45
+# Jersey numbers are 0-99. Anything 3+ digits is almost always merged signage/text.
+JERSEY_DIGIT_MIN_LENGTH = 1
+JERSEY_DIGIT_MAX_LENGTH = 2
+# Bbox aspect ratio sanity: width/height should be plausible for a digit (not a word).
+# Numbers are typically taller than wide; reject if ratio > 1.5 (wide/short = text).
+JERSEY_BBOX_MAX_ASPECT_RATIO = 1.5
+# Spatial dedup: if a detection overlaps with a higher-confidence detection by this
+# IoU (Intersection over Union), suppress the lower-confidence one.
+JERSEY_BBOX_OVERLAP_DEDUP_IOU = 0.3
+
 # Parallel Processing
 def get_optimal_worker_count():
     """

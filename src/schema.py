@@ -180,4 +180,28 @@ def init_schema(conn: sqlite3.Connection) -> None:
     except Exception:
         pass
 
+    # Add OCR bounding box coordinates for jersey number detections
+    try:
+        cursor.execute("ALTER TABLE ocr_results ADD COLUMN bbox_x0 INTEGER")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE ocr_results ADD COLUMN bbox_y0 INTEGER")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE ocr_results ADD COLUMN bbox_x1 INTEGER")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE ocr_results ADD COLUMN bbox_y1 INTEGER")
+    except Exception:
+        pass
+
+    # Add roster_entry_id to ocr_results for linking to player rosters
+    try:
+        cursor.execute("ALTER TABLE ocr_results ADD COLUMN roster_entry_id INTEGER REFERENCES rosters(id)")
+    except Exception:
+        pass
+
     conn.commit()

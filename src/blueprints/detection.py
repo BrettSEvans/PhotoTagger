@@ -16,15 +16,22 @@ bp = Blueprint("detection", __name__)
 @bp.route("/api/detect-faces", methods=["POST"])
 def detect_faces_endpoint():
     """
-    Run face detection on all photos and store embeddings.
+    Run face detection and jersey number recognition on all photos.
 
     JSON body (optional):
     {
         "photo_ids": [1, 2, 3]  // Optional: process specific photos
     }
+
+    Returns a job ID for async processing. The job will:
+    1. Validate game context has jersey colors for both teams
+    2. Run face detection (existing)
+    3. Run jersey number recognition and roster matching (new)
+    4. Return combined results
     """
     from src.face_detector import FaceDetector
     from src.uniform_detector import UniformDetector
+    from src.jersey_recognition import JerseyRecognizer
 
     db = current_app.db
     app_job_runner = current_app.job_runner
@@ -33,18 +40,34 @@ def detect_faces_endpoint():
     photo_ids = data.get("photo_ids", None)
 
     try:
+        # Validate game context has jersey colors before starting detection
+        game_context = db.context.get_game_context()
+        missing_colors = []
+        for team in game_context:
+            if not team.get("uniform_color") or not team.get("uniform_color").strip():
+                missing_colors.append(team.get("team_name", "Unknown team"))
+
+        if missing_colors:
+            error_msg = f"Jersey colors required for player matching. Missing colors for: {', '.join(missing_colors)}. Please fill out the Game Context card."
+            logger.warning(f"detect-faces validation failed: {error_msg}")
+            return jsonify({"error": error_msg, "code": "MISSING_JERSEY_COLORS"}), 400
+
         def run_detection(job_id: int):
             detector = FaceDetector()
             uniform = UniformDetector()
+            recognizer = JerseyRecognizer(db)
             photos = db.photos.get_all_photos()
 
             if photo_ids:
                 photos = [p for p in photos if p["id"] in set(photo_ids)]
 
             total_faces = 0
+            total_jersey_detections = 0
+            jersey_matched = 0
             errors = 0
             skipped_existing = 0
 
+            # Phase 1: Face detection
             for idx, photo in enumerate(photos):
                 photo_id = photo["id"]
                 file_path = photo.get("file_path", "")
@@ -77,8 +100,8 @@ def detect_faces_endpoint():
                         )
                     total_faces += len(faces)
 
-                    # Update job with per-photo progress message
-                    progress = int((idx + 1) / max(len(photos), 1) * 95)  # 95% max, leave 100 for completion
+                    # Update job with per-photo progress message (phase 1: 0-70%)
+                    progress = int((idx + 1) / max(len(photos), 1) * 70)
                     db.jobs.update_processing_job(
                         job_id,
                         progress=progress,
@@ -89,9 +112,37 @@ def detect_faces_endpoint():
                     logger.error(f"Face detection error on photo {photo_id}: {e}")
                     errors += 1
 
+            # Phase 2: Jersey number recognition and roster matching
+            logger.info("Starting jersey number recognition...")
+            try:
+                photo_ids_to_process = [p["id"] for p in photos]
+                jersey_matches = recognizer.process_photos(photo_ids_to_process, game_context)
+                for detections in jersey_matches.values():
+                    total_jersey_detections += len(detections)
+                    jersey_matched += sum(1 for d in detections if d.get("roster_entry_id"))
+            except Exception as e:
+                logger.error(f"Jersey recognition error: {e}")
+                errors += 1
+
+            # Update job to completion
+            db.jobs.update_processing_job(
+                job_id,
+                progress=100,
+                result={
+                    "photos_processed": len(photos),
+                    "faces_detected": total_faces,
+                    "jersey_detections": total_jersey_detections,
+                    "matched_to_roster": jersey_matched,
+                    "photos_skipped_existing": skipped_existing,
+                    "errors": errors,
+                }
+            )
+
             return {
                 "photos_processed": len(photos),
                 "faces_detected": total_faces,
+                "jersey_detections": total_jersey_detections,
+                "matched_to_roster": jersey_matched,
                 "photos_skipped_existing": skipped_existing,
                 "errors": errors,
             }
@@ -206,6 +257,51 @@ def get_players():
         return jsonify({"error": str(e)}), 500
 
 
+@bp.route("/api/photos/<int:photo_id>/jersey-detections", methods=["GET"])
+def get_jersey_detections_for_photo(photo_id: int):
+    """Get all jersey number detections for a specific photo with roster information.
+
+    Returns:
+    {
+        "photo_id": 2684,
+        "detections": [
+            {
+                "id": 105,
+                "jersey_number": "31",
+                "confidence": 0.94,
+                "bbox": [x0, y0, x1, y1],
+                "roster_entry_id": 42,
+                "player_name": "Nathan De Morgan",
+                "team_name": "Carleton (CUT)",
+                "uniform_color": "red"
+            },
+            ...
+        ],
+        "total": 2
+    }
+    """
+    db = current_app.db
+
+    try:
+        # Verify photo exists
+        photo = db.photos.get_photo_by_id(photo_id)
+        if not photo:
+            return jsonify({"error": "Photo not found"}), 404
+
+        # Get jersey detections with roster info
+        detections = db.photos.get_jersey_detections(photo_id)
+
+        return jsonify({
+            "photo_id": photo_id,
+            "detections": detections,
+            "total": len(detections),
+        }), 200
+
+    except Exception as e:
+        logger.error(f"get-jersey-detections error for photo {photo_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @bp.route("/api/players/<int:cluster_id>/photos", methods=["GET"])
 def get_player_photos(cluster_id: int):
     """Get all photos containing a specific player."""
@@ -286,6 +382,30 @@ def serve_face_crop(face_id: int):
 
     except Exception as e:
         logger.error(f"face-crop error for face {face_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/players/<int:cluster_id>/faces/<int:face_id>", methods=["DELETE"])
+def remove_face_from_cluster(cluster_id: int, face_id: int):
+    """Remove a face from a player cluster (deselect a photo from tagged group)."""
+    db = current_app.db
+    try:
+        db.faces.deassign_faces([face_id])
+        return jsonify({"success": True, "message": f"Removed face {face_id} from cluster {cluster_id}"}), 200
+    except Exception as e:
+        logger.error(f"Error removing face {face_id} from cluster {cluster_id}: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/consolidate-player/<string:player_name>", methods=["POST"])
+def consolidate_player_clusters(player_name: str):
+    """Merge all clusters with the same player_name into one primary cluster."""
+    db = current_app.db
+    try:
+        result = db.clusters.consolidate_player_clusters(player_name)
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error consolidating clusters for player {player_name}: {e}")
         return jsonify({"error": str(e)}), 500
 
 

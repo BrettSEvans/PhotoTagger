@@ -44,6 +44,7 @@ def update_batch(batch_id: int):
             team_name=data.get("team_name"),
             team_year=data.get("team_year"),
             tournament=data.get("tournament"),
+            name=data.get("name"),
         )
         batch = db.batches.get_batch(batch_id)
         return jsonify({"success": True, "batch": batch}), 200

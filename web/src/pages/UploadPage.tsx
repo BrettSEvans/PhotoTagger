@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
-import PhotoUpload from '../components/PhotoUpload';
+import SelectPhotosCard from '../components/SelectPhotosCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { SidebarLayout } from '../components/SidebarLayout';
 import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
 import { useSidebar } from '../contexts/SidebarContext';
-import type { ProcessingSummary, TaggedPhoto, ReviewPhoto, PhotoBatch } from '../types/index';
+import type { ProcessingSummary, TaggedPhoto, ReviewPhoto, PhotoBatch, CrawlResult } from '../types/index';
 
 type TabId = 'confirmed' | 'review';
 
 const SHADOW_CLASSES = ['shadow-pop', 'shadow-pop-pink', 'shadow-pop-yellow', 'shadow-pop-mint', 'shadow-pop-violet'];
 
 export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?: () => void }> = ({ onOpenWorkspace, onGoToRoster }) => {
-  const { setSelectedGame, clearSelection } = useSidebar();
+  const { selectedGame, selectedTournament, selectedYear, setSelectedGame, clearSelection } = useSidebar();
   const [summary,       setSummary]       = useState<ProcessingSummary | null>(null);
   const [confirmedPhotos, setConfirmedPhotos] = useState<TaggedPhoto[]>([]);
   const [reviewPhotos,  setReviewPhotos]  = useState<ReviewPhoto[]>([]);
@@ -23,8 +23,8 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
   const [showPostUploadMessage, setShowPostUploadMessage] = useState(false);
   const [gameContext, setGameContext] = useState<any[]>([
-    { team_name: '', team_year: 0 },
-    { team_name: '', team_year: 0 },
+    { team_name: '', team_year: 0, uniform_color: '' },
+    { team_name: '', team_year: 0, uniform_color: '' },
   ]);
   const [tournament, setTournament] = useState('');
   const [tournamentInput, setTournamentInput] = useState('');
@@ -32,6 +32,14 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const [contextMsg, setContextMsg] = useState<string | null>(null);
   const [rosterTeams, setRosterTeams] = useState<string[]>([]);
   const [rosterTeamYears, setRosterTeamYears] = useState<Record<string, number>>({});
+
+  // Photo selection state (lifted from PhotoUpload)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [photoDirectory, setPhotoDirectory] = useState('');
+  const [uploadMode, setUploadMode] = useState<'files' | 'directory'>('files');
+  const [isDragging, setIsDragging] = useState(false);
+  const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isSavingGame, setIsSavingGame] = useState(false);
 
   const confirmedPhotosForDisplay = useMemo(() => {
     const grouped = new Map<string, TaggedPhoto[]>();
@@ -76,7 +84,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     try {
       const data = await photoTaggerClient.getGameContext();
       if (data.teams.length > 0) {
-        setGameContext(data.teams.map((t: any) => ({ team_name: t.team_name, team_year: t.team_year })));
+        setGameContext(data.teams.map((t: any) => ({ team_name: t.team_name, team_year: t.team_year, uniform_color: t.uniform_color ?? '' })));
       }
     } catch { /* non-critical */ }
   }, []);
@@ -106,6 +114,43 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     loadRosterTeams();
   }, [loadSummary, loadBatches, loadGameContext, loadRosterTeams]);
 
+  // When a game is selected from the sidebar, populate the Game Details form
+  useEffect(() => {
+    if (!selectedGame || batches.length === 0) return;
+
+    // Find the batch that matches the selected game
+    const selectedBatch = batches.find(b => b.source_folder === selectedGame || b.id.toString() === selectedGame);
+    if (!selectedBatch) return;
+
+    // Parse the game name to extract Team A and Team B
+    // Game name format is typically "Team A vs Team B"
+    const teamA = selectedBatch.team_name || '';
+    let teamB = '';
+
+    if (selectedBatch.name) {
+      const vsIndex = selectedBatch.name.indexOf(' vs ');
+      if (vsIndex > -1) {
+        teamB = selectedBatch.name.substring(vsIndex + 4).trim();
+      }
+    }
+
+    // Populate the form
+    setTournament(selectedBatch.tournament || '');
+    setTournamentInput(selectedBatch.tournament || '');
+    setGameContext([
+      {
+        team_name: teamA,
+        team_year: selectedBatch.team_year || 0,
+        uniform_color: '',
+      },
+      {
+        team_name: teamB,
+        team_year: selectedBatch.team_year || 0,
+        uniform_color: '',
+      },
+    ]);
+  }, [selectedGame, batches]);
+
   const handleUploadSuccess = () => {
     loadSummary();
     loadBatches();
@@ -122,7 +167,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     const year = rosterTeamYears[teamName] ?? 0;
     setGameContext(prev => {
       const next = [...prev];
-      next[index] = { team_name: teamName, team_year: year };
+      next[index] = { team_name: teamName, team_year: year, uniform_color: '' };
       return next;
     });
   };
@@ -130,7 +175,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const updateContextTeam = (index: number, patch: any) => {
     setGameContext(prev => {
       const next = [...prev];
-      next[index] = { ...(next[index] ?? { team_name: '', team_year: 0 }), ...patch };
+      next[index] = { ...(next[index] ?? { team_name: '', team_year: 0, uniform_color: '' }), ...patch };
       return next;
     });
   };
@@ -142,7 +187,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         .map(team => ({
           team_name: (team.team_name ?? '').trim(),
           team_year: Number(team.team_year) || new Date().getFullYear(),
-          uniform_color: '',
+          uniform_color: (team.uniform_color ?? '').trim(),
         }))
         .filter(team => team.team_name);
       await photoTaggerClient.setGameContext(teams);
@@ -150,15 +195,19 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
 
       // Tag the most recently uploaded batch with tournament + team info so the
       // sidebar hierarchy populates immediately.
-      const teamA = teams[0];
-      const teamB = teams[1];
-      if (teamA && batches.length > 0) {
+      if (batches.length > 0) {
         const latestBatch = batches.reduce((a, b) => (b.id > a.id ? b : a));
+        const teamA = teams[0];
+        const teamB = teams[1];
+        const gameName = teamB
+          ? `${teamA.team_name} vs ${teamB.team_name}`
+          : teamA.team_name;
+
         await photoTaggerClient.updateBatch(latestBatch.id, {
           tournament: tournament.trim() || undefined,
-          team_name: teamA.team_name,
-          team_year: teamA.team_year,
-          name: teamB ? `${teamA.team_name} vs ${teamB.team_name}` : teamA.team_name,
+          team_name: teamA?.team_name || undefined,
+          team_year: teamA?.team_year,
+          name: gameName,
         });
       }
 
@@ -187,6 +236,130 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     if (c >= 0.7) return 'bg-quaternary';
     if (c >= 0.4) return 'bg-tertiary';
     return 'bg-secondary';
+  };
+
+  // Drag and drop handlers for file selection
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFiles = files.filter(file => file.type.startsWith('image/'));
+
+    if (imageFiles.length === 0) {
+      setUploadMessage({
+        type: 'error',
+        text: 'Please drop image files only (JPG, PNG, TIFF, HEIC, WebP)',
+      });
+      return;
+    }
+
+    setSelectedFiles(imageFiles);
+    setUploadMessage(null);
+  };
+
+  // Unified handler: save game + upload photos
+  const handleSaveGameAndUpload = async () => {
+    if (selectedFiles.length === 0) {
+      setUploadMessage({ type: 'error', text: 'Please select at least one photo' });
+      return;
+    }
+
+    if (!gameContext[0]?.team_name) {
+      setUploadMessage({ type: 'error', text: 'Please enter Team A name' });
+      return;
+    }
+
+    setIsSavingGame(true);
+    try {
+      // 1. Save game context first
+      setContextMsg(null);
+      const teams = gameContext
+        .map(team => ({
+          team_name: (team.team_name ?? '').trim(),
+          team_year: Number(team.team_year) || new Date().getFullYear(),
+          uniform_color: (team.uniform_color ?? '').trim(),
+        }))
+        .filter(team => team.team_name);
+
+      await photoTaggerClient.setGameContext(teams);
+
+      // Update batch with game name
+      if (batches.length > 0) {
+        const latestBatch = batches.reduce((a, b) => (b.id > a.id ? b : a));
+        const teamA = teams[0];
+        const teamB = teams[1];
+        const gameName = teamB
+          ? `${teamA.team_name} vs ${teamB.team_name}`
+          : teamA.team_name;
+
+        await photoTaggerClient.updateBatch(latestBatch.id, {
+          tournament: tournament.trim() || undefined,
+          team_name: teamA?.team_name || undefined,
+          team_year: teamA?.team_year,
+          name: gameName,
+        });
+      }
+
+      await loadBatches();
+      setContextMsg('Game saved');
+
+      // 2. Upload photos
+      setUploadMessage(null);
+      const formData = new FormData();
+      selectedFiles.forEach(file => formData.append('files', file));
+
+      const response = await photoTaggerClient.uploadPhotos(formData);
+
+      // Poll job status
+      const job = await photoTaggerClient.pollJob<CrawlResult>(response.job_id, {
+        onUpdate: currentJob => {
+          if (currentJob.status === 'queued') {
+            setUploadMessage({ type: 'success', text: 'Processing queued…' });
+          } else if (currentJob.status === 'running') {
+            setUploadMessage({ type: 'success', text: `Processing… ${currentJob.progress}%` });
+          }
+        },
+      });
+
+      const result = job.result as CrawlResult;
+      if (!result) {
+        throw new Error('Upload finished without a result');
+      }
+
+      // 3. Show success and clear
+      setUploadMessage({
+        type: 'success',
+        text: `Added ${result.photos_ingested} photos · ${result.duplicates_skipped} duplicates skipped`,
+      });
+      setSelectedFiles([]);
+      setPhotoDirectory('');
+      setShowPostUploadMessage(true);
+      setTimeout(() => setShowPostUploadMessage(false), 8000);
+      await loadSummary();
+      await loadBatches();
+    } catch (error) {
+      console.error('Failed to save game and upload photos:', error);
+      setUploadMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to save game and upload photos',
+      });
+    } finally {
+      setIsSavingGame(false);
+    }
   };
 
   return (
@@ -228,6 +401,26 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         </div>
       )}
 
+      {/* ── Step 1: Select Photos ────────────────────────────────────────────── */}
+      <SelectPhotosCard
+        selectedFiles={selectedFiles}
+        uploadMode={uploadMode}
+        photoDirectory={photoDirectory}
+        isDragging={isDragging}
+        message={uploadMessage}
+        isLoading={isSavingGame}
+        onFilesSelected={setSelectedFiles}
+        onModeChange={setUploadMode}
+        onDirectoryChange={setPhotoDirectory}
+        onClear={() => {
+          setSelectedFiles([]);
+          setUploadMessage(null);
+        }}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      />
+
       {/* ── Game Context ────────────────────────────────────────────────────── */}
       {(() => {
         const existingTournaments = [...new Set(batches.map(b => b.tournament).filter(Boolean))] as string[];
@@ -237,15 +430,9 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         return (
         <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-quaternary rounded-full border-2 border-foreground opacity-80" />
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="font-outfit text-lg font-bold text-foreground">Game Context</h2>
-            <button
-              type="button"
-              onClick={saveGameContext}
-              className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop whitespace-nowrap"
-            >
-              Save Game
-            </button>
+          <div className="flex items-center gap-2">
+            <span className="font-outfit text-lg font-bold text-foreground">2.</span>
+            <h2 className="font-outfit text-lg font-bold text-foreground">Game Details</h2>
           </div>
 
           {/* Tournament typeahead */}
@@ -283,27 +470,40 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
                 <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">
                   Team {index === 0 ? 'A' : 'B'}
                 </label>
-                <div className="flex flex-wrap gap-1.5">
+                <select
+                  value={gameContext[index]?.team_name || ''}
+                  onChange={e => {
+                    if (e.target.value) {
+                      selectContextTeam(index, e.target.value);
+                    } else {
+                      updateContextTeam(index, { team_name: '', team_year: 0, uniform_color: '' });
+                    }
+                  }}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                >
+                  <option value="">— Select Team —</option>
                   {rosterTeams.map(team => (
-                    <button
-                      key={team}
-                      type="button"
-                      onClick={() => selectContextTeam(index, team)}
-                      className={`font-jakarta text-xs px-2.5 py-1 rounded-full border-2 transition-colors ${
-                        gameContext[index]?.team_name === team
-                          ? 'bg-accent text-white border-foreground shadow-pop'
-                          : 'bg-white text-foreground border-frame hover:border-foreground'
-                      }`}
-                    >
+                    <option key={team} value={team}>
                       {team}
-                    </button>
+                    </option>
                   ))}
-                </div>
+                </select>
                 {gameContext[index]?.team_name && (
-                  <p className="font-jakarta text-xs text-muted-fg">
-                    {gameContext[index].team_name}
-                    {gameContext[index].team_year ? ` · ${gameContext[index].team_year}` : ''}
-                  </p>
+                  <>
+                    <p className="font-jakarta text-xs text-muted-fg">
+                      {gameContext[index].team_name}
+                      {gameContext[index].team_year ? ` · ${gameContext[index].team_year}` : ''}
+                    </p>
+                    <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">
+                      Jersey Color
+                    </label>
+                    <input
+                      type="text"
+                      value={gameContext[index].uniform_color ?? ''}
+                      onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
+                      className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                    />
+                  </>
                 )}
               </div>
             ))}
@@ -318,8 +518,22 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         );
       })()}
 
-      {/* Import form */}
-      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
+      {/* ── Step 3: Unified CTA ──────────────────────────────────────────── */}
+      <div className="flex gap-3 items-center">
+        <span className="font-outfit text-lg font-bold text-foreground">3.</span>
+        <button
+          onClick={handleSaveGameAndUpload}
+          disabled={isSavingGame || selectedFiles.length === 0 || !gameContext[0]?.team_name}
+          className="flex-1 btn-candy bg-accent text-white font-jakarta font-bold px-6 py-4 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 disabled:cursor-not-allowed text-lg"
+        >
+          {isSavingGame ? (
+            <span className="flex items-center justify-center gap-2">
+              <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              Saving game & uploading…
+            </span>
+          ) : 'Save game & upload photos'}
+        </button>
+      </div>
 
       {/* ── Summary Accordion ──────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden relative">

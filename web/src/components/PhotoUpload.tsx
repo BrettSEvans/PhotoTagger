@@ -5,9 +5,11 @@ import type { CrawlResult } from '../types/index';
 
 interface PhotoUploadProps {
   onUploadSuccess?: () => void;
+  gameContext?: Array<{ team_name: string; team_year: number; uniform_color: string }>;
+  tournament?: string;
 }
 
-export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => {
+export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess, gameContext = [], tournament = '' }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const folderInputRef = useRef<HTMLInputElement>(null);
   const dropZoneRef = useRef<HTMLDivElement>(null);
@@ -156,7 +158,25 @@ export const PhotoUpload: React.FC<PhotoUploadProps> = ({ onUploadSuccess }) => 
       {/* Floating accent dot */}
       <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground" />
 
-      <h2 className="font-outfit text-xl font-bold text-foreground mb-5">Add Photos</h2>
+      <div className="mb-5">
+        <h2 className="font-outfit text-xl font-bold text-foreground">Add Photos</h2>
+        {/* Game metadata display */}
+        {(gameContext.some(t => t.team_name) || tournament) && (
+          <p className="font-jakarta text-xs text-muted-fg mt-2">
+            {tournament && <span>{tournament}</span>}
+            {tournament && gameContext.some(t => t.team_name) && <span> · </span>}
+            {gameContext
+              .filter(t => t.team_name)
+              .map((t, i) => (
+                <span key={i}>
+                  {t.team_name}
+                  {t.team_year ? ` (${t.team_year})` : ''}
+                  {i < gameContext.filter(t => t.team_name).length - 1 ? ' vs ' : ''}
+                </span>
+              ))}
+          </p>
+        )}
+      </div>
 
       {/* Upload mode toggle */}
       <div className="flex gap-2 mb-4">

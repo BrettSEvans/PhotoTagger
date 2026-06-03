@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { SidebarLayout } from '../components/SidebarLayout';
@@ -7,7 +8,8 @@ import { useSidebar } from '../contexts/SidebarContext';
 import type { GameContextTeam, RosterEntry } from '../types/index';
 
 export const RosterPage: React.FC = () => {
-  const { selectedYear, selectedTeam } = useSidebar();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { selectedYear, selectedTeam, setSelectedTeam, setSelectedYear } = useSidebar();
   const [entries, setEntries]       = useState<RosterEntry[]>([]);
   const [isLoading, setIsLoading]   = useState(true);
   const [error, setError]           = useState<string | null>(null);
@@ -30,16 +32,18 @@ export const RosterPage: React.FC = () => {
   const [isResetting,  setIsResetting]  = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
 
+  // Delete roster confirmation
+  const [showDeleteRosterConfirm, setShowDeleteRosterConfirm] = useState(false);
+  const [deleteRosterMode, setDeleteRosterMode] = useState<'all' | 'team'>('team');
+
   // Bulk import state
   const [isDragging, setIsDragging] = useState(false);
   const [isParsing,  setIsParsing]  = useState(false);
   const [importMsg,  setImportMsg]  = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [rosterUrl,  setRosterUrl]  = useState('');
   const [importTeam, setImportTeam] = useState('');
-  const [importTeamYear,   setImportTeamYear]   = useState(2026);
+  const [importTeamYear,   setImportTeamYear]   = useState<number | null>(null);
   const [duplicatePolicy, setDuplicatePolicy] = useState<'replace' | 'skip'>('replace');
-  // Whether to show the "Import as team" pill row — hidden after +Add Roster is pressed
-  const [showImportTeamPills, setShowImportTeamPills] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Individual player edit modal state
@@ -60,6 +64,17 @@ export const RosterPage: React.FC = () => {
   const [bulkEditError, setBulkEditError] = useState<string | null>(null);
   const [isSavingBulk, setIsSavingBulk] = useState(false);
 
+  // Add Player/Coach modal state
+  const [showAddPlayerModal, setShowAddPlayerModal] = useState(false);
+  const [addPlayerForm, setAddPlayerForm] = useState({
+    player_name: '',
+    jersey_number: '',
+    team_name: '',
+    team_year: 2026,
+    uniform_color: '',
+  });
+  const [addPlayerError, setAddPlayerError] = useState<string | null>(null);
+
   // Derived team list for filtering
   const rosterTeams = useMemo(() => {
     const teams = new Set<string>();
@@ -77,6 +92,31 @@ export const RosterPage: React.FC = () => {
     loadRoster();
     loadGameContext();
   }, []);
+
+  // Restore filters from URL on mount
+  useEffect(() => {
+    const team = searchParams.get('team');
+    const year = searchParams.get('year');
+    if (team) setSelectedTeam(team);
+    if (year) setSelectedYear(parseInt(year, 10));
+  }, []);
+
+  // Sync filters to URL when they change
+  useEffect(() => {
+    if (selectedTeam && selectedYear) {
+      setSearchParams({ team: selectedTeam, year: selectedYear.toString() });
+    }
+  }, [selectedTeam, selectedYear, setSearchParams]);
+
+  // Repopulate Import Roster card when user selects from sidebar
+  useEffect(() => {
+    if (selectedTeam) {
+      setImportTeam(selectedTeam);
+    }
+    if (selectedYear) {
+      setImportTeamYear(selectedYear);
+    }
+  }, [selectedTeam, selectedYear]);
 
   const loadRoster = async () => {
     setIsLoading(true);
@@ -116,10 +156,8 @@ export const RosterPage: React.FC = () => {
     // Clear import form — team and year blanked so user starts fresh
     setRosterUrl('');
     setImportTeam('');
-    setImportTeamYear(2026);
+    setImportTeamYear(null);
     setDuplicatePolicy('replace');
-    // Hide team pills until user interacts with the import form again
-    setShowImportTeamPills(false);
     setImportMsg(null);
     setIsDragging(false);
 
@@ -167,19 +205,27 @@ export const RosterPage: React.FC = () => {
     }
   };
 
-  const handleDeleteRoster = async () => {
-    if (!selectedTeam || !selectedYear) return;
-    const confirmed = window.confirm(
-      `Delete all ${selectedTeam} (${selectedYear}) players? This cannot be undone.`
-    );
-    if (!confirmed) return;
+  const handleDeleteRoster = () => {
+    setDeleteRosterMode('team');
+    setShowDeleteRosterConfirm(true);
+  };
 
+  const handleConfirmDeleteRoster = async () => {
+    setShowDeleteRosterConfirm(false);
     try {
       setIsSaving(true);
-      // Delete all entries for this team/year
-      const entriesToDelete = entries.filter(
-        e => e.team_name === selectedTeam && e.team_year === selectedYear
-      );
+      let entriesToDelete: RosterEntry[] = [];
+
+      if (deleteRosterMode === 'all') {
+        // Delete all roster entries
+        entriesToDelete = entries;
+      } else {
+        // Delete only the selected team/year
+        if (!selectedTeam || !selectedYear) return;
+        entriesToDelete = entries.filter(
+          e => e.team_name === selectedTeam && e.team_year === selectedYear
+        );
+      }
 
       await Promise.all(
         entriesToDelete.map(e => photoTaggerClient.deleteRosterEntry(e.id))
@@ -236,6 +282,12 @@ export const RosterPage: React.FC = () => {
     setIsResetting(true);
     try {
       await photoTaggerClient.resetAllData();
+      // Clear import roster card before reload
+      setRosterUrl('');
+      setImportTeam('');
+      setImportTeamYear(null);
+      // Clear URL parameters so sidebar selection doesn't auto-repopulate import form
+      setSearchParams({});
       // Full page reload clears ALL component state across every tab
       // (Gallery, Review, Players, sidebar — every page has its own cache)
       window.location.reload();
@@ -246,6 +298,59 @@ export const RosterPage: React.FC = () => {
   };
 
   // ── Individual Player Editing ──────────────────────────────────────────────
+
+  const handleOpenAddPlayerModal = () => {
+    // Prefill team if filtered to one team
+    const prefillTeam = selectedTeam && selectedYear ? selectedTeam : '';
+    const prefillYear = selectedTeam && selectedYear ? selectedYear : 2026;
+
+    setAddPlayerForm({
+      player_name: '',
+      jersey_number: '',
+      team_name: prefillTeam,
+      team_year: prefillYear,
+      uniform_color: '',
+    });
+    setAddPlayerError(null);
+    setShowAddPlayerModal(true);
+  };
+
+  const handleAddPlayerChange = (field: string, value: any) => {
+    setAddPlayerForm(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleAddPlayerSave = async () => {
+    if (!addPlayerForm.player_name.trim()) {
+      setAddPlayerError('Name cannot be empty');
+      return;
+    }
+    if (!addPlayerForm.jersey_number.trim()) {
+      setAddPlayerError('Jersey number cannot be empty');
+      return;
+    }
+    if (!addPlayerForm.team_name.trim()) {
+      setAddPlayerError('Team name cannot be empty');
+      return;
+    }
+
+    setIsSaving(true);
+    setAddPlayerError(null);
+    try {
+      await photoTaggerClient.addRosterEntry(
+        addPlayerForm.jersey_number.trim(),
+        addPlayerForm.player_name.trim(),
+        addPlayerForm.team_name.trim(),
+        addPlayerForm.team_year,
+        addPlayerForm.uniform_color.trim() || undefined,
+      );
+      await loadRoster();
+      setShowAddPlayerModal(false);
+    } catch (err) {
+      setAddPlayerError(err instanceof Error ? err.message : 'Failed to add player');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const handleEditOpen = (entry: RosterEntry) => {
     setEditingEntry(entry);
@@ -369,10 +474,9 @@ export const RosterPage: React.FC = () => {
   const clearImportForm = () => {
     setRosterUrl('');
     setImportTeam('');
-    setImportTeamYear(2026);
+    setImportTeamYear(null);
     setDuplicatePolicy('replace');
     setIsDragging(false);
-    setShowImportTeamPills(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -411,7 +515,6 @@ export const RosterPage: React.FC = () => {
       const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
-      if (result.failed === 0) clearImportForm();
     } catch (err) {
       setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'Import failed' });
     } finally {
@@ -447,7 +550,6 @@ export const RosterPage: React.FC = () => {
       const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
-      if (result.failed === 0) clearImportForm();
     } catch (err) {
       setImportMsg({ type: 'error', text: err instanceof Error ? err.message : 'URL import failed' });
     } finally {
@@ -573,51 +675,92 @@ export const RosterPage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-        {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
+      {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
         <div ref={importCardRef} className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
           <h2 className="font-outfit text-lg font-bold text-foreground">Import Roster</h2>
 
-          {/* Drop zone (also click-to-browse) */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,.txt,.md,.xlsx,.pdf,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            onChange={handleFileSelect}
-            className="hidden"
-          />
-          <div
-            onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
-            onDragLeave={() => setIsDragging(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
-            role="button"
-            tabIndex={0}
-            aria-label="Drag and drop a roster file, or click to browse"
-            className={`relative cursor-pointer border-2 border-dashed rounded-xl p-8 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
-              isDragging ? 'border-accent bg-accent/5' : 'border-frame bg-muted/30 hover:border-foreground'
-            }`}
-          >
-            {/* Parsing overlay */}
-            {isParsing && (
-              <div className="absolute inset-0 z-10 bg-white/85 rounded-xl flex flex-col items-center justify-center gap-2">
-                <span className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
-                <p className="font-jakarta text-sm font-bold text-foreground">Importing roster…</p>
+          {/* Drag zone and metadata side by side */}
+          <div className="grid grid-cols-4 gap-4 items-start">
+            {/* Drop zone (also click-to-browse) */}
+            <div className="col-span-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.txt,.md,.xlsx,.pdf,text/csv,text/plain,application/pdf,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+              <div
+                onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
+                onDragLeave={() => setIsDragging(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
+                role="button"
+                tabIndex={0}
+                aria-label="Drag and drop a roster file, or click to browse"
+                className={`relative cursor-pointer border-2 border-dashed rounded-xl p-6 text-center transition-colors focus:outline-none focus:ring-2 focus:ring-accent ${
+                  isDragging ? 'border-accent bg-accent/5' : 'border-frame bg-muted/30 hover:border-foreground'
+                }`}
+              >
+                {/* Parsing overlay */}
+                {isParsing && (
+                  <div className="absolute inset-0 z-10 bg-white/85 rounded-xl flex flex-col items-center justify-center gap-2">
+                    <span className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin block" />
+                    <p className="font-jakarta text-sm font-bold text-foreground">Importing roster…</p>
+                  </div>
+                )}
+                <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="mx-auto mb-3 text-muted-fg">
+                  <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                <p className="font-jakarta text-sm font-semibold text-foreground">
+                  {isDragging ? 'Drop to import…' : 'Drag & drop roster'}
+                </p>
+                <p className="font-jakarta text-xs text-muted-fg mt-1">CSV, TXT, MD, XLSX, PDF</p>
               </div>
-            )}
-            <svg width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24" className="mx-auto mb-3 text-muted-fg">
-              <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
-              <polyline points="17 8 12 3 7 8" />
-              <line x1="12" y1="3" x2="12" y2="15" />
-            </svg>
-            <p className="font-jakarta text-sm font-semibold text-foreground">
-              {isDragging ? 'Drop to import…' : 'Drag & drop roster here'}
-            </p>
-            <p className="font-jakarta text-xs text-muted-fg mt-1">CSV, TXT, MD, XLSX, PDF — or click to browse</p>
+            </div>
+
+            {/* Metadata on the right */}
+            <div className="space-y-3">
+              {/* Team name input for import */}
+              <div>
+                <label htmlFor="importTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Team Name
+                </label>
+                <input
+                  id="importTeam"
+                  type="text"
+                  value={importTeam}
+                  onChange={e => setImportTeam(e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Year
+                </label>
+                <input
+                  id="importTeamYear"
+                  type="number"
+                  value={importTeamYear ?? ''}
+                  onChange={e => setImportTeamYear(e.target.value ? Number(e.target.value) : null)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              {importMsg && importMsg.type === 'success' && (
+                <div className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-3">
+                  <p className="font-jakarta text-xs text-quaternary font-bold">{importMsg.text}</p>
+                </div>
+              )}
+            </div>
           </div>
 
+          {/* Roster URL input */}
           <div className="space-y-2">
             <label htmlFor="rosterUrl" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">
               Roster URL
@@ -640,125 +783,19 @@ export const RosterPage: React.FC = () => {
                 Import
               </button>
             </div>
+            <p className="font-jakarta text-xs text-muted-fg">
+              <a href="https://play.usaultimate.org/events/2026-D-I-College-Championships/schedule/Men/CollegeMen/" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">
+                College Natties Rosters
+              </a>
+            </p>
           </div>
 
-          {/* Team selector for import */}
-          <div>
-            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
-              Import as team
-            </label>
-            <div className="space-y-2">
-              {showImportTeamPills && rosterTeams.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {rosterTeams.map(team => (
-                    <button
-                      key={team}
-                      onClick={() => { setImportTeam(team); setShowImportTeamPills(true); }}
-                      className={`font-jakarta text-sm px-3 py-1.5 rounded-full border-2 transition-colors ${
-                        importTeam === team
-                          ? 'bg-accent text-white border-foreground shadow-pop'
-                          : 'bg-white text-foreground border-frame hover:border-foreground'
-                      }`}
-                    >
-                      {team}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <input
-                id="importTeam"
-                type="text"
-                value={importTeam}
-                onChange={e => { setImportTeam(e.target.value); setShowImportTeamPills(true); }}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-              Year
-            </label>
-            <input
-              id="importTeamYear"
-              type="number"
-              value={importTeamYear}
-              onChange={e => setImportTeamYear(Number(e.target.value) || 2026)}
-              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-            />
-          </div>
-
-          {importMsg && (
-            <div role={importMsg.type === 'error' ? 'alert' : 'status'} aria-live="polite"
-              className={`p-3 rounded-xl border-2 font-jakarta text-sm ${importMsg.type === 'success' ? 'bg-quaternary/10 border-quaternary' : 'bg-secondary/10 border-secondary'}`}>
-              {importMsg.text}
+          {importMsg && importMsg.type === 'error' && (
+            <div role="alert" className="bg-secondary/10 border-2 border-secondary rounded-xl p-3">
+              <p className="font-jakarta text-xs text-secondary font-bold">{importMsg.text}</p>
             </div>
           )}
         </div>
-
-        {/* ── Add Player ───────────────────────────────────────────────────── */}
-        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop p-6 space-y-4 relative overflow-hidden">
-          <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-accent rounded-full border-2 border-foreground opacity-70" />
-          <h2 className="font-outfit text-lg font-bold text-foreground">Add Player</h2>
-
-          <form onSubmit={handleAddRow} className="space-y-3">
-            <div>
-              <label htmlFor="newName" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Name</label>
-              <input
-                id="newName"
-                ref={nameInputRef}
-                type="text"
-                value={newName}
-                onChange={e => setNewName(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-              />
-            </div>
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label htmlFor="newJersey" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">#</label>
-                <input
-                  id="newJersey"
-                  type="text"
-                  value={newJersey}
-                  onChange={e => setNewJersey(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground text-center"
-                />
-              </div>
-              <div>
-                <label htmlFor="newTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Team</label>
-                <input
-                  id="newTeam"
-                  type="text"
-                  value={newTeam}
-                  onChange={e => setNewTeam(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-                />
-              </div>
-              <div>
-                <label htmlFor="newYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Year</label>
-                <input
-                  id="newYear"
-                  type="number"
-                  value={teamYear}
-                  onChange={e => setTeamYear(Number(e.target.value) || 2026)}
-                  onKeyDown={handleKeyDown}
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-                />
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={isSaving || !newName.trim() || !newJersey.trim()}
-              className="btn-candy w-full bg-accent text-white font-jakarta font-bold px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40"
-            >
-              + Add Player
-            </button>
-          </form>
-        </div>
-      </div>
 
       {/* ── Roster Table ─────────────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden">
@@ -774,24 +811,32 @@ export const RosterPage: React.FC = () => {
               </p>
             )}
           </div>
-          {selectedTeam && selectedYear && (
-            <div className="flex gap-2">
-              <button
-                onClick={handleOpenBulkEdit}
-                disabled={isSaving || filtered.length === 0}
-                className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
-              >
-                Edit Roster
-              </button>
-              <button
-                onClick={handleDeleteRoster}
-                disabled={isSaving || filtered.length === 0}
-                className="btn-candy bg-secondary text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
-              >
-                Delete Roster
-              </button>
-            </div>
-          )}
+          <div className="flex gap-2 flex-wrap justify-end">
+            <button
+              onClick={handleOpenAddPlayerModal}
+              className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop whitespace-nowrap"
+            >
+              + Add Player/Coach
+            </button>
+            {selectedTeam && selectedYear && (
+              <>
+                <button
+                  onClick={handleOpenBulkEdit}
+                  disabled={isSaving || filtered.length === 0}
+                  className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
+                >
+                  Edit Roster
+                </button>
+                <button
+                  onClick={handleDeleteRoster}
+                  disabled={isSaving || filtered.length === 0}
+                  className="btn-candy bg-red-600 text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-red-800 shadow-[3px_3px_0px_0px_rgba(153,27,27,0.5)] hover:bg-red-700 active:bg-red-800 disabled:opacity-40 whitespace-nowrap transition-colors"
+                >
+                  🗑 Delete Roster
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         {isLoading ? (
@@ -1035,6 +1080,199 @@ export const RosterPage: React.FC = () => {
                 className="flex-1 font-jakarta font-bold text-sm text-white bg-accent hover:bg-accent/80 px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 transition-colors"
               >
                 {isSavingBulk ? 'Updating…' : 'Update All'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete Roster Confirmation Modal ────────────────────────────────── */}
+      {showDeleteRosterConfirm && (
+        <div className="fixed inset-0 z-50 bg-foreground/70 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg max-w-md w-full p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-2xl flex-shrink-0">🗑</span>
+              <div>
+                <h2 className="font-outfit text-lg font-extrabold text-foreground">Delete roster?</h2>
+                <p className="font-jakarta text-sm text-muted-fg mt-1">
+                  Choose what to delete. This cannot be undone.
+                </p>
+              </div>
+            </div>
+
+            {/* Delete options */}
+            <div className="space-y-3 bg-muted/30 border-2 border-frame rounded-xl p-3">
+              <label className="flex items-start gap-3 cursor-pointer hover:bg-muted/40 p-2 rounded-lg transition-colors">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  value="team"
+                  checked={deleteRosterMode === 'team'}
+                  onChange={e => setDeleteRosterMode(e.target.value as 'team' | 'all')}
+                  className="mt-1 cursor-pointer"
+                />
+                <div>
+                  <p className="font-jakarta font-bold text-sm text-foreground">
+                    Delete selected team only
+                  </p>
+                  <p className="font-jakarta text-xs text-muted-fg mt-0.5">
+                    Remove all {selectedTeam} ({selectedYear}) players ({filtered.length} player{filtered.length === 1 ? '' : 's'})
+                  </p>
+                </div>
+              </label>
+
+              <label className="flex items-start gap-3 cursor-pointer hover:bg-muted/40 p-2 rounded-lg transition-colors">
+                <input
+                  type="radio"
+                  name="deleteMode"
+                  value="all"
+                  checked={deleteRosterMode === 'all'}
+                  onChange={e => setDeleteRosterMode(e.target.value as 'team' | 'all')}
+                  className="mt-1 cursor-pointer"
+                />
+                <div>
+                  <p className="font-jakarta font-bold text-sm text-foreground">
+                    Delete all rosters
+                  </p>
+                  <p className="font-jakarta text-xs text-muted-fg mt-0.5">
+                    Remove all {entries.length} player{entries.length === 1 ? '' : 's'} from all teams
+                  </p>
+                </div>
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowDeleteRosterConfirm(false)}
+                disabled={isSaving}
+                className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white hover:bg-muted disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeleteRoster}
+                disabled={isSaving}
+                className="flex-1 font-jakarta font-bold text-sm text-white bg-red-600 hover:bg-red-700 active:bg-red-800 px-4 py-2 rounded-full border-2 border-red-800 shadow-[3px_3px_0px_0px_rgba(153,27,27,0.5)] disabled:opacity-50 transition-colors"
+              >
+                {isSaving ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Player/Coach Modal ───────────────────────────────────────────── */}
+      {showAddPlayerModal && (
+        <div className="fixed inset-0 z-50 bg-foreground/70 flex items-center justify-center p-4">
+          <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg max-w-md w-full p-6 space-y-4">
+            <h2 className="font-outfit text-lg font-extrabold text-foreground">
+              Add Player/Coach
+            </h2>
+
+            <div className="space-y-3">
+              <div>
+                <label htmlFor="addPlayerName" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Name
+                </label>
+                <input
+                  id="addPlayerName"
+                  type="text"
+                  value={addPlayerForm.player_name}
+                  onChange={e => handleAddPlayerChange('player_name', e.target.value)}
+                  autoFocus
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="addPlayerNumber" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Jersey Number
+                </label>
+                <input
+                  id="addPlayerNumber"
+                  type="text"
+                  value={addPlayerForm.jersey_number}
+                  onChange={e => handleAddPlayerChange('jersey_number', e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground text-center"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="addPlayerTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Team
+                </label>
+                <select
+                  id="addPlayerTeam"
+                  value={addPlayerForm.team_name}
+                  onChange={e => handleAddPlayerChange('team_name', e.target.value)}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                >
+                  <option value="">— Select Team —</option>
+                  {rosterTeams.map(team => (
+                    <option key={team} value={team}>
+                      {team}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="addPlayerYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Year
+                </label>
+                <select
+                  id="addPlayerYear"
+                  value={addPlayerForm.team_year}
+                  onChange={e => handleAddPlayerChange('team_year', Number(e.target.value))}
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                >
+                  {[2024, 2025, 2026, 2027].map(year => (
+                    <option key={year} value={year}>
+                      {year}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="addPlayerColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                  Jersey Color (Optional)
+                </label>
+                <input
+                  id="addPlayerColor"
+                  type="text"
+                  value={addPlayerForm.uniform_color}
+                  onChange={e => handleAddPlayerChange('uniform_color', e.target.value)}
+                  placeholder="e.g., red, blue, white"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+                />
+              </div>
+            </div>
+
+            {addPlayerError && (
+              <div role="alert" className="bg-secondary/10 border-2 border-secondary rounded-xl p-3">
+                <p className="font-jakarta text-xs text-secondary font-bold">{addPlayerError}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddPlayerModal(false)}
+                disabled={isSaving}
+                className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white hover:bg-muted disabled:opacity-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleAddPlayerSave}
+                disabled={isSaving}
+                className="flex-1 font-jakarta font-bold text-sm text-white bg-accent hover:bg-accent/80 px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-50 transition-colors"
+              >
+                {isSaving ? 'Adding…' : 'Add'}
               </button>
             </div>
           </div>

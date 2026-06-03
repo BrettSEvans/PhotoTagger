@@ -1,10 +1,22 @@
+import { useLocation } from 'react-router-dom'
+
 export interface NavButtonProps {
   label: string;
-  isActive: boolean;
   onClick: () => void;
 }
 
-export function NavButton({ label, isActive, onClick }: NavButtonProps) {
+export function NavButton({ label, onClick }: NavButtonProps) {
+  const location = useLocation()
+  const isActive = (() => {
+    const path = location.pathname
+    if (label.includes('Roster')) return path.startsWith('/roster')
+    if (label.includes('Upload')) return path === '/upload'
+    if (label.includes('Players')) return path.startsWith('/players') || path.startsWith('/player')
+    if (label.includes('Search')) return path.startsWith('/search')
+    if (label.includes('Gallery')) return path === '/gallery'
+    return false
+  })()
+
   return (
     <button
       onClick={onClick}

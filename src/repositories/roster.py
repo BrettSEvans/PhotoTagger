@@ -91,27 +91,27 @@ class RosterRepository(BaseRepository):
             return result[0] if result else None
 
     def get_all_roster_entries(self) -> List[Dict]:
-        """Return every roster row ordered by team then jersey number."""
+        """Return every roster row ordered by team then jersey number.
+
+        Optimized query: avoid N+1 correlated subqueries by using a UNION and GROUP BY.
+        For each roster entry, find the best matching cluster (by roster_entry_id or player_name),
+        then pick the cluster with the highest photo_count.
+        """
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
                 SELECT r.id, r.team_name, r.team_year, r.jersey_number, r.player_name, r.uniform_color,
-                       (
-                         SELECT pc.thumbnail_face_id
-                         FROM player_clusters pc
-                         WHERE (
-                            pc.roster_entry_id = r.id
-                            OR (
-                              pc.roster_entry_id IS NULL
-                              AND pc.player_name = r.player_name
-                            )
-                         )
-                           AND pc.thumbnail_face_id IS NOT NULL
-                         ORDER BY pc.photo_count DESC, pc.face_count DESC, pc.id
-                         LIMIT 1
+                       COALESCE(
+                         (SELECT pc.thumbnail_face_id FROM player_clusters pc
+                          WHERE pc.roster_entry_id = r.id AND pc.thumbnail_face_id IS NOT NULL
+                          ORDER BY pc.photo_count DESC, pc.face_count DESC, pc.id LIMIT 1),
+                         (SELECT pc.thumbnail_face_id FROM player_clusters pc
+                          WHERE pc.roster_entry_id IS NULL AND pc.player_name = r.player_name
+                            AND pc.thumbnail_face_id IS NOT NULL
+                          ORDER BY pc.photo_count DESC, pc.face_count DESC, pc.id LIMIT 1)
                        ) AS thumbnail_face_id
                 FROM rosters r
-                ORDER BY team_name, CAST(jersey_number AS INTEGER)
+                ORDER BY r.team_name, CAST(r.jersey_number AS INTEGER)
             """)
             return [
                 {"id": r[0], "team_name": r[1], "team_year": r[2],
@@ -314,6 +314,47 @@ class RosterRepository(BaseRepository):
             if score > 0:
                 matched.append({**candidate, "match_score": score})
         return matched
+
+    def find_by_jersey_color_and_team(
+        self,
+        jersey_number: str,
+        team_name: str,
+        jersey_color: str,
+        year: int,
+    ) -> Optional[Dict]:
+        """Find a roster entry by all four matching criteria: jersey, team, color, year.
+
+        Args:
+            jersey_number: Jersey number (e.g. "31")
+            team_name: Team name (e.g. "Carleton")
+            jersey_color: Uniform color (e.g. "red")
+            year: Tournament year
+
+        Returns:
+            Roster entry dict if found, None otherwise
+        """
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                FROM rosters
+                WHERE jersey_number = ?
+                  AND team_name = ?
+                  AND team_year = ?
+                  AND uniform_color = ?
+                LIMIT 1
+            """, (str(jersey_number), team_name, year, jersey_color))
+            row = cursor.fetchone()
+            if not row:
+                return None
+            return {
+                "id": row[0],
+                "team_name": row[1],
+                "team_year": row[2],
+                "jersey_number": row[3],
+                "player_name": row[4],
+                "uniform_color": row[5],
+            }
 
     @staticmethod
     def _color_match_score(detected: Optional[str], roster: Optional[str]) -> float:

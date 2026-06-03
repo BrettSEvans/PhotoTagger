@@ -28,6 +28,20 @@ export interface OCRResult {
 }
 
 /**
+ * JerseyDetection - Jersey number detection with roster matching
+ */
+export interface JerseyDetection {
+  id: number;
+  jersey_number: string;
+  confidence: number;
+  bbox: BoundingBox | null;
+  roster_entry_id: number | null;
+  player_name: string | null;
+  team_name: string | null;
+  uniform_color: string | null;
+}
+
+/**
  * BoundingBox - Coordinates for a rectangular region
  * Format: [x0, y0, x1, y1]
  */
@@ -150,6 +164,8 @@ export type OCRProcessResponse = JobSubmissionResponse<OCRProcessingResult>;
 export interface FaceDetectionResult {
   photos_processed: number;
   faces_detected: number;
+  jersey_detections?: number;
+  matched_to_roster?: number;
   photos_skipped_existing: number;
   errors: number;
 }
@@ -163,12 +179,17 @@ export interface ClusterPlayersResult {
 
 /**
  * Face data in response - Lightweight version without full embedding
+ * Includes quality and jersey color signals for filtering player vs. background faces
  */
 export interface FaceInResponse {
   id: number;
   bbox: BoundingBox;
   confidence: number;
   embedding_dim: number;
+  quality_score?: number;
+  face_size_ratio?: number;
+  jersey_color?: string | null;
+  jersey_color_conf?: number | null;
 }
 
 /**

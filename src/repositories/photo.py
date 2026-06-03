@@ -39,14 +39,34 @@ class PhotoRepository(BaseRepository):
         confidence: float,
         raw_text: str,
         uniform_color: Optional[str] = None,
+        bbox: Optional[List[int]] = None,
+        roster_entry_id: Optional[int] = None,
     ):
-        """Add OCR extraction results for a photo."""
+        """Add OCR extraction results for a photo.
+
+        Args:
+            photo_id: Photo ID in database
+            jersey_number: Extracted jersey number (e.g. "31")
+            confidence: OCR confidence (0-1)
+            raw_text: Raw OCR text
+            uniform_color: Uniform color from game context
+            bbox: Bounding box [x0, y0, x1, y1] or None
+            roster_entry_id: ID of matched roster entry, or None
+        """
         with self._lock:
             cursor = self._conn.cursor()
+            bbox_x0, bbox_y0, bbox_x1, bbox_y1 = (None, None, None, None)
+            if bbox and len(bbox) >= 4:
+                bbox_x0, bbox_y0, bbox_x1, bbox_y1 = bbox[0], bbox[1], bbox[2], bbox[3]
+
             cursor.execute("""
-                INSERT INTO ocr_results (photo_id, jersey_number, uniform_color, confidence, raw_text)
-                VALUES (?, ?, ?, ?, ?)
-            """, (photo_id, jersey_number, uniform_color, confidence, raw_text))
+                INSERT INTO ocr_results (
+                    photo_id, jersey_number, uniform_color, confidence, raw_text,
+                    bbox_x0, bbox_y0, bbox_x1, bbox_y1, roster_entry_id
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (photo_id, jersey_number, uniform_color, confidence, raw_text,
+                  bbox_x0, bbox_y0, bbox_x1, bbox_y1, roster_entry_id))
             self._conn.commit()
 
     def get_photo_by_jersey(self, jersey_number: str) -> List[Dict]:
@@ -153,6 +173,117 @@ class PhotoRepository(BaseRepository):
             """, (photo_id,))
             result = cursor.fetchone()
             return result[0] if result else None
+
+    def get_ocr_by_photo(self, photo_id: int) -> List[Dict]:
+        """Get all OCR results for a photo with roster information.
+
+        Returns OCR results with linked roster information if available.
+
+        Args:
+            photo_id: Photo ID in database
+
+        Returns:
+            List of dicts with OCR result and roster info:
+            {
+                "id": ocr_result_id,
+                "photo_id": photo_id,
+                "jersey_number": "31",
+                "confidence": 0.94,
+                "bbox": [x0, y0, x1, y1],
+                "roster_entry_id": 42,
+                "player_name": "Nathan De Morgan",
+                "team_name": "Carleton (CUT)",
+                "uniform_color": "red",
+            }
+        """
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                SELECT
+                    o.id,
+                    o.photo_id,
+                    o.jersey_number,
+                    o.confidence,
+                    o.bbox_x0, o.bbox_y0, o.bbox_x1, o.bbox_y1,
+                    o.roster_entry_id,
+                    r.player_name,
+                    r.team_name,
+                    r.uniform_color
+                FROM ocr_results o
+                LEFT JOIN rosters r ON o.roster_entry_id = r.id
+                WHERE o.photo_id = ?
+                ORDER BY o.processed_at DESC
+            """, (photo_id,))
+
+            results = []
+            for row in cursor.fetchall():
+                bbox = [row[4], row[5], row[6], row[7]] if all(x is not None for x in row[4:8]) else None
+                results.append({
+                    "id": row[0],
+                    "photo_id": row[1],
+                    "jersey_number": row[2],
+                    "confidence": row[3],
+                    "bbox": bbox,
+                    "roster_entry_id": row[8],
+                    "player_name": row[9],
+                    "team_name": row[10],
+                    "uniform_color": row[11],
+                })
+            return results
+
+    def get_jersey_detections(self, photo_id: int) -> List[Dict]:
+        """Get all jersey number detections for a photo with roster information.
+
+        Returns jersey detections with linked roster information (player name, team, etc).
+
+        Args:
+            photo_id: Photo ID in database
+
+        Returns:
+            List of dicts with jersey detection and roster info:
+            {
+                "id": ocr_result_id,
+                "jersey_number": "31",
+                "confidence": 0.94,
+                "bbox": [x0, y0, x1, y1],
+                "roster_entry_id": 42,
+                "player_name": "Nathan De Morgan",
+                "team_name": "Carleton (CUT)",
+                "uniform_color": "red",
+            }
+        """
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                SELECT
+                    o.id,
+                    o.jersey_number,
+                    o.confidence,
+                    o.bbox_x0, o.bbox_y0, o.bbox_x1, o.bbox_y1,
+                    o.roster_entry_id,
+                    r.player_name,
+                    r.team_name,
+                    r.uniform_color
+                FROM ocr_results o
+                LEFT JOIN rosters r ON o.roster_entry_id = r.id
+                WHERE o.photo_id = ?
+                ORDER BY o.processed_at DESC
+            """, (photo_id,))
+
+            results = []
+            for row in cursor.fetchall():
+                bbox = [row[3], row[4], row[5], row[6]] if all(x is not None for x in row[3:7]) else None
+                results.append({
+                    "id": row[0],
+                    "jersey_number": row[1],
+                    "confidence": row[2],
+                    "bbox": bbox,
+                    "roster_entry_id": row[7],
+                    "player_name": row[8],
+                    "team_name": row[9],
+                    "uniform_color": row[10],
+                })
+            return results
 
     @staticmethod
     def _compute_file_hash(file_path: str, chunk_size: int = 8192) -> str:

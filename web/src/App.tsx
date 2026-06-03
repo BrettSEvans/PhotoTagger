@@ -1,19 +1,17 @@
 import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import photoTaggerClient from './api/photoTaggerClient'
 import { UploadPage } from './pages/UploadPage'
 import { SearchPage } from './pages/SearchPage'
 import { GalleryPage } from './pages/GalleryPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { RosterPage } from './pages/RosterPage'
-import { ReviewPage } from './pages/ReviewPage'
 import LoadingSpinner from './components/LoadingSpinner'
 import { NavButton } from './components/NavButton'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { SidebarProvider } from './contexts/SidebarContext'
 import type { AgentSettings } from './types/index'
 import './styles/globals.css'
-
-type Page = 'upload' | 'roster' | 'review' | 'gallery' | 'players' | 'search'
 
 async function checkConnection(setIsConnected: (value: boolean) => void) {
   try {
@@ -25,7 +23,7 @@ async function checkConnection(setIsConnected: (value: boolean) => void) {
 }
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>('roster')
+  const navigate = useNavigate()
   const [isConnected, setIsConnected] = useState<boolean | null>(null)
   const [agentSettings, setAgentSettings] = useState<AgentSettings>(() => photoTaggerClient.getLocalAgentSettings())
 
@@ -136,12 +134,11 @@ function App() {
       <nav className="bg-cream border-b-2 border-foreground sticky top-0 z-20">
         <div className="max-w-6xl mx-auto px-4">
           <div className="flex gap-1 overflow-x-auto">
-            <NavButton label="1 Roster"   isActive={currentPage === 'roster'}  onClick={() => setCurrentPage('roster')} />
-            <NavButton label="2 Upload"   isActive={currentPage === 'upload'}  onClick={() => setCurrentPage('upload')} />
-            <NavButton label="3 Review"   isActive={currentPage === 'review'}  onClick={() => setCurrentPage('review')} />
-            <NavButton label="4 Players"  isActive={currentPage === 'players'} onClick={() => setCurrentPage('players')} />
-            <NavButton label="5 Search"   isActive={currentPage === 'search'}  onClick={() => setCurrentPage('search')} />
-            <NavButton label="6 Gallery"  isActive={currentPage === 'gallery'} onClick={() => setCurrentPage('gallery')} />
+            <NavButton label="1 Roster"   onClick={() => navigate('/roster')} />
+            <NavButton label="2 Upload"   onClick={() => navigate('/upload')} />
+            <NavButton label="3 Players"  onClick={() => navigate('/players')} />
+            <NavButton label="4 Search"   onClick={() => navigate('/search')} />
+            <NavButton label="5 Gallery"  onClick={() => navigate('/gallery')} />
           </div>
         </div>
       </nav>
@@ -150,12 +147,15 @@ function App() {
       <SidebarProvider>
         <main className="max-w-6xl mx-auto px-4 py-8 flex flex-col">
           <ErrorBoundary>
-            {currentPage === 'roster'  && <RosterPage />}
-            {currentPage === 'upload'  && <UploadPage onOpenWorkspace={() => setCurrentPage('review')} onGoToRoster={() => setCurrentPage('roster')} />}
-            {currentPage === 'review'  && <ReviewPage />}
-            {currentPage === 'search'  && <SearchPage />}
-            {currentPage === 'gallery' && <GalleryPage />}
-            {currentPage === 'players' && <PlayersPage />}
+            <Routes>
+              <Route path="/" element={<Navigate to="/roster" replace />} />
+              <Route path="/roster/*" element={<RosterPage />} />
+              <Route path="/upload" element={<UploadPage onOpenWorkspace={() => navigate('/players')} onGoToRoster={() => navigate('/roster')} />} />
+              <Route path="/players/*" element={<PlayersPage />} />
+              <Route path="/player/:clusterId" element={<PlayersPage />} />
+              <Route path="/search/*" element={<SearchPage />} />
+              <Route path="/gallery" element={<GalleryPage />} />
+            </Routes>
           </ErrorBoundary>
         </main>
       </SidebarProvider>

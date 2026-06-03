@@ -48,12 +48,12 @@ def set_game_context():
             team_year = int(team.get("team_year", 2026)) if isinstance(team, dict) else 2026
         except (TypeError, ValueError):
             return jsonify({"error": f"teams[{idx}].team_year must be an integer"}), 400
-        if not team_name or not uniform_color:
-            return jsonify({"error": f"teams[{idx}] requires team_name and uniform_color"}), 400
+        if not team_name:
+            return jsonify({"error": f"teams[{idx}] requires team_name"}), 400
         normalized.append({
             "team_name": team_name,
             "team_year": team_year,
-            "uniform_color": uniform_color,
+            "uniform_color": uniform_color or None,
         })
 
     try:

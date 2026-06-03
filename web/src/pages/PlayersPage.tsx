@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AssignPlayerPanel, { AssignedInfo } from '../components/AssignPlayerPanel';
 import photoTaggerClient from '../api/photoTaggerClient';
@@ -13,6 +14,8 @@ const ACCENT_SHADOWS = ['shadow-pop', 'shadow-pop-pink', 'shadow-pop-yellow', 's
 const ACCENT_RINGS   = ['border-foreground', 'border-secondary', 'border-tertiary', 'border-quaternary', 'border-accent'];
 
 export const PlayersPage: React.FC = () => {
+  const { clusterId } = useParams<{ clusterId?: string }>();
+  const navigate = useNavigate();
   const [view, setView] = useState<ViewState>('grid');
   const [players, setPlayers] = useState<PlayerCluster[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerCluster | null>(null);
@@ -29,6 +32,7 @@ export const PlayersPage: React.FC = () => {
 
   const [detectResult, setDetectResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [gameContext, setGameContext] = useState<any[]>([]);
 
   // ── Tagging ─────────────────────────────────────────────────────────────
   const [taggingPlayer, setTaggingPlayer] = useState<PlayerCluster | null>(null);
@@ -47,7 +51,40 @@ export const PlayersPage: React.FC = () => {
     });
   }, []);
 
-  useEffect(() => { loadStatus(); }, []);
+  useEffect(() => {
+    loadStatus();
+    // Load game context for jersey color validation
+    (async () => {
+      try {
+        const data = await photoTaggerClient.getGameContext();
+        setGameContext(data.teams || []);
+      } catch { /* non-critical */ }
+    })();
+  }, []);
+
+  // Load specific player if clusterId is in the URL
+  useEffect(() => {
+    if (clusterId && players.length > 0) {
+      const id = parseInt(clusterId, 10);
+      const player = players.find(p => p.id === id);
+      if (player && (!selectedPlayer || selectedPlayer.id !== id)) {
+        setSelectedPlayer(player);
+        setView('player-detail');
+        setAssignMsg(null);
+        setImgDims(new Map());
+        setIsLoadingPhotos(true);
+        setPlayerPhotos([]);
+        (async () => {
+          try {
+            const result = await photoTaggerClient.getPlayerPhotos(id);
+            setPlayerPhotos(result.photos);
+          } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to load player photos');
+          } finally { setIsLoadingPhotos(false); }
+        })();
+      }
+    }
+  }, [clusterId, players]);
 
   /**
    * Reflect an assignment in local state: name the tagged cluster, plus any
@@ -65,6 +102,19 @@ export const PlayersPage: React.FC = () => {
 
     const extra = autoTagged.size > 0 ? ` · also tagged ${autoTagged.size} more from other photos` : '';
     setAssignMsg(`Tagged as ${info.playerName} #${info.jerseyNumber}${extra}`);
+
+    // Fire-and-forget: consolidate clusters with the same player_name
+    (async () => {
+      try {
+        const result = await photoTaggerClient.consolidatePlayerClusters(info.playerName);
+        if (result.merged && result.merged_count && result.merged_count > 0) {
+          setAssignMsg(prev => (prev ? `${prev} · consolidated ${result.merged_count} duplicate cluster${result.merged_count !== 1 ? 's' : ''}` : ''));
+          await loadPlayers();
+        }
+      } catch (err) {
+        console.warn(`Failed to consolidate clusters: ${err}`);
+      }
+    })();
   };
 
   const loadStatus = async () => {
@@ -94,12 +144,21 @@ export const PlayersPage: React.FC = () => {
     setDetectResult(null);
     setError(null);
     try {
+      // Check game context for jersey colors
+      const missingColors = gameContext.filter(team => !team.uniform_color || !team.uniform_color.trim());
+      if (missingColors.length > 0) {
+        const teamNames = missingColors.map(t => t.team_name || 'Unknown').join(', ');
+        setError(`Jersey colors required for player matching. Missing colors for: ${teamNames}. Please fill out the Game Context card in the Upload tab.`);
+        setIsDetecting(false);
+        return;
+      }
+
       const response = await photoTaggerClient.detectFaces();
-      setDetectResult('Face detection queued…');
+      setDetectResult('Face detection and jersey recognition queued…');
       const job = await photoTaggerClient.pollJob<FaceDetectionResult>(response.job_id, {
         onUpdate: currentJob => {
           if (currentJob.status === 'running') {
-            setDetectResult(`Detecting faces… ${currentJob.progress}%`);
+            setDetectResult(`Detecting faces and reading jerseys… ${currentJob.progress}%`);
           }
         },
       });
@@ -112,7 +171,10 @@ export const PlayersPage: React.FC = () => {
       const skipped = result.photos_skipped_existing > 0
         ? ` · ${result.photos_skipped_existing} already processed`
         : '';
-      setDetectResult(`Detected ${result.faces_detected} faces in ${result.photos_processed} photos${skipped}`);
+      const jerseyInfo = result.jersey_detections
+        ? ` · ${result.jersey_detections} jerseys detected, ${result.matched_to_roster || 0} matched`
+        : '';
+      setDetectResult(`Detected ${result.faces_detected} faces in ${result.photos_processed} photos${jerseyInfo}${skipped}`);
       await loadStatus();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Face detection failed');
@@ -137,6 +199,7 @@ export const PlayersPage: React.FC = () => {
   };
 
   const handlePlayerClick = async (player: PlayerCluster) => {
+    navigate(`/player/${player.id}`);
     setSelectedPlayer(player);
     setView('player-detail');
     setAssignMsg(null);
@@ -152,11 +215,23 @@ export const PlayersPage: React.FC = () => {
   };
 
   const handleBack = () => {
+    navigate('/players');
     setView('grid');
     setSelectedPlayer(null);
     setPlayerPhotos([]);
     setError(null);
     setAssignMsg(null);
+  };
+
+  const handleRemovePhoto = async (faceId: number, photoId: number) => {
+    if (!selectedPlayer) return;
+    try {
+      await photoTaggerClient.removePlayerPhoto(selectedPlayer.id, faceId);
+      setPlayerPhotos(prev => prev.filter(p => p.id !== photoId));
+      setAssignMsg(`Removed photo from ${selectedPlayer.player_name || `Player ${selectedPlayer.id}`}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to remove photo');
+    }
   };
 
   if (isLoadingStatus) {
@@ -249,7 +324,7 @@ export const PlayersPage: React.FC = () => {
               return (
                 <div
                   key={photo.id}
-                  className={`sticker-card bg-white border-2 border-foreground rounded-xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} overflow-hidden`}
+                  className={`sticker-card bg-white border-2 border-foreground rounded-xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} overflow-hidden group`}
                 >
                   <div className="aspect-square bg-muted overflow-hidden relative">
                     <img
@@ -269,6 +344,14 @@ export const PlayersPage: React.FC = () => {
                     <span className="absolute top-1.5 right-1.5 bg-foreground text-white font-jakarta text-xs font-bold px-1.5 py-0.5 rounded-full">
                       {Math.round(photo.face_confidence * 100)}%
                     </span>
+                    {/* Remove button — appears on hover */}
+                    <button
+                      onClick={() => handleRemovePhoto(photo.face_id, photo.id)}
+                      className="absolute top-1.5 left-1.5 bg-secondary text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-jakarta font-bold text-sm hover:bg-secondary/80"
+                      title="Remove photo from this player"
+                    >
+                      ×
+                    </button>
                   </div>
                   <div className="p-2.5">
                     <p className="font-jakarta text-xs font-semibold text-foreground truncate">{photo.filename}</p>
@@ -320,18 +403,28 @@ export const PlayersPage: React.FC = () => {
                 </div>
               )}
             </div>
-            <button
-              onClick={handleDetect}
-              disabled={isDetecting || isClustering}
-              className="btn-candy w-full bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40"
-            >
-              {isDetecting ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Detecting… (few minutes)
-                </span>
-              ) : faceCount > 0 ? 'Re-detect Faces' : 'Detect Faces'}
-            </button>
+            {(() => {
+              const missingColors = gameContext.filter(team => !team.uniform_color || !team.uniform_color.trim());
+              const isDisabled = isDetecting || isClustering || missingColors.length > 0;
+              const tooltipText = missingColors.length > 0
+                ? `Jersey colors required: ${missingColors.map(t => t.team_name || 'Unknown').join(', ')}. Fill out Game Context in Upload tab.`
+                : '';
+              return (
+                <button
+                  onClick={handleDetect}
+                  disabled={isDisabled}
+                  title={tooltipText}
+                  className="btn-candy w-full bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {isDetecting ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Detecting… (few minutes)
+                    </span>
+                  ) : faceCount > 0 ? 'Re-detect Faces' : 'Detect Faces'}
+                </button>
+              );
+            })()}
             {detectResult && (
               <p className="font-jakarta text-xs text-foreground bg-quaternary/20 rounded-lg px-2 py-1">✅ {detectResult}</p>
             )}

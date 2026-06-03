@@ -1,4 +1,5 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import photoTaggerClient from '../api/photoTaggerClient';
 import LoadingSpinner from '../components/LoadingSpinner';
 import type { PlayerPhotoItem, RosterSearchResult } from '../types/index';
@@ -15,6 +16,7 @@ interface ClusterWithAssignment {
 }
 
 export const SearchPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [query,           setQuery]           = useState('');
   const [rosterMatches,   setRosterMatches]   = useState<RosterSearchResult[]>([]);
   const [selectedPlayer,  setSelectedPlayer]  = useState<RosterSearchResult | null>(null);
@@ -32,6 +34,11 @@ export const SearchPage: React.FC = () => {
   // ── Debounced roster search ──────────────────────────────────────────────
   const handleQueryChange = useCallback((q: string) => {
     setQuery(q);
+    if (q.trim()) {
+      setSearchParams({ q });
+    } else {
+      setSearchParams({});
+    }
     setSelectedPlayer(null);
     setPhotos([]);
     setCluster(null);
@@ -50,6 +57,14 @@ export const SearchPage: React.FC = () => {
         setIsSearching(false);
       }
     }, 200);
+  }, [setSearchParams]);
+
+  // Restore search query from URL on mount
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q) {
+      setQuery(q);
+    }
   }, []);
 
   // ── Select player → load their photos ───────────────────────────────────

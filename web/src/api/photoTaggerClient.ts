@@ -25,6 +25,7 @@ import {
   AssignClusterResponse,
   MatchSimilarResponse,
   RosterSearchResult,
+  JerseyDetection,
   ProcessingSummary,
   TaggedPhoto,
   ReviewPhoto,
@@ -354,6 +355,24 @@ class PhotoTaggerClient {
   }
 
   /**
+   * Remove a face from a player cluster (deselect a photo)
+   */
+  async removePlayerPhoto(clusterId: number, faceId: number): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.delete<{ success: boolean; message: string }>(`/api/players/${clusterId}/faces/${faceId}`);
+    return response.data;
+  }
+
+  /**
+   * Consolidate all clusters with the same player_name into one
+   */
+  async consolidatePlayerClusters(playerName: string): Promise<{ merged: boolean; primary_id?: number; merged_count?: number }> {
+    const response = await this.client.post<{ merged: boolean; primary_id?: number; merged_count?: number }>(
+      `/api/consolidate-player/${encodeURIComponent(playerName)}`
+    );
+    return response.data;
+  }
+
+  /**
    * Get the URL for a cropped face thumbnail
    */
   getFaceCropUrl(faceId: number): string {
@@ -452,6 +471,13 @@ class PhotoTaggerClient {
       '/api/roster/search', { params: { q: query } }
     );
     return response.data.results;
+  }
+
+  async getJerseyDetections(photoId: number): Promise<JerseyDetection[]> {
+    const response = await this.client.get<{ detections: JerseyDetection[]; total: number }>(
+      `/api/photos/${photoId}/jersey-detections`
+    );
+    return response.data.detections;
   }
 
   // ── Processing summary ────────────────────────────────────────────────────

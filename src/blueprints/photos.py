@@ -288,7 +288,7 @@ def info():
 
 @bp.route("/api/faces/<int:photo_id>", methods=["GET"])
 def get_faces(photo_id):
-    """Get all detected faces for a photo."""
+    """Get all detected faces for a photo with quality and jersey color signals."""
     db = current_app.db
     try:
         faces = db.faces.get_faces_by_photo(photo_id)
@@ -300,7 +300,11 @@ def get_faces(photo_id):
                     "id": f["id"],
                     "bbox": f["bbox"],
                     "confidence": f["confidence"],
-                    "embedding_dim": len(f["embedding"])
+                    "embedding_dim": len(f["embedding"]),
+                    "quality_score": f.get("quality_score"),
+                    "face_size_ratio": f.get("face_size_ratio"),
+                    "jersey_color": f.get("jersey_color"),
+                    "jersey_color_conf": f.get("jersey_color_conf"),
                 }
                 for f in faces
             ]

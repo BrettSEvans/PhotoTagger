@@ -69,14 +69,14 @@ class ClusterRepository(BaseRepository):
                 team_jersey_faces = row[9] or 0
                 # Always surface clusters the user has already assigned
                 if player_name is None:
-                    if photo_count < min_photos:
-                        # Singleton passes if it has a team jersey colour OR is a
-                        # prominent close-up (jersey may be out of frame when the
-                        # face fills the shot, so colour signal isn't reliable)
-                        if team_jersey_faces == 0 and max_face_size < CLOSE_UP_PROMINENCE:
-                            continue
+                    # Check prominence for all unassigned clusters
                     if min_prominence > 0 and max_face_size < min_prominence:
                         continue
+                    # For singletons, also allow if no team jersey AND small faces
+                    # (only close-ups can pass with small faces)
+                    if photo_count < min_photos:
+                        if team_jersey_faces == 0 and max_face_size < CLOSE_UP_PROMINENCE:
+                            continue
                 result.append({
                     "id": row[0],
                     "face_count": row[1],
@@ -187,3 +187,44 @@ class ClusterRepository(BaseRepository):
                 WHERE id = ?
             """, (player_name, jersey_number, roster_entry_id, cluster_id))
             self._conn.commit()
+
+    def consolidate_player_clusters(self, player_name: str) -> Dict:
+        """Merge all clusters with the same player_name into one primary cluster.
+        Keeps the cluster with most faces, merges others into it, deletes secondaries."""
+        if not player_name:
+            return {"merged": False, "reason": "No player_name provided"}
+
+        with self._lock:
+            cursor = self._conn.cursor()
+            # Find all clusters with this player_name
+            cursor.execute("""
+                SELECT id, face_count FROM player_clusters
+                WHERE player_name = ?
+                ORDER BY face_count DESC
+            """, (player_name,))
+            clusters = cursor.fetchall()
+
+            if len(clusters) <= 1:
+                return {"merged": False, "reason": "Only one or zero clusters found"}
+
+            # Primary cluster is the one with most faces
+            primary_id = clusters[0][0]
+            secondary_ids = [c[0] for c in clusters[1:]]
+
+            # Move all faces from secondary clusters to primary
+            for secondary_id in secondary_ids:
+                cursor.execute("""
+                    UPDATE faces SET cluster_id = ? WHERE cluster_id = ?
+                """, (primary_id, secondary_id))
+
+            # Delete secondary clusters
+            placeholders = ','.join('?' * len(secondary_ids))
+            cursor.execute(f"DELETE FROM player_clusters WHERE id IN ({placeholders})", secondary_ids)
+
+            self._conn.commit()
+            return {
+                "merged": True,
+                "primary_id": primary_id,
+                "merged_count": len(secondary_ids),
+                "secondary_ids": secondary_ids
+            }

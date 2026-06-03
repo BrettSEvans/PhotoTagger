@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner';
+import PhotoLightbox from '../components/PhotoLightbox';
 import photoTaggerClient from '../api/photoTaggerClient';
-import type { PhotoItem } from '../types/index';
+import type { PhotoItem, JerseyDetection } from '../types/index';
 
 const PAGE_SIZE = 40;
 
@@ -15,14 +17,43 @@ const SHADOW_CLASSES = [
 ];
 
 export const GalleryPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
+  const [selectedPhotoId, setSelectedPhotoId] = useState<number | null>(null);
+  const [jerseyDetectionsByPhoto, setJerseyDetectionsByPhoto] = useState<Map<number, JerseyDetection[]>>(new Map());
 
-  useEffect(() => { loadPhotos(1); }, []);
+  useEffect(() => {
+    const pageParam = searchParams.get('page');
+    const initialPage = pageParam ? parseInt(pageParam, 10) : 1;
+    loadPhotos(initialPage);
+  }, []);
+
+  // Fetch jersey detections for all loaded photos
+  useEffect(() => {
+    const fetchDetections = async () => {
+      const detections = new Map<number, JerseyDetection[]>();
+      for (const photo of photos) {
+        try {
+          const result = await photoTaggerClient.getJerseyDetections(photo.id);
+          if (result && result.length > 0) {
+            detections.set(photo.id, result);
+          }
+        } catch (err) {
+          // Silently ignore errors for individual photos
+        }
+      }
+      setJerseyDetectionsByPhoto(detections);
+    };
+
+    if (photos.length > 0) {
+      fetchDetections();
+    }
+  }, [photos]);
 
   const loadPhotos = async (pageNum: number) => {
     const isFirst = pageNum === 1;
@@ -33,6 +64,11 @@ export const GalleryPage: React.FC = () => {
       setTotal(result.total);
       setPhotos(prev => isFirst ? result.photos : [...prev, ...result.photos]);
       setPage(pageNum);
+      if (pageNum > 1) {
+        setSearchParams({ page: pageNum.toString() });
+      } else {
+        setSearchParams({});
+      }
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to load photos');
     } finally {
@@ -81,7 +117,15 @@ export const GalleryPage: React.FC = () => {
             {photos.map((photo, i) => (
               <div
                 key={photo.id}
-                className={`sticker-card bg-white border-2 border-foreground rounded-xl ${SHADOW_CLASSES[i % SHADOW_CLASSES.length]} overflow-hidden`}
+                className={`sticker-card bg-white border-2 border-foreground rounded-xl ${SHADOW_CLASSES[i % SHADOW_CLASSES.length]} overflow-hidden cursor-pointer hover:scale-105 transition-transform`}
+                onClick={() => setSelectedPhotoId(photo.id)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    setSelectedPhotoId(photo.id);
+                  }
+                }}
               >
                 <div className="aspect-square bg-muted overflow-hidden">
                   <img
@@ -100,12 +144,30 @@ export const GalleryPage: React.FC = () => {
                 </div>
                 <div className="p-2.5">
                   <p className="font-jakarta text-xs font-semibold text-foreground truncate">{photo.filename}</p>
-                  <p className="font-jakarta text-xs text-muted-fg mt-0.5">
-                    {(() => {
-                      const d = new Date(photo.added_at);
-                      return !isNaN(d.getTime()) ? d.toLocaleDateString() : '—';
-                    })()}
-                  </p>
+                  {(() => {
+                    const detections = jerseyDetectionsByPhoto.get(photo.id);
+                    const playerNames = detections
+                      ? Array.from(
+                          new Set(
+                            detections
+                              .filter(j => j.player_name)
+                              .map(j => j.player_name!)
+                          )
+                        )
+                      : [];
+                    return playerNames.length > 0 ? (
+                      <p className="font-jakarta text-xs text-accent font-medium mt-0.5 truncate">
+                        {playerNames.join(', ')}
+                      </p>
+                    ) : (
+                      <p className="font-jakarta text-xs text-muted-fg mt-0.5">
+                        {(() => {
+                          const d = new Date(photo.added_at);
+                          return !isNaN(d.getTime()) ? d.toLocaleDateString() : '—';
+                        })()}
+                      </p>
+                    );
+                  })()}
                 </div>
               </div>
             ))}
@@ -128,6 +190,14 @@ export const GalleryPage: React.FC = () => {
             </div>
           )}
         </>
+      )}
+
+      {/* Photo lightbox modal */}
+      {selectedPhotoId && (
+        <PhotoLightbox
+          photoId={selectedPhotoId}
+          onClose={() => setSelectedPhotoId(null)}
+        />
       )}
     </div>
   );

@@ -54,11 +54,12 @@ class FaceRepository(BaseRepository):
             ]
 
     def get_faces_by_photo(self, photo_id: int) -> List[Dict]:
-        """Get all faces detected in a photo."""
+        """Get all faces detected in a photo with quality and jersey color signals."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
-                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence
+                SELECT id, photo_id, embedding, bbox_x0, bbox_y0, bbox_x1, bbox_y1, confidence,
+                       quality_score, face_size_ratio, jersey_color, jersey_color_conf
                 FROM faces
                 WHERE photo_id = ?
                 ORDER BY confidence DESC
@@ -71,7 +72,11 @@ class FaceRepository(BaseRepository):
                     "photo_id": row[1],
                     "embedding": json.loads(row[2]),
                     "bbox": [row[3], row[4], row[5], row[6]],
-                    "confidence": row[7]
+                    "confidence": row[7],
+                    "quality_score": row[8],
+                    "face_size_ratio": row[9],
+                    "jersey_color": row[10],
+                    "jersey_color_conf": row[11],
                 })
             return results
 

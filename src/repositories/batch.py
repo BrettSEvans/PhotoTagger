@@ -92,12 +92,16 @@ class BatchRepository(BaseRepository):
         team_name: Optional[str] = None,
         team_year: Optional[int] = None,
         tournament: Optional[str] = None,
+        name: Optional[str] = None,
     ) -> None:
         """Update batch metadata."""
         with self._lock:
             cursor = self._conn.cursor()
             fields = []
             values = []
+            if name is not None:
+                fields.append("name = ?")
+                values.append(name)
             if team_name is not None:
                 fields.append("team_name = ?")
                 values.append(team_name)
