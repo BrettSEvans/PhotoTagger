@@ -38,7 +38,8 @@ export const RosterPage: React.FC = () => {
   const [importTeam, setImportTeam] = useState('');
   const [importTeamYear,   setImportTeamYear]   = useState(2026);
   const [duplicatePolicy, setDuplicatePolicy] = useState<'replace' | 'skip'>('replace');
-  const [importTeamColor, setImportTeamColor] = useState('');
+  // Whether to show the "Import as team" pill row — hidden after +Add Roster is pressed
+  const [showImportTeamPills, setShowImportTeamPills] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Individual player edit modal state
@@ -116,8 +117,9 @@ export const RosterPage: React.FC = () => {
     setRosterUrl('');
     setImportTeam('');
     setImportTeamYear(2026);
-    setImportTeamColor('');
     setDuplicatePolicy('replace');
+    // Hide team pills until user interacts with the import form again
+    setShowImportTeamPills(false);
     setImportMsg(null);
     setIsDragging(false);
 
@@ -368,9 +370,9 @@ export const RosterPage: React.FC = () => {
     setRosterUrl('');
     setImportTeam('');
     setImportTeamYear(2026);
-    setImportTeamColor('');
     setDuplicatePolicy('replace');
     setIsDragging(false);
+    setShowImportTeamPills(true);
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
@@ -406,7 +408,7 @@ export const RosterPage: React.FC = () => {
         // Inference failed, continue with current values
       }
 
-      const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy, importTeamColor.trim() || undefined);
+      const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
       if (result.failed === 0) clearImportForm();
@@ -442,7 +444,7 @@ export const RosterPage: React.FC = () => {
         // Inference failed, continue with current values
       }
 
-      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear, duplicatePolicy, importTeamColor.trim() || undefined);
+      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
       if (result.failed === 0) clearImportForm();
@@ -575,8 +577,7 @@ export const RosterPage: React.FC = () => {
         {/* ── Bulk Import Zone ─────────────────────────────────────────────── */}
         <div ref={importCardRef} className="bg-white border-2 border-foreground rounded-2xl shadow-pop-yellow p-6 space-y-4 relative overflow-hidden">
           <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-tertiary rounded-full border-2 border-foreground opacity-80" />
-          <h2 className="font-outfit text-lg font-bold text-foreground">Import</h2>
-          <p className="font-jakarta text-xs text-muted-fg">Drop a roster file or paste a roster URL</p>
+          <h2 className="font-outfit text-lg font-bold text-foreground">Import Roster</h2>
 
           {/* Drop zone (also click-to-browse) */}
           <input
@@ -628,8 +629,7 @@ export const RosterPage: React.FC = () => {
                 type="url"
                 value={rosterUrl}
                 onChange={e => setRosterUrl(e.target.value)}
-                placeholder="https://play.usaultimate.org/events/teams/?EventTeamId=…"
-                className="geo-input flex-1 min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                className="geo-input flex-1 min-w-0 px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
               />
               <button
                 type="button"
@@ -637,7 +637,7 @@ export const RosterPage: React.FC = () => {
                 disabled={isParsing || !rosterUrl.trim()}
                 className="btn-candy bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
               >
-                Scrape
+                Import
               </button>
             </div>
           </div>
@@ -648,12 +648,12 @@ export const RosterPage: React.FC = () => {
               Import as team
             </label>
             <div className="space-y-2">
-              {rosterTeams.length > 0 && (
+              {showImportTeamPills && rosterTeams.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {rosterTeams.map(team => (
                     <button
                       key={team}
-                      onClick={() => setImportTeam(team)}
+                      onClick={() => { setImportTeam(team); setShowImportTeamPills(true); }}
                       className={`font-jakarta text-sm px-3 py-1.5 rounded-full border-2 transition-colors ${
                         importTeam === team
                           ? 'bg-accent text-white border-foreground shadow-pop'
@@ -665,48 +665,27 @@ export const RosterPage: React.FC = () => {
                   ))}
                 </div>
               )}
-              <div>
-                <label htmlFor="importTeam" className="block font-jakarta text-xs text-muted-fg mb-1">
-                  Or type a new team name:
-                </label>
-                <input
-                  id="importTeam"
-                  type="text"
-                  value={importTeam}
-                  onChange={e => setImportTeam(e.target.value)}
-                  placeholder="Team name…"
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_130px] gap-3">
-            <div>
-              <label htmlFor="importTeamColor" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Team uniform color
-              </label>
               <input
-                id="importTeamColor"
+                id="importTeam"
                 type="text"
-                value={importTeamColor}
-                onChange={e => setImportTeamColor(e.target.value)}
-                placeholder="red, white, blue…"
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-              />
-            </div>
-            <div>
-              <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                Year
-              </label>
-              <input
-                id="importTeamYear"
-                type="number"
-                value={importTeamYear}
-                onChange={e => setImportTeamYear(Number(e.target.value) || 2026)}
+                value={importTeam}
+                onChange={e => { setImportTeam(e.target.value); setShowImportTeamPills(true); }}
                 className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
               />
             </div>
+          </div>
+
+          <div>
+            <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+              Year
+            </label>
+            <input
+              id="importTeamYear"
+              type="number"
+              value={importTeamYear}
+              onChange={e => setImportTeamYear(Number(e.target.value) || 2026)}
+              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+            />
           </div>
 
           {importMsg && (
@@ -732,8 +711,7 @@ export const RosterPage: React.FC = () => {
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Player name…"
-                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
               />
             </div>
             <div className="grid grid-cols-3 gap-2">
@@ -745,8 +723,7 @@ export const RosterPage: React.FC = () => {
                   value={newJersey}
                   onChange={e => setNewJersey(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="23"
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg text-center"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground text-center"
                 />
               </div>
               <div>
@@ -757,8 +734,7 @@ export const RosterPage: React.FC = () => {
                   value={newTeam}
                   onChange={e => setNewTeam(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="Team…"
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
+                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
                 />
               </div>
               <div>
@@ -781,7 +757,6 @@ export const RosterPage: React.FC = () => {
               + Add Player
             </button>
           </form>
-          <p className="font-jakarta text-xs text-muted-fg">Press Enter to submit</p>
         </div>
       </div>
 

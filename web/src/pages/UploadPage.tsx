@@ -22,9 +22,16 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const [batches, setBatches] = useState<PhotoBatch[]>([]);
   const [isLoadingBatches, setIsLoadingBatches] = useState(true);
   const [showPostUploadMessage, setShowPostUploadMessage] = useState(false);
-  const [gameContext, setGameContext] = useState<any[]>([]);
+  const [gameContext, setGameContext] = useState<any[]>([
+    { team_name: '', team_year: 0 },
+    { team_name: '', team_year: 0 },
+  ]);
+  const [tournament, setTournament] = useState('');
+  const [tournamentInput, setTournamentInput] = useState('');
+  const [showTournamentDropdown, setShowTournamentDropdown] = useState(false);
   const [contextMsg, setContextMsg] = useState<string | null>(null);
   const [rosterTeams, setRosterTeams] = useState<string[]>([]);
+  const [rosterTeamYears, setRosterTeamYears] = useState<Record<string, number>>({});
 
   const confirmedPhotosForDisplay = useMemo(() => {
     const grouped = new Map<string, TaggedPhoto[]>();
@@ -68,23 +75,25 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   const loadGameContext = useCallback(async () => {
     try {
       const data = await photoTaggerClient.getGameContext();
-      setGameContext(data.teams.length > 0 ? data.teams : [
-        { team_name: '', team_year: 0, uniform_color: '' },
-        { team_name: '', team_year: 0, uniform_color: '' },
-      ]);
-    } catch {
-      setGameContext([
-        { team_name: '', team_year: 0, uniform_color: '' },
-        { team_name: '', team_year: 0, uniform_color: '' },
-      ]);
-    }
+      if (data.teams.length > 0) {
+        setGameContext(data.teams.map((t: any) => ({ team_name: t.team_name, team_year: t.team_year })));
+      }
+    } catch { /* non-critical */ }
   }, []);
 
   const loadRosterTeams = useCallback(async () => {
     try {
       const data = await photoTaggerClient.getRoster();
-      const teams = Array.from(new Set(data.entries.map((e: any) => e.team_name))).sort();
+      const teams = Array.from(new Set(data.entries.map((e: any) => e.team_name))).sort() as string[];
       setRosterTeams(teams);
+      // Build team → most-recent year map
+      const yearMap: Record<string, number> = {};
+      data.entries.forEach((e: any) => {
+        if (!yearMap[e.team_name] || e.team_year > yearMap[e.team_name]) {
+          yearMap[e.team_name] = e.team_year;
+        }
+      });
+      setRosterTeamYears(yearMap);
     } catch {
       setRosterTeams([]);
     }
@@ -108,18 +117,20 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     clearSelection();
   };
 
+  /** Select a roster team for a slot; year auto-fills from roster. */
+  const selectContextTeam = (index: number, teamName: string) => {
+    const year = rosterTeamYears[teamName] ?? 0;
+    setGameContext(prev => {
+      const next = [...prev];
+      next[index] = { team_name: teamName, team_year: year };
+      return next;
+    });
+  };
+
   const updateContextTeam = (index: number, patch: any) => {
     setGameContext(prev => {
       const next = [...prev];
-      const current = next[index] ?? {
-        team_name: '',
-        team_year: 2026,
-        uniform_color: '',
-      };
-      next[index] = {
-        ...current,
-        ...patch,
-      };
+      next[index] = { ...(next[index] ?? { team_name: '', team_year: 0 }), ...patch };
       return next;
     });
   };
@@ -129,18 +140,32 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
     try {
       const teams = gameContext
         .map(team => ({
-          team_name: team.team_name.trim(),
-          team_year: Number(team.team_year) || 2026,
-          uniform_color: team.uniform_color.trim().toLowerCase(),
+          team_name: (team.team_name ?? '').trim(),
+          team_year: Number(team.team_year) || new Date().getFullYear(),
+          uniform_color: '',
         }))
-        .filter(team => team.team_name && team.uniform_color);
-      const data = await photoTaggerClient.setGameContext(teams);
-      setGameContext(data.teams);
+        .filter(team => team.team_name);
+      await photoTaggerClient.setGameContext(teams);
       setContextMsg('Game saved');
-      // Refresh sidebar so updated batch metadata is reflected
+
+      // Tag the most recently uploaded batch with tournament + team info so the
+      // sidebar hierarchy populates immediately.
+      const teamA = teams[0];
+      const teamB = teams[1];
+      if (teamA && batches.length > 0) {
+        const latestBatch = batches.reduce((a, b) => (b.id > a.id ? b : a));
+        await photoTaggerClient.updateBatch(latestBatch.id, {
+          tournament: tournament.trim() || undefined,
+          team_name: teamA.team_name,
+          team_year: teamA.team_year,
+          name: teamB ? `${teamA.team_name} vs ${teamB.team_name}` : teamA.team_name,
+        });
+      }
+
       await loadBatches();
     } catch (err) {
       console.error('Failed to save game context:', err);
+      setContextMsg('Save failed');
     }
   };
 
@@ -203,83 +228,98 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
         </div>
       )}
 
-      {/* Import form */}
-      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
-
-      {/* Game Context */}
-      <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="font-outfit text-lg font-bold text-foreground">Game Context (Empty on Start)</h2>
-            <p className="font-jakarta text-xs text-muted-fg">Set the current matchup and uniform colors before evaluating photos</p>
+      {/* ── Game Context ────────────────────────────────────────────────────── */}
+      {(() => {
+        const existingTournaments = [...new Set(batches.map(b => b.tournament).filter(Boolean))] as string[];
+        const filteredTournaments = tournamentInput.trim()
+          ? existingTournaments.filter(t => t.toLowerCase().includes(tournamentInput.toLowerCase()))
+          : existingTournaments;
+        return (
+        <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-mint p-5 space-y-4 relative overflow-hidden">
+          <div aria-hidden="true" className="absolute -top-3 -right-3 w-8 h-8 bg-quaternary rounded-full border-2 border-foreground opacity-80" />
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-outfit text-lg font-bold text-foreground">Game Context</h2>
+            <button
+              type="button"
+              onClick={saveGameContext}
+              className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop whitespace-nowrap"
+            >
+              Save Game
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={saveGameContext}
-            className="btn-candy bg-quaternary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 whitespace-nowrap"
-          >
-            Save Game
-          </button>
-        </div>
-        <div className="space-y-4">
-          {[0, 1].map(index => (
-            <div key={index} className="space-y-2">
-              <div>
-                <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-2">
+
+          {/* Tournament typeahead */}
+          <div className="relative">
+            <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Tournament</label>
+            <input
+              type="text"
+              value={tournamentInput}
+              onChange={e => { setTournamentInput(e.target.value); setTournament(e.target.value); setShowTournamentDropdown(true); }}
+              onFocus={() => setShowTournamentDropdown(true)}
+              onBlur={() => setTimeout(() => setShowTournamentDropdown(false), 150)}
+              className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+            />
+            {showTournamentDropdown && filteredTournaments.length > 0 && (
+              <ul className="absolute z-20 left-0 right-0 mt-1 bg-white border-2 border-foreground rounded-xl shadow-pop overflow-hidden max-h-40 overflow-y-auto">
+                {filteredTournaments.map(t => (
+                  <li key={t}>
+                    <button
+                      type="button"
+                      onMouseDown={() => { setTournamentInput(t); setTournament(t); setShowTournamentDropdown(false); }}
+                      className="w-full text-left px-3 py-2 font-jakarta text-sm hover:bg-quaternary/10"
+                    >
+                      {t}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* Team A / Team B */}
+          <div className="grid grid-cols-2 gap-4">
+            {[0, 1].map(index => (
+              <div key={index} className="space-y-2">
+                <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground">
                   Team {index === 0 ? 'A' : 'B'}
                 </label>
-                {rosterTeams.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {rosterTeams.map(team => (
-                      <button
-                        key={team}
-                        onClick={() => updateContextTeam(index, { team_name: team })}
-                        className={`font-jakarta text-sm px-3 py-1.5 rounded-full border-2 transition-colors ${
-                          gameContext[index]?.team_name === team
-                            ? 'bg-accent text-white border-foreground shadow-pop'
-                            : 'bg-white text-foreground border-frame hover:border-foreground'
-                        }`}
-                      >
-                        {team}
-                      </button>
-                    ))}
-                  </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {rosterTeams.map(team => (
+                    <button
+                      key={team}
+                      type="button"
+                      onClick={() => selectContextTeam(index, team)}
+                      className={`font-jakarta text-xs px-2.5 py-1 rounded-full border-2 transition-colors ${
+                        gameContext[index]?.team_name === team
+                          ? 'bg-accent text-white border-foreground shadow-pop'
+                          : 'bg-white text-foreground border-frame hover:border-foreground'
+                      }`}
+                    >
+                      {team}
+                    </button>
+                  ))}
+                </div>
+                {gameContext[index]?.team_name && (
+                  <p className="font-jakarta text-xs text-muted-fg">
+                    {gameContext[index].team_name}
+                    {gameContext[index].team_year ? ` · ${gameContext[index].team_year}` : ''}
+                  </p>
                 )}
-                <input
-                  type="text"
-                  value={gameContext[index]?.team_name ?? ''}
-                  onChange={e => updateContextTeam(index, { team_name: e.target.value })}
-                  placeholder="Or type a team name…"
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                />
               </div>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Year</label>
-                  <input
-                    type="number"
-                    value={gameContext[index]?.team_year || ''}
-                    placeholder="2026"
-                    onChange={e => updateContextTeam(index, { team_year: Number(e.target.value) || 0 })}
-                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                  />
-                </div>
-                <div>
-                  <label className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">Color</label>
-                  <input
-                    type="text"
-                    value={gameContext[index]?.uniform_color ?? ''}
-                    onChange={e => updateContextTeam(index, { uniform_color: e.target.value })}
-                    placeholder={index === 0 ? 'red' : 'white'}
-                    className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground placeholder:text-muted-fg"
-                  />
-                </div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+
+          {contextMsg && (
+            <p className={`font-jakarta text-xs font-semibold ${contextMsg === 'Save failed' ? 'text-secondary' : 'text-foreground'}`}>
+              {contextMsg === 'Game saved' ? '✅ ' : '⚠️ '}{contextMsg}
+            </p>
+          )}
         </div>
-        {contextMsg && <p className="font-jakarta text-xs font-semibold text-foreground">{contextMsg}</p>}
-      </div>
+        );
+      })()}
+
+      {/* Import form */}
+      <PhotoUpload onUploadSuccess={handleUploadSuccess} />
 
       {/* ── Summary Accordion ──────────────────────────────────────────────── */}
       <div className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg overflow-hidden relative">
