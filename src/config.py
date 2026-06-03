@@ -83,3 +83,9 @@ TEAM_INFER_EXCLUDE_COLORS = {"black"}
 # Already-assigned clusters (player_name set) are always shown regardless.
 MIN_CLUSTER_PHOTOS = 2
 MIN_CLUSTER_PROMINENCE = 0.002
+# A singleton cluster whose largest face covers this fraction of the image is
+# treated as a close-up shot of a real subject — jersey may not be visible when
+# the face fills the frame, so the jersey-color signal can't be used, but high
+# prominence alone is sufficient evidence the photo is of a person, not noise.
+# 576×384 image: 0.08 ≈ a ~170×170 px face, clearly a foreground close-up.
+CLOSE_UP_PROMINENCE = 0.08
