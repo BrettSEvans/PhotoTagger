@@ -188,10 +188,15 @@ def cluster_players():
 
 @bp.route("/api/players", methods=["GET"])
 def get_players():
-    """Get all player clusters with stats."""
+    """Get player clusters worth reviewing (recurring, prominent, or already assigned)."""
+    from src.config import MIN_CLUSTER_PHOTOS, MIN_CLUSTER_PROMINENCE
+
     db = current_app.db
     try:
-        clusters = db.clusters.get_all_player_clusters()
+        clusters = db.clusters.get_all_player_clusters(
+            min_photos=MIN_CLUSTER_PHOTOS,
+            min_prominence=MIN_CLUSTER_PROMINENCE,
+        )
         return jsonify({
             "players": clusters,
             "total": len(clusters),

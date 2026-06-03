@@ -64,7 +64,7 @@ def test_sharp_large_face_included_in_clustering(db, tmp_path, monkeypatch):
     assert result["clusters_created"] == 1
 
 def test_quality_filter_log_counts_removed_faces(db, tmp_path, monkeypatch, caplog):
-    """Clusterer must log how many faces were removed by the quality filter."""
+    """Clusterer must log how many faces were dropped by the subject filter."""
     import logging
     monkeypatch.setattr(cfg, "MIN_FACE_SHARPNESS", 30.0)
     monkeypatch.setattr(cfg, "MIN_FACE_SIZE_RATIO", 0.002)
@@ -76,8 +76,8 @@ def test_quality_filter_log_counts_removed_faces(db, tmp_path, monkeypatch, capl
     with caplog.at_level(logging.INFO, logger="src.face_cluster"):
         FaceClusterer(db).run()
 
-    assert "Quality filter" in caplog.text
-    assert "removed 1" in caplog.text
+    assert "Subject filter" in caplog.text
+    assert "dropped 1" in caplog.text
 
 
 # ── Null quality values (pre-migration rows) ─────────────────────────────────

@@ -37,34 +37,48 @@ class ClusterRepository(BaseRepository):
             cursor.execute("UPDATE faces SET cluster_id = ? WHERE id = ?", (cluster_id, face_id))
             self._conn.commit()
 
-    def get_all_player_clusters(self) -> List[Dict]:
+    def get_all_player_clusters(self, min_photos: int = 1, min_prominence: float = 0.0) -> List[Dict]:
         """Get all player clusters with stats.
 
-        Subject detection gates faces before they're assigned a cluster_id, so every
-        persisted cluster already contains only real (player) faces — no empty-cluster
-        filtering needed here.
+        Optional review filtering separates real, taggable players from noise:
+          - min_photos: drop clusters seen in fewer than this many photos (one-off
+            "zombie" mis-detections).
+          - min_prominence: drop clusters whose LARGEST face is below this size ratio
+            (all-background clusters that never get a foreground appearance).
+        Clusters already assigned to a player (player_name set) are always returned.
+        Defaults (1, 0.0) apply no filtering.
         """
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
-                       player_name, jersey_number, roster_entry_id
-                FROM player_clusters
+                       player_name, jersey_number, roster_entry_id,
+                       (SELECT MAX(f.face_size_ratio) FROM faces f WHERE f.cluster_id = pc.id) as max_face_size
+                FROM player_clusters pc
                 ORDER BY photo_count DESC
             """)
-            return [
-                {
+            result = []
+            for row in cursor.fetchall():
+                player_name = row[5]
+                photo_count = row[2] or 0
+                max_face_size = row[8] or 0.0
+                # Always surface clusters the user has already assigned
+                if player_name is None:
+                    if photo_count < min_photos:
+                        continue
+                    if min_prominence > 0 and max_face_size < min_prominence:
+                        continue
+                result.append({
                     "id": row[0],
                     "face_count": row[1],
                     "photo_count": row[2],
                     "thumbnail_face_id": row[3],
                     "created_at": row[4],
-                    "player_name": row[5],
+                    "player_name": player_name,
                     "jersey_number": row[6],
                     "roster_entry_id": row[7],
-                }
-                for row in cursor.fetchall()
-            ]
+                })
+            return result
 
     def get_photos_by_cluster(self, cluster_id: int, min_face_confidence: float = 0.0) -> List[Dict]:
         """Get all photos that contain a face in this cluster.
