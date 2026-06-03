@@ -508,7 +508,7 @@ export const RosterPage: React.FC = () => {
         // Inference failed, continue with current values
       }
 
-      const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear, duplicatePolicy);
+      const result = await photoTaggerClient.importRosterFile(file, teamName, teamYear ?? 2026, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
@@ -543,7 +543,7 @@ export const RosterPage: React.FC = () => {
         // Inference failed, continue with current values
       }
 
-      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear, duplicatePolicy);
+      const result = await photoTaggerClient.importRosterUrl(rosterUrl.trim(), teamName, teamYear ?? 2026, duplicatePolicy);
       await loadRoster();
       setImportMsg({ type: result.failed === 0 ? 'success' : 'error', text: formatImportMessage(result) });
     } catch (err) {
