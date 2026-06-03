@@ -17,6 +17,7 @@ ENV/
 
 # Project-specific
 photos/
+uploads/
 *.db
 *.sqlite3
 .env
