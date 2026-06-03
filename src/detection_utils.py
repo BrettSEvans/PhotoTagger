@@ -91,11 +91,19 @@ def match_to_roster(
         logger.debug(f"Incomplete matching criteria: jersey={jersey_number}, team={team_name}, color={jersey_color}, year={year}")
         return None
 
+    # Normalize jersey_number to integer for consistent matching
+    try:
+        jersey_int = int(str(jersey_number).strip())
+    except (ValueError, TypeError):
+        logger.debug(f"Cannot convert jersey_number to int: {jersey_number!r}")
+        return None
+
     try:
         # Use roster repository's find method to locate a matching entry
         # with all four criteria: jersey_number, team_name, uniform_color, year
+        # NULL jersey numbers in the roster are never matched
         entry = db.roster.find_by_jersey_color_and_team(
-            jersey_number=jersey_number,
+            jersey_number=jersey_int,
             team_name=team_name,
             jersey_color=jersey_color,
             year=year,

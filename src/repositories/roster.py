@@ -12,11 +12,11 @@ class RosterRepository(BaseRepository):
         self,
         team_name: str,
         team_year: int,
-        jersey_number: str,
+        jersey_number: Optional[int],
         player_name: str,
         uniform_color: Optional[str] = None,
     ):
-        """Add a player to the roster."""
+        """Add a player to the roster. jersey_number may be None (e.g. coaches)."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
@@ -25,14 +25,20 @@ class RosterRepository(BaseRepository):
             """, (team_name, team_year, jersey_number, player_name, uniform_color))
             self._conn.commit()
 
-    def roster_entry_exists(self, team_name: str, team_year: int, jersey_number: str) -> bool:
+    def roster_entry_exists(self, team_name: str, team_year: int, jersey_number: Optional[int]) -> bool:
         """Return whether a roster entry already exists for team/year/jersey."""
         with self._lock:
             cursor = self._conn.cursor()
-            cursor.execute("""
-                SELECT 1 FROM rosters
-                WHERE team_name = ? AND team_year = ? AND jersey_number = ?
-            """, (team_name, team_year, jersey_number))
+            if jersey_number is None:
+                cursor.execute("""
+                    SELECT 1 FROM rosters
+                    WHERE team_name = ? AND team_year = ? AND jersey_number IS NULL
+                """, (team_name, team_year))
+            else:
+                cursor.execute("""
+                    SELECT 1 FROM rosters
+                    WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+                """, (team_name, team_year, jersey_number))
             return cursor.fetchone() is not None
 
     def import_roster_entries(
@@ -53,11 +59,19 @@ class RosterRepository(BaseRepository):
         errors = []
 
         for idx, row in enumerate(rows, start=1):
-            jersey = str(row.get("jersey_number", "")).strip()
+            jersey_raw = row.get("jersey_number")
+            jersey: Optional[int] = None
+            if jersey_raw is not None and str(jersey_raw).strip() != "":
+                try:
+                    jersey = int(str(jersey_raw).strip())
+                except (ValueError, TypeError):
+                    failed += 1
+                    errors.append(f"Row {idx}: jersey_number must be an integer, got {jersey_raw!r}")
+                    continue
             name = str(row.get("player_name", "")).strip()
-            if not jersey or not name:
+            if not name:
                 failed += 1
-                errors.append(f"Row {idx}: missing jersey_number or player_name")
+                errors.append(f"Row {idx}: missing player_name")
                 continue
 
             if duplicate_policy == "skip" and self.roster_entry_exists(team_name, team_year, jersey):
@@ -79,14 +93,14 @@ class RosterRepository(BaseRepository):
             "errors": errors,
         }
 
-    def get_player_name(self, team_name: str, team_year: int, jersey_number: str) -> Optional[str]:
-        """Look up player name by jersey."""
+    def get_player_name(self, team_name: str, team_year: int, jersey_number: int) -> Optional[str]:
+        """Look up player name by jersey number (integer). Returns None for NULL jersey entries."""
         with self._lock:
             cursor = self._conn.cursor()
             cursor.execute("""
                 SELECT player_name FROM rosters
-                WHERE team_name = ? AND team_year = ? AND jersey_number = ?
-            """, (team_name, team_year, jersey_number))
+                WHERE team_name = ? AND team_year = ? AND jersey_number IS NOT NULL AND CAST(jersey_number AS INTEGER) = ?
+            """, (team_name, team_year, int(jersey_number)))
             result = cursor.fetchone()
             return result[0] if result else None
 
@@ -166,19 +180,27 @@ class RosterRepository(BaseRepository):
             }
 
             # Build update dict with new values, keeping current values for unspecified fields
+            # jersey_number: parse to int if provided and non-empty, allow None
+            raw_jersey = kwargs.get("jersey_number", current["jersey_number"])
+            if raw_jersey is None or str(raw_jersey).strip() == "":
+                new_jersey: Optional[int] = None
+            else:
+                try:
+                    new_jersey = int(str(raw_jersey).strip())
+                except (ValueError, TypeError):
+                    raise ValueError(f"jersey_number must be an integer, got {raw_jersey!r}")
+
             updates = {
                 "team_name": kwargs.get("team_name", current["team_name"]),
                 "team_year": kwargs.get("team_year", current["team_year"]),
-                "jersey_number": kwargs.get("jersey_number", current["jersey_number"]),
+                "jersey_number": new_jersey,
                 "player_name": kwargs.get("player_name", current["player_name"]),
                 "uniform_color": kwargs.get("uniform_color", current["uniform_color"]),
             }
 
-            # Validate required fields
+            # Validate required fields (jersey_number is optional)
             if not updates["player_name"] or not updates["player_name"].strip():
                 raise ValueError("player_name cannot be empty")
-            if not updates["jersey_number"] or not updates["jersey_number"].strip():
-                raise ValueError("jersey_number cannot be empty")
 
             # Check for unique constraint violation (only if the key fields changed)
             key_fields_changed = (
@@ -187,7 +209,7 @@ class RosterRepository(BaseRepository):
                 updates["jersey_number"] != current["jersey_number"]
             )
 
-            if key_fields_changed:
+            if key_fields_changed and updates["jersey_number"] is not None:
                 cursor.execute(
                     """SELECT 1 FROM rosters
                     WHERE id != ? AND team_name = ? AND team_year = ? AND jersey_number = ?""",
@@ -317,7 +339,7 @@ class RosterRepository(BaseRepository):
 
     def find_by_jersey_color_and_team(
         self,
-        jersey_number: str,
+        jersey_number: int,
         team_name: str,
         jersey_color: str,
         year: int,
@@ -325,7 +347,7 @@ class RosterRepository(BaseRepository):
         """Find a roster entry by all four matching criteria: jersey, team, color, year.
 
         Args:
-            jersey_number: Jersey number (e.g. "31")
+            jersey_number: Jersey number as integer (e.g. 31). NULL entries are never matched.
             team_name: Team name (e.g. "Carleton")
             jersey_color: Uniform color (e.g. "red")
             year: Tournament year
@@ -338,12 +360,13 @@ class RosterRepository(BaseRepository):
             cursor.execute("""
                 SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
                 FROM rosters
-                WHERE jersey_number = ?
+                WHERE jersey_number IS NOT NULL
+                  AND CAST(jersey_number AS INTEGER) = ?
                   AND team_name = ?
                   AND team_year = ?
                   AND uniform_color = ?
                 LIMIT 1
-            """, (str(jersey_number), team_name, year, jersey_color))
+            """, (int(jersey_number), team_name, year, jersey_color))
             row = cursor.fetchone()
             if not row:
                 return None

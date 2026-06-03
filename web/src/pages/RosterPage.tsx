@@ -333,7 +333,7 @@ export const RosterPage: React.FC = () => {
     setAddPlayerError(null);
     try {
       await photoTaggerClient.addRosterEntry(
-        addPlayerForm.jersey_number.trim() || '0',
+        addPlayerForm.jersey_number.trim() || null,
         addPlayerForm.player_name.trim(),
         addPlayerForm.team_name.trim(),
         addPlayerForm.team_year,

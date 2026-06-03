@@ -2,6 +2,7 @@
 
 import logging
 import requests
+from typing import Optional
 from flask import Blueprint, jsonify, request, current_app
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file, infer_team_and_year, extract_team_and_year_from_html
 
@@ -68,7 +69,13 @@ def set_game_context():
 def add_roster():
     """Add a player to the roster."""
     data = request.get_json() or {}
-    jersey = str(data.get("jersey_number", "")).strip()
+    jersey_raw = data.get("jersey_number")
+    jersey: Optional[int] = None
+    if jersey_raw is not None and str(jersey_raw).strip() != "":
+        try:
+            jersey = int(str(jersey_raw).strip())
+        except (ValueError, TypeError):
+            return jsonify({"error": "jersey_number must be an integer"}), 400
     name = str(data.get("player_name", "")).strip()
     team = str(data.get("team_name", "Manual Entry")).strip()
     try:
@@ -76,8 +83,8 @@ def add_roster():
     except (TypeError, ValueError):
         return jsonify({"error": "team_year must be an integer"}), 400
     uniform_color = str(data.get("uniform_color", "")).strip().lower() or None
-    if not jersey or not name:
-        return jsonify({"error": "jersey_number and player_name are required"}), 400
+    if not name:
+        return jsonify({"error": "player_name is required"}), 400
     try:
         db = current_app.db
         db.roster.add_roster_entry(team, year, jersey, name, uniform_color=uniform_color)
@@ -203,7 +210,15 @@ def update_roster(entry_id: int):
         if "player_name" in data:
             updates["player_name"] = str(data["player_name"]).strip()
         if "jersey_number" in data:
-            updates["jersey_number"] = str(data["jersey_number"]).strip()
+            # Allow null/empty to clear jersey number (e.g. coaches)
+            raw = data["jersey_number"]
+            if raw is None or str(raw).strip() == "":
+                updates["jersey_number"] = None
+            else:
+                try:
+                    updates["jersey_number"] = int(str(raw).strip())
+                except (ValueError, TypeError):
+                    return jsonify({"error": "jersey_number must be an integer"}), 400
         if "team_name" in data:
             updates["team_name"] = str(data["team_name"]).strip()
         if "team_year" in data:

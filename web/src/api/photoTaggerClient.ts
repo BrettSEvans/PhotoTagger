@@ -404,14 +404,14 @@ class PhotoTaggerClient {
   }
 
   async addRosterEntry(
-    jerseyNumber: string,
+    jerseyNumber: string | null,
     playerName: string,
     teamName = 'Manual Entry',
     teamYear = 2026,
     uniformColor?: string,
   ): Promise<void> {
     await this.client.post('/api/roster', {
-      jersey_number: jerseyNumber,
+      jersey_number: jerseyNumber !== null && jerseyNumber !== '' ? parseInt(jerseyNumber, 10) : null,
       player_name: playerName,
       team_name: teamName,
       team_year: teamYear,

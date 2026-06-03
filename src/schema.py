@@ -55,7 +55,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             team_name TEXT NOT NULL,
             team_year INTEGER NOT NULL,
-            jersey_number TEXT NOT NULL,
+            jersey_number INTEGER,
             player_name TEXT NOT NULL,
             uniform_color TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -203,5 +203,39 @@ def init_schema(conn: sqlite3.Connection) -> None:
         cursor.execute("ALTER TABLE ocr_results ADD COLUMN roster_entry_id INTEGER REFERENCES rosters(id)")
     except Exception:
         pass
+
+    # Migrate rosters.jersey_number from TEXT NOT NULL to INTEGER (nullable).
+    # Check if the column is still NOT NULL (old schema) by inspecting table_info.
+    cursor.execute("PRAGMA table_info(rosters)")
+    cols = {row[1]: row for row in cursor.fetchall()}  # name -> (cid, name, type, notnull, dflt, pk)
+    jersey_col = cols.get("jersey_number")
+    if jersey_col and jersey_col[3] == 1:  # notnull == 1 means NOT NULL constraint
+        # Recreate the table without the NOT NULL constraint and with INTEGER type
+        cursor.executescript("""
+            PRAGMA foreign_keys = OFF;
+
+            CREATE TABLE rosters_new (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                team_name TEXT NOT NULL,
+                team_year INTEGER NOT NULL,
+                jersey_number INTEGER,
+                player_name TEXT NOT NULL,
+                uniform_color TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(team_name, team_year, jersey_number)
+            );
+
+            INSERT INTO rosters_new (id, team_name, team_year, jersey_number, player_name, uniform_color, created_at)
+            SELECT id, team_name, team_year,
+                   CASE WHEN jersey_number IS NULL OR jersey_number = '' THEN NULL
+                        ELSE CAST(jersey_number AS INTEGER) END,
+                   player_name, uniform_color, created_at
+            FROM rosters;
+
+            DROP TABLE rosters;
+            ALTER TABLE rosters_new RENAME TO rosters;
+
+            PRAGMA foreign_keys = ON;
+        """)
 
     conn.commit()
