@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AssignPlayerPanel, { AssignedInfo } from '../components/AssignPlayerPanel';
 import photoTaggerClient from '../api/photoTaggerClient';
+import { bboxStyle } from '../utils/bboxUtils';
+import type { ImgDim } from '../utils/bboxUtils';
 import type { ClusterPlayersResult, FaceDetectionResult, PlayerCluster, PlayerPhotoItem } from '../types/index';
 
 type ViewState = 'grid' | 'player-detail';
@@ -31,6 +33,19 @@ export const PlayersPage: React.FC = () => {
   // ── Tagging ─────────────────────────────────────────────────────────────
   const [taggingPlayer, setTaggingPlayer] = useState<PlayerCluster | null>(null);
   const [assignMsg, setAssignMsg] = useState<string | null>(null);
+
+  // ── Face bbox overlay ────────────────────────────────────────────────────
+  const [showBbox, setShowBbox] = useState(true);
+  const [imgDims, setImgDims] = useState<Map<number, ImgDim>>(new Map());
+
+  const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {
+    const img = e.currentTarget;
+    setImgDims(prev => {
+      const next = new Map(prev);
+      next.set(photoId, { w: img.naturalWidth, h: img.naturalHeight });
+      return next;
+    });
+  }, []);
 
   useEffect(() => { loadStatus(); }, []);
 
@@ -125,6 +140,7 @@ export const PlayersPage: React.FC = () => {
     setSelectedPlayer(player);
     setView('player-detail');
     setAssignMsg(null);
+    setImgDims(new Map());
     setIsLoadingPhotos(true);
     setPlayerPhotos([]);
     try {
@@ -173,12 +189,31 @@ export const PlayersPage: React.FC = () => {
             </div>
           )}
           <div className="flex-1">
-            <h1 className="font-outfit text-4xl font-extrabold text-foreground">
-              {selectedPlayer.player_name || `Player ${selectedPlayer.id}`}
-              {selectedPlayer.jersey_number && (
-                <span className="ml-3 align-middle text-2xl text-accent">#{selectedPlayer.jersey_number}</span>
-              )}
-            </h1>
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="font-outfit text-4xl font-extrabold text-foreground">
+                {selectedPlayer.player_name || `Player ${selectedPlayer.id}`}
+                {selectedPlayer.jersey_number && (
+                  <span className="ml-3 align-middle text-2xl text-accent">#{selectedPlayer.jersey_number}</span>
+                )}
+              </h1>
+              <button
+                type="button"
+                onClick={() => setShowBbox(v => !v)}
+                title={showBbox ? 'Hide face box' : 'Show face box'}
+                className={`flex items-center gap-1.5 font-jakarta font-bold text-xs px-3 py-1.5 rounded-full border-2 transition-colors ${
+                  showBbox
+                    ? 'bg-accent text-white border-foreground shadow-pop'
+                    : 'bg-white text-foreground border-frame hover:border-foreground'
+                }`}
+              >
+                {/* face-box icon: square with a small circle inside */}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="1" y="1" width="12" height="12" rx="1.5" />
+                  <circle cx="7" cy="7" r="2.2" />
+                </svg>
+                {showBbox ? 'Face on' : 'Face off'}
+              </button>
+            </div>
             <p className="font-jakarta text-muted-fg mt-1">
               {selectedPlayer.photo_count} photos · {selectedPlayer.face_count} appearances
             </p>
@@ -209,27 +244,38 @@ export const PlayersPage: React.FC = () => {
           <div className="flex justify-center py-12"><LoadingSpinner message="Loading photos…" /></div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3">
-            {playerPhotos.map((photo, i) => (
-              <div
-                key={photo.id}
-                className={`sticker-card bg-white border-2 border-foreground rounded-xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} overflow-hidden`}
-              >
-                <div className="aspect-square bg-muted overflow-hidden relative">
-                  <img
-                    src={photoTaggerClient.getPhotoUrl(photo.id)}
-                    alt={photo.filename}
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                  />
-                  <span className="absolute top-1.5 right-1.5 bg-foreground text-white font-jakarta text-xs font-bold px-1.5 py-0.5 rounded-full">
-                    {Math.round(photo.face_confidence * 100)}%
-                  </span>
+            {playerPhotos.map((photo, i) => {
+              const dim = imgDims.get(photo.id);
+              return (
+                <div
+                  key={photo.id}
+                  className={`sticker-card bg-white border-2 border-foreground rounded-xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} overflow-hidden`}
+                >
+                  <div className="aspect-square bg-muted overflow-hidden relative">
+                    <img
+                      src={photoTaggerClient.getPhotoUrl(photo.id)}
+                      alt={photo.filename}
+                      className="w-full h-full object-cover"
+                      onLoad={(e) => handleImgLoad(e, photo.id)}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                    {/* Purple face bbox overlay */}
+                    {showBbox && dim && photo.face_bbox && (
+                      <div
+                        className="absolute border-2 border-accent pointer-events-none rounded-sm"
+                        style={bboxStyle(photo.face_bbox, dim, 4)}
+                      />
+                    )}
+                    <span className="absolute top-1.5 right-1.5 bg-foreground text-white font-jakarta text-xs font-bold px-1.5 py-0.5 rounded-full">
+                      {Math.round(photo.face_confidence * 100)}%
+                    </span>
+                  </div>
+                  <div className="p-2.5">
+                    <p className="font-jakarta text-xs font-semibold text-foreground truncate">{photo.filename}</p>
+                  </div>
                 </div>
-                <div className="p-2.5">
-                  <p className="font-jakarta text-xs font-semibold text-foreground truncate">{photo.filename}</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

@@ -50,6 +50,7 @@ class ClusterRepository(BaseRepository):
         """
         with self._lock:
             cursor = self._conn.cursor()
+            from src.config import CLOSE_UP_PROMINENCE
             cursor.execute("""
                 SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
                        player_name, jersey_number, roster_entry_id,
@@ -68,10 +69,12 @@ class ClusterRepository(BaseRepository):
                 team_jersey_faces = row[9] or 0
                 # Always surface clusters the user has already assigned
                 if player_name is None:
-                    # Singletons: keep if at least one face has a confident team jersey
-                    # (a player may only appear clearly in one photo — don't discard them)
-                    if photo_count < min_photos and team_jersey_faces == 0:
-                        continue
+                    if photo_count < min_photos:
+                        # Singleton passes if it has a team jersey colour OR is a
+                        # prominent close-up (jersey may be out of frame when the
+                        # face fills the shot, so colour signal isn't reliable)
+                        if team_jersey_faces == 0 and max_face_size < CLOSE_UP_PROMINENCE:
+                            continue
                     if min_prominence > 0 and max_face_size < min_prominence:
                         continue
                 result.append({
