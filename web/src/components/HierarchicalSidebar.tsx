@@ -128,34 +128,30 @@ export function HierarchicalSidebar({
   if ((pageType === 'roster' || pageType === 'players' || pageType === 'search' || pageType === 'gallery') && rosterEntries.length > 0) {
     const hierarchy = buildRosterHierarchy(rosterEntries);
     return (
-      <div className="p-4 space-y-2">
+      <div className="p-3 space-y-1">
         {hierarchy.map(({ year, teams }) => (
           <div key={year}>
             <button
               onClick={() => toggleYear(year)}
-              className="w-full text-left px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2"
+              className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted/40 font-outfit font-bold text-sm text-foreground flex items-center gap-2"
             >
-              <span className="text-gray-600 dark:text-gray-400">
-                {expandedYears.has(year) ? '▼' : '▶'}
-              </span>
-              Year {year}
+              <span className="text-muted-fg text-xs">{expandedYears.has(year) ? '▼' : '▶'}</span>
+              {year}
             </button>
             {expandedYears.has(year) && (
-              <div className="ml-4 space-y-1">
+              <div className="ml-3 space-y-0.5">
                 {teams.map(({ team, count }) => (
                   <button
                     key={`${year}-${team}`}
-                    onClick={() => {
-                      setSelectedYear(year);
-                      setSelectedTeam(team);
-                    }}
-                    className={`w-full text-left px-3 py-2 rounded text-sm ${
+                    onClick={() => { setSelectedYear(year); setSelectedTeam(team); }}
+                    className={`w-full text-left px-3 py-1.5 rounded-lg font-jakarta text-xs transition-colors ${
                       selectedYear === year && selectedTeam === team
-                        ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 font-semibold'
-                        : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
+                        ? 'bg-accent/10 text-accent font-semibold border border-accent/20'
+                        : 'text-muted-fg hover:bg-muted/40 hover:text-foreground'
                     }`}
                   >
-                    {team} ({count})
+                    {team}
+                    <span className="ml-1 opacity-60">({count})</span>
                   </button>
                 ))}
               </div>
@@ -169,91 +165,63 @@ export function HierarchicalSidebar({
   if (pageType === 'upload' || pageType === 'review') {
     const hierarchy = batches.length > 0 ? buildGameHierarchy(batches) : [];
     return (
-      <div className="p-4 space-y-3">
-        {pageType === 'upload' && (
-          <button
-            onClick={onAddGame}
-            className="w-full bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-3 rounded text-sm"
-          >
-            + Add Game
-          </button>
-        )}
+      <div className="p-3 space-y-1">
         {batches.length === 0 ? (
-          <div className="text-gray-600 dark:text-gray-400 text-sm text-center py-8">
-            No games yet
-          </div>
+          <p className="font-jakarta text-xs text-muted-fg text-center py-8 px-3">
+            No games yet — save a game context and upload photos.
+          </p>
         ) : (
           hierarchy.map(({ year, tournaments }) => (
-          <div key={year}>
-            <button
-              onClick={() => toggleYear(year)}
-              className="w-full text-left px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2"
-            >
-              <span className="text-gray-600 dark:text-gray-400">
-                {expandedYears.has(year) ? '▼' : '▶'}
-              </span>
-              Year {year}
-            </button>
-            {expandedYears.has(year) && (
-              <div className="ml-4 space-y-2">
-                {tournaments.map(({ tournament, games }) => (
-                  <div key={tournament}>
-                    <button
-                      onClick={() => toggleTournament(tournament)}
-                      className="w-full text-left px-3 py-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700 font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2"
-                    >
-                      <span className="text-gray-600 dark:text-gray-400">
-                        {expandedTournaments.has(tournament) ? '▼' : '▶'}
-                      </span>
-                      {tournament}
-                    </button>
-                    {expandedTournaments.has(tournament) && (
-                      <div className="ml-4 space-y-1">
-                        {games.map(({ id, teamA, teamB, photoCount }) => (
-                          <button
-                            key={id}
-                            onClick={() => {
-                              setSelectedYear(year);
-                              setSelectedTournament(tournament);
-                              setSelectedGame(id);
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded text-sm ${
-                              selectedGame === id
-                                ? 'bg-blue-100 dark:bg-blue-900 text-blue-900 dark:text-blue-100 font-semibold'
-                                : 'hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'
-                            }`}
-                          >
-                            {teamA} vs {teamB} ({photoCount})
-                          </button>
-                        ))}
-                        {pageType === 'upload' && (
-                          <button
-                            onClick={() => {
-                              setSelectedYear(year);
-                              setSelectedTournament(tournament);
-                              setSelectedGame(null);
-                              onAddGame?.();
-                            }}
-                            className="w-full text-left px-3 py-2 rounded text-sm text-blue-600 dark:text-blue-400 hover:bg-gray-200 dark:hover:bg-gray-700"
-                          >
-                            + Add Game
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))
+            <div key={year}>
+              <button
+                onClick={() => toggleYear(year)}
+                className="w-full text-left px-3 py-2 rounded-lg hover:bg-muted/40 font-outfit font-bold text-sm text-foreground flex items-center gap-2"
+              >
+                <span className="text-muted-fg text-xs">{expandedYears.has(year) ? '▼' : '▶'}</span>
+                {year}
+              </button>
+              {expandedYears.has(year) && (
+                <div className="ml-3 space-y-1">
+                  {tournaments.map(({ tournament, games }) => (
+                    <div key={tournament}>
+                      <button
+                        onClick={() => toggleTournament(tournament)}
+                        className="w-full text-left px-3 py-1.5 rounded-lg hover:bg-muted/40 font-jakarta font-semibold text-xs text-foreground flex items-center gap-2"
+                      >
+                        <span className="text-muted-fg text-xs">{expandedTournaments.has(tournament) ? '▼' : '▶'}</span>
+                        {tournament}
+                      </button>
+                      {expandedTournaments.has(tournament) && (
+                        <div className="ml-3 space-y-0.5">
+                          {games.map(({ id, teamA, teamB, photoCount }) => (
+                            <button
+                              key={id}
+                              onClick={() => { setSelectedYear(year); setSelectedTournament(tournament); setSelectedGame(id); }}
+                              className={`w-full text-left px-3 py-1.5 rounded-lg font-jakarta text-xs transition-colors ${
+                                selectedGame === id
+                                  ? 'bg-accent/10 text-accent font-semibold border border-accent/20'
+                                  : 'text-muted-fg hover:bg-muted/40 hover:text-foreground'
+                              }`}
+                            >
+                              {teamA} vs {teamB}
+                              {photoCount > 0 && <span className="ml-1 opacity-60">({photoCount})</span>}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))
         )}
       </div>
     );
   }
 
   return (
-    <div className="p-4 text-gray-600 dark:text-gray-400 text-sm">
+    <div className="p-4 font-jakarta text-xs text-muted-fg">
       No data to display
     </div>
   );
