@@ -324,10 +324,6 @@ export const RosterPage: React.FC = () => {
       setAddPlayerError('Name cannot be empty');
       return;
     }
-    if (!addPlayerForm.jersey_number.trim()) {
-      setAddPlayerError('Jersey number cannot be empty');
-      return;
-    }
     if (!addPlayerForm.team_name.trim()) {
       setAddPlayerError('Team name cannot be empty');
       return;
@@ -337,7 +333,7 @@ export const RosterPage: React.FC = () => {
     setAddPlayerError(null);
     try {
       await photoTaggerClient.addRosterEntry(
-        addPlayerForm.jersey_number.trim(),
+        addPlayerForm.jersey_number.trim() || '0',
         addPlayerForm.player_name.trim(),
         addPlayerForm.team_name.trim(),
         addPlayerForm.team_year,
@@ -1189,7 +1185,7 @@ export const RosterPage: React.FC = () => {
 
               <div>
                 <label htmlFor="addPlayerNumber" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                  Jersey Number
+                  Jersey Number <span className="font-normal text-muted-fg">(optional)</span>
                 </label>
                 <input
                   id="addPlayerNumber"
