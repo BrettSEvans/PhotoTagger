@@ -683,7 +683,7 @@ export const RosterPage: React.FC = () => {
           {/* Drag zone and metadata side by side */}
           <div className="grid grid-cols-4 gap-4 items-start">
             {/* Drop zone (also click-to-browse) */}
-            <div className="col-span-3">
+            <div className="col-span-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -723,40 +723,37 @@ export const RosterPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Metadata on the right */}
-            <div className="space-y-3">
-              {/* Team name input for import */}
-              <div>
-                <label htmlFor="importTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                  Team Name
-                </label>
-                <input
-                  id="importTeam"
-                  type="text"
-                  value={importTeam}
-                  onChange={e => setImportTeam(e.target.value)}
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
-                  Year
-                </label>
-                <input
-                  id="importTeamYear"
-                  type="number"
-                  value={importTeamYear ?? ''}
-                  onChange={e => setImportTeamYear(e.target.value ? Number(e.target.value) : null)}
-                  className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
-                />
-              </div>
-
+            {/* Team name input for import */}
+            <div>
+              <label htmlFor="importTeam" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Team Name
+              </label>
+              <input
+                id="importTeam"
+                type="text"
+                value={importTeam}
+                onChange={e => setImportTeam(e.target.value)}
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
               {importMsg && importMsg.type === 'success' && (
-                <div className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-3">
+                <div className="bg-quaternary/10 border-2 border-quaternary rounded-xl p-3 mt-3">
                   <p className="font-jakarta text-xs text-quaternary font-bold">{importMsg.text}</p>
                 </div>
               )}
+            </div>
+
+            {/* Year input for import */}
+            <div>
+              <label htmlFor="importTeamYear" className="block font-jakarta text-xs font-bold uppercase tracking-wider text-foreground mb-1">
+                Year
+              </label>
+              <input
+                id="importTeamYear"
+                type="number"
+                value={importTeamYear ?? ''}
+                onChange={e => setImportTeamYear(e.target.value ? Number(e.target.value) : null)}
+                className="geo-input w-full px-3 py-2 bg-white border-2 border-frame rounded-xl font-jakarta text-sm text-foreground"
+              />
             </div>
           </div>
 
