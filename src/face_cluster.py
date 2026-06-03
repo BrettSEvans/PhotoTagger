@@ -128,11 +128,15 @@ class FaceClusterer:
         in_team = bool(team_colors) and color in team_colors and color_conf >= MIN_JERSEY_COLOR_CONF
 
         if not team_colors:
-            # No color info at all — fall back to geometric quality score
+            # No jersey-color signal at all (legacy/colorless data) — fall back to
+            # pure geometry. Prefer the composite quality score; otherwise require
+            # BOTH sharpness and size thresholds, treating missing values as failures.
             qs = face.get("quality_score")
             if qs is not None:
                 return qs >= MIN_FACE_QUALITY_SCORE
-            return size >= MIN_FACE_SIZE_RATIO
+            sharp_ok = (face.get("sharpness") or 0) >= MIN_FACE_SHARPNESS
+            size_ok = (face.get("face_size_ratio") or 0) >= MIN_FACE_SIZE_RATIO
+            return sharp_ok and size_ok
 
         if in_team:
             threshold = max(SUBJECT_ABS_FLOOR, SUBJECT_REL_FRAC * (photo_ref_size or 0))

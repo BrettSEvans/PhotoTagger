@@ -70,3 +70,16 @@ TEAM_INFER_MIN_SIZE = 0.01
 # Colors that are usually shadows/shorts/skin rather than a distinguishing jersey
 # color — excluded when inferring team colors.
 TEAM_INFER_EXCLUDE_COLORS = {"black"}
+
+# ── Cluster-level review filtering ─────────────────────────────────────────
+# Which clusters are worth surfacing in the Review & Assign list. Two signals
+# separate a real, taggable player from noise:
+#   1) Recurrence — a player you'd tag appears across multiple photos. A cluster
+#      seen in only one photo is almost always a one-off mis-detection ("zombie").
+#   2) Prominence — a real player gets at least one close/foreground appearance,
+#      so their cluster has at least one sizable face. A background person is never
+#      the subject, so every face in their cluster stays tiny (e.g. cluster of all
+#      0.0004–0.0012 faces). Their cluster's LARGEST face still falls below this.
+# Already-assigned clusters (player_name set) are always shown regardless.
+MIN_CLUSTER_PHOTOS = 2
+MIN_CLUSTER_PROMINENCE = 0.002
