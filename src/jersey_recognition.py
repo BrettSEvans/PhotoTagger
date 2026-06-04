@@ -8,7 +8,8 @@ from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import cv2
 import numpy as np
-import easyocr
+import pytesseract
+from PIL import Image
 
 from src import detection_utils
 from src import config
@@ -23,19 +24,73 @@ class JerseyRecognizer:
 
     def __init__(self, db, languages: List[str] = None):
         """
-        Initialize jersey recognizer.
+        Initialize jersey recognizer with Tesseract OCR backend.
 
         Args:
             db: Database connection (from current_app.db in Flask)
-            languages: Languages for OCR (default: English)
+            languages: Languages for OCR (ignored, kept for compatibility)
         """
         self.db = db
         self.languages = languages or ["en"]
-        logger.info(f"Initializing JerseyRecognizer with languages: {self.languages}")
-        self.reader = easyocr.Reader(self.languages, gpu=False)
+        logger.info(f"Initializing JerseyRecognizer with Tesseract OCR backend")
         self.uniform_detector = UniformDetector()
         # Per-game color-scheme learning (stubbed for now; would accumulate per team)
         self.learned_number_colors = {}
+
+    @staticmethod
+    def _tesseract_ocr_digits(image_bgr: np.ndarray) -> List[Tuple]:
+        """
+        Run Tesseract OCR on preprocessed image to extract digit numbers.
+
+        Args:
+            image_bgr: Preprocessed image (BGR numpy array, already upscaled and enhanced)
+
+        Returns:
+            List of (bbox, text, confidence) tuples
+        """
+        try:
+            # Convert BGR to RGB for PIL
+            image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+            pil_image = Image.fromarray(image_rgb)
+
+            # Configure Tesseract for digit-only detection
+            # --psm 8: Treat image as a single word
+            # --oem 3: Use both legacy and LSTM engine
+            config_str = r'--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789'
+
+            # Get detailed results including bounding boxes and confidence
+            ocr_results = pytesseract.image_to_data(
+                pil_image,
+                config=config_str,
+                output_type=pytesseract.Output.DICT
+            )
+
+            detections = []
+            if ocr_results['text']:
+                for i, text in enumerate(ocr_results['text']):
+                    if not text.strip():  # Skip empty detections
+                        continue
+
+                    confidence = int(ocr_results['conf'][i]) / 100.0
+                    if confidence < 0.3:  # Skip very low confidence
+                        continue
+
+                    # Extract bbox from Tesseract output
+                    x0 = ocr_results['left'][i]
+                    y0 = ocr_results['top'][i]
+                    x1 = x0 + ocr_results['width'][i]
+                    y1 = y0 + ocr_results['height'][i]
+
+                    # Return in format compatible with previous EasyOCR code
+                    # bbox_ocr is dummy (not used in validation), text is digit string, confidence is float
+                    bbox_ocr = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+                    detections.append((bbox_ocr, text, confidence))
+
+            return detections
+
+        except Exception as e:
+            logger.error(f"Tesseract OCR error: {e}")
+            return []
 
     @staticmethod
     def _compute_iou(box1: List[int], box2: List[int]) -> float:
@@ -420,9 +475,9 @@ class JerseyRecognizer:
                 if torso_crop is None:
                     continue
 
-                # Run OCR on the torso crop
+                # Run OCR on the torso crop using Tesseract
                 try:
-                    ocr_results = self.reader.readtext(torso_crop, allowlist='0123456789', paragraph=False)
+                    ocr_results = self._tesseract_ocr_digits(torso_crop)
                 except Exception as e:
                     logger.debug(f"OCR failed on torso crop for face {face['id']}: {e}")
                     continue
@@ -513,9 +568,9 @@ class JerseyRecognizer:
                 blurred = cv2.GaussianBlur(enhanced, (0, 0), 2)
                 sharpened = cv2.addWeighted(enhanced, 1.5, blurred, -0.5, 0)
 
-                # Run OCR on the preprocessed region crop
+                # Run OCR on the preprocessed region crop using Tesseract
                 try:
-                    ocr_results = self.reader.readtext(sharpened, allowlist='0123456789', paragraph=False)
+                    ocr_results = self._tesseract_ocr_digits(sharpened)
                 except Exception as e:
                     logger.debug(f"OCR failed on region [{x0}:{x1}, {y0}:{y1}] for photo {photo_id}: {e}")
                     continue
