@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
 import photoTaggerClient from './api/photoTaggerClient'
 import { UploadPage } from './pages/UploadPage'
-import { SearchPage } from './pages/SearchPage'
 import { GalleryPage } from './pages/GalleryPage'
 import { PlayersPage } from './pages/PlayersPage'
 import { RosterPage } from './pages/RosterPage'
@@ -137,8 +136,7 @@ function App() {
             <NavButton label="1 Roster"   onClick={() => navigate('/roster')} />
             <NavButton label="2 Upload"   onClick={() => navigate('/upload')} />
             <NavButton label="3 Players"  onClick={() => navigate('/players')} />
-            <NavButton label="4 Search"   onClick={() => navigate('/search')} />
-            <NavButton label="5 Gallery"  onClick={() => navigate('/gallery')} />
+            <NavButton label="4 Gallery"  onClick={() => navigate('/gallery')} />
           </div>
         </div>
       </nav>
@@ -153,7 +151,6 @@ function App() {
               <Route path="/upload" element={<UploadPage onOpenWorkspace={() => navigate('/players')} onGoToRoster={() => navigate('/roster')} />} />
               <Route path="/players/*" element={<PlayersPage />} />
               <Route path="/player/:clusterId" element={<PlayersPage />} />
-              <Route path="/search/*" element={<SearchPage />} />
               <Route path="/gallery" element={<GalleryPage />} />
             </Routes>
           </ErrorBoundary>

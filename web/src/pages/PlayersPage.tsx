@@ -42,6 +42,10 @@ export const PlayersPage: React.FC = () => {
   const [showBbox, setShowBbox] = useState(true);
   const [imgDims, setImgDims] = useState<Map<number, ImgDim>>(new Map());
 
+  // ── HITL player matching modal ─────────────────────────────────────────
+  const [matchModalPhoto, setMatchModalPhoto] = useState<PlayerPhotoItem | null>(null);
+  const [isMatchingClusters, setIsMatchingClusters] = useState(false);
+
   const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {
     const img = e.currentTarget;
     setImgDims(prev => {
@@ -234,6 +238,33 @@ export const PlayersPage: React.FC = () => {
     }
   };
 
+  const handleMatchOtherClusters = async () => {
+    if (!matchModalPhoto) return;
+    setIsMatchingClusters(true);
+    setError(null);
+    try {
+      const result = await photoTaggerClient.matchSimilarClusters(selectedPlayer?.id || 0);
+
+      const autoCount = result.auto_tagged?.length || 0;
+      const suggestedCount = result.suggestions?.length || 0;
+
+      if (autoCount > 0) {
+        setAssignMsg(`Auto-matched ${autoCount} face${autoCount !== 1 ? 's' : ''} to player stack${autoCount !== 1 ? 's' : ''}`);
+        await loadPlayers();
+      } else if (suggestedCount > 0) {
+        setAssignMsg(`Found ${suggestedCount} potential match${suggestedCount !== 1 ? 'es' : ''} — review in player grid`);
+      } else {
+        setAssignMsg('No other matching player stacks found');
+      }
+
+      setMatchModalPhoto(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to match clusters');
+    } finally {
+      setIsMatchingClusters(false);
+    }
+  };
+
   if (isLoadingStatus) {
     return <div className="flex justify-center py-16"><LoadingSpinner message="Loading player data…" /></div>;
   }
@@ -344,14 +375,23 @@ export const PlayersPage: React.FC = () => {
                     <span className="absolute top-1.5 right-1.5 bg-foreground text-white font-jakarta text-xs font-bold px-1.5 py-0.5 rounded-full">
                       {Math.round(photo.face_confidence * 100)}%
                     </span>
-                    {/* Remove button — appears on hover */}
-                    <button
-                      onClick={() => handleRemovePhoto(photo.face_id, photo.id)}
-                      className="absolute top-1.5 left-1.5 bg-secondary text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity font-jakarta font-bold text-sm hover:bg-secondary/80"
-                      title="Remove photo from this player"
-                    >
-                      ×
-                    </button>
+                    {/* Action buttons — appear on hover */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end gap-1.5 p-1.5 bg-gradient-to-b from-transparent via-transparent to-foreground/10 pointer-events-auto">
+                      <button
+                        onClick={() => setMatchModalPhoto(photo)}
+                        className="flex-1 bg-accent text-white text-[10px] font-jakarta font-bold rounded-lg px-1.5 py-1 hover:bg-accent/90"
+                        title="Match other faces in this photo to other players"
+                      >
+                        Match others
+                      </button>
+                      <button
+                        onClick={() => handleRemovePhoto(photo.face_id, photo.id)}
+                        className="bg-secondary text-white rounded-full w-5 h-5 flex items-center justify-center font-jakarta font-bold text-xs hover:bg-secondary/80"
+                        title="Remove photo from this player"
+                      >
+                        ×
+                      </button>
+                    </div>
                   </div>
                   <div className="p-2.5">
                     <p className="font-jakarta text-xs font-semibold text-foreground truncate">{photo.filename}</p>
@@ -359,6 +399,69 @@ export const PlayersPage: React.FC = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* HITL Cluster Matching Modal */}
+        {matchModalPhoto && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-foreground/40 p-4"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => !isMatchingClusters && setMatchModalPhoto(null)}
+          >
+            <div
+              className="bg-white border-2 border-foreground rounded-2xl shadow-pop-lg w-full max-w-md p-6 space-y-4"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 bg-accent rounded-lg border-2 border-foreground flex items-center justify-center flex-shrink-0">
+                  <svg width="16" height="16" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                    <path d="M12 8v4M12 16h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-outfit font-bold text-foreground">
+                    Match other players?
+                  </h3>
+                  <p className="font-jakarta text-xs text-muted-fg mt-1">
+                    This photo may contain faces of other players. Would you like to auto-match them to their correct player clusters?
+                  </p>
+                </div>
+                <button
+                  onClick={() => setMatchModalPhoto(null)}
+                  disabled={isMatchingClusters}
+                  aria-label="Close"
+                  className="text-muted-fg hover:text-foreground text-xl leading-none px-1 disabled:cursor-not-allowed"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setMatchModalPhoto(null)}
+                  disabled={isMatchingClusters}
+                  className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-white text-foreground hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Skip
+                </button>
+                <button
+                  onClick={handleMatchOtherClusters}
+                  disabled={isMatchingClusters}
+                  className="flex-1 font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground bg-accent text-white hover:bg-accent/90 shadow-pop disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isMatchingClusters ? (
+                    <>
+                      <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Matching…
+                    </>
+                  ) : (
+                    'Yes, match them'
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
