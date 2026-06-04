@@ -1,0 +1,17 @@
+<svg viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Rounded square background -->
+  <rect width="192" height="192" rx="48" fill="#7C3AED"/>
+
+  <!-- Camera icon -->
+  <g transform="translate(48, 48)">
+    <!-- Camera body -->
+    <rect x="12" y="28" width="72" height="56" rx="6" fill="none" stroke="white" stroke-width="4"/>
+
+    <!-- Camera lens circle -->
+    <circle cx="48" cy="56" r="16" fill="none" stroke="white" stroke-width="4"/>
+    <circle cx="48" cy="56" r="10" fill="white"/>
+
+    <!-- Flash/top accent -->
+    <rect x="20" y="12" width="12" height="12" rx="2" fill="white"/>
+  </g>
+</svg>
