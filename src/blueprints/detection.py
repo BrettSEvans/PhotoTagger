@@ -108,7 +108,12 @@ def detect_faces_endpoint():
                     db.jobs.update_processing_job(
                         job_id,
                         progress=progress,
-                        result={"current_file": filename, "faces_detected": total_faces}
+                        result={
+                            "current_stage": "Detecting faces",
+                            "current_file": filename,
+                            "faces_detected": total_faces,
+                            "timestamp": __import__('time').time()
+                        }
                     )
                     logger.info(f"Detected {len(faces)} face(s) in {filename}")
                 except Exception as e:
@@ -116,11 +121,16 @@ def detect_faces_endpoint():
                     errors += 1
 
             # Phase 2: Jersey number recognition and roster matching
+            import time
             logger.info("Starting jersey number recognition...")
             db.jobs.update_processing_job(
                 job_id,
                 progress=71,
-                result={"current_stage": "Reading jersey numbers…", "faces_detected": total_faces}
+                result={
+                    "current_stage": "Reading jersey numbers…",
+                    "faces_detected": total_faces,
+                    "timestamp": time.time()
+                }
             )
             try:
                 photo_ids_to_process = [p["id"] for p in photos]
@@ -136,7 +146,8 @@ def detect_faces_endpoint():
                     result={
                         "current_stage": "Matching jerseys to roster…",
                         "faces_detected": total_faces,
-                        "jersey_detections": total_jersey_detections
+                        "jersey_detections": total_jersey_detections,
+                        "timestamp": time.time()
                     }
                 )
             except Exception as e:
@@ -148,12 +159,14 @@ def detect_faces_endpoint():
                 job_id,
                 progress=100,
                 result={
+                    "current_stage": "Detection complete",
                     "photos_processed": len(photos),
                     "faces_detected": total_faces,
                     "jersey_detections": total_jersey_detections,
                     "matched_to_roster": jersey_matched,
                     "photos_skipped_existing": skipped_existing,
                     "errors": errors,
+                    "timestamp": __import__('time').time()
                 }
             )
 
@@ -251,14 +264,233 @@ def cluster_players():
 
     try:
         def run_clustering(job_id: int):
-            clusterer = FaceClusterer(db, similarity_threshold=threshold)
-            return clusterer.run()
+            import time
+            clusterer = FaceClusterer(db, similarity_threshold=threshold, job_id=job_id)
+            result = clusterer.run()
+            # Final progress update
+            db.jobs.update_processing_job(
+                job_id,
+                progress=100,
+                result={
+                    "current_stage": "Clustering complete",
+                    **result,
+                    "timestamp": time.time()
+                }
+            )
+            return result
 
         job_id = app_job_runner.submit("cluster_players", {"threshold": threshold}, run_clustering)
         job = db.jobs.get_processing_job(job_id)
         return jsonify({"success": True, "job_id": job_id, "job": job}), 202
     except Exception as e:
         logger.error(f"cluster-players error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/detect-faces-and-cluster", methods=["POST"])
+def detect_faces_and_cluster():
+    """
+    Unified endpoint: detect faces, recognize jersey numbers, and cluster all in one job.
+
+    Combines detect-faces and cluster-players into a single operation with unified progress tracking.
+
+    JSON body (optional):
+    {
+        "photo_ids": [1, 2, 3],  // Optional: process specific photos
+        "threshold": 0.40  // Optional: clustering similarity threshold
+    }
+
+    Returns a job ID for async processing tracking all three phases:
+    - Phase 1 (0-50%): Face detection
+    - Phase 2 (51-80%): Jersey recognition
+    - Phase 3 (81-100%): Face clustering
+    """
+    from src.face_detector import FaceDetector
+    from src.uniform_detector import UniformDetector
+    from src.jersey_recognition import JerseyRecognizer
+    from src.face_cluster import FaceClusterer
+    from src.utils import parse_float
+    import time
+
+    db = current_app.db
+    app_job_runner = current_app.job_runner
+
+    if not app_job_runner:
+        return jsonify({"error": "Detection and clustering are not available in this deployment"}), 503
+
+    data = request.get_json() or {}
+    photo_ids = data.get("photo_ids", None)
+    threshold = parse_float(data.get("threshold", 0.40))
+    if threshold is None:
+        threshold = 0.40
+
+    try:
+        # Validate game context has jersey colors before starting detection
+        game_context = db.context.get_game_context()
+        missing_colors = []
+        for team in game_context:
+            if not team.get("uniform_color") or not team.get("uniform_color").strip():
+                missing_colors.append(team.get("team_name", "Unknown team"))
+
+        if missing_colors:
+            error_msg = f"Jersey colors required for player matching. Missing colors for: {', '.join(missing_colors)}. Please fill out the Game Context card."
+            logger.warning(f"detect-faces-and-cluster validation failed: {error_msg}")
+            return jsonify({"error": error_msg, "code": "MISSING_JERSEY_COLORS"}), 400
+
+        def run_detection_and_clustering(job_id: int):
+            detector = FaceDetector()
+            uniform = UniformDetector()
+            recognizer = JerseyRecognizer(db)
+            photos = db.photos.get_all_photos()
+
+            if photo_ids:
+                photos = [p for p in photos if p["id"] in set(photo_ids)]
+
+            total_faces = 0
+            total_jersey_detections = 0
+            jersey_matched = 0
+            errors = 0
+            skipped_existing = 0
+
+            # ===== PHASE 1: Face detection (0-50%) =====
+            for idx, photo in enumerate(photos):
+                photo_id = photo["id"]
+                file_path = photo.get("file_path", "")
+                filename = Path(file_path).name if file_path else f"photo_{photo_id}"
+
+                if not file_path or not os.path.exists(file_path):
+                    continue
+                if db.faces.photo_has_faces(photo_id):
+                    skipped_existing += 1
+                    continue
+                try:
+                    faces = detector.detect_faces(file_path)
+                    img_bgr = cv2.imread(file_path) if faces else None
+                    for face in faces:
+                        emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]
+                        jersey_color, jersey_conf = (None, None)
+                        if img_bgr is not None:
+                            jersey_color, jersey_conf, _ = uniform.sample_face_jersey(img_bgr, face["bbox"])
+                        db.faces.add_face(
+                            photo_id=photo_id,
+                            embedding=emb_list,
+                            bbox=face["bbox"],
+                            confidence=face["confidence"],
+                            sharpness=face.get("sharpness"),
+                            face_size_ratio=face.get("face_size_ratio"),
+                            quality_score=face.get("quality_score"),
+                            jersey_color=jersey_color,
+                            jersey_color_conf=jersey_conf,
+                        )
+                    total_faces += len(faces)
+
+                    # Update job: Phase 1 progress (0-50%)
+                    progress = int((idx + 1) / max(len(photos), 1) * 50)
+                    db.jobs.update_processing_job(
+                        job_id,
+                        progress=progress,
+                        result={
+                            "current_stage": "Detecting faces",
+                            "current_file": filename,
+                            "faces_detected": total_faces,
+                            "timestamp": time.time()
+                        }
+                    )
+                    logger.info(f"Detected {len(faces)} face(s) in {filename}")
+                except Exception as e:
+                    logger.error(f"Face detection error on photo {photo_id}: {e}")
+                    errors += 1
+
+            # ===== PHASE 2: Jersey recognition (51-80%) =====
+            logger.info("Starting jersey number recognition...")
+            db.jobs.update_processing_job(
+                job_id,
+                progress=51,
+                result={
+                    "current_stage": "Reading jersey numbers…",
+                    "faces_detected": total_faces,
+                    "timestamp": time.time()
+                }
+            )
+            try:
+                photo_ids_to_process = [p["id"] for p in photos]
+                jersey_matches = recognizer.process_photos(photo_ids_to_process, game_context)
+                for detections in jersey_matches.values():
+                    total_jersey_detections += len(detections)
+                    jersey_matched += sum(1 for d in detections if d.get("roster_entry_id"))
+
+                db.jobs.update_processing_job(
+                    job_id,
+                    progress=65,
+                    result={
+                        "current_stage": "Matching jerseys to roster…",
+                        "faces_detected": total_faces,
+                        "jersey_detections": total_jersey_detections,
+                        "timestamp": time.time()
+                    }
+                )
+            except Exception as e:
+                logger.error(f"Jersey recognition error: {e}")
+                errors += 1
+
+            # ===== PHASE 3: Clustering (81-100%) =====
+            logger.info("Starting face clustering...")
+            db.jobs.update_processing_job(
+                job_id,
+                progress=81,
+                result={
+                    "current_stage": "Clustering faces",
+                    "faces_detected": total_faces,
+                    "jersey_detections": total_jersey_detections,
+                    "timestamp": time.time()
+                }
+            )
+            try:
+                clusterer = FaceClusterer(db, similarity_threshold=threshold, job_id=job_id)
+                clustering_result = clusterer.run()
+                clusters_created = clustering_result.get("clusters_created", 0)
+                auto_matched = clustering_result.get("auto_matched", 0)
+            except Exception as e:
+                logger.error(f"Clustering error: {e}")
+                clusters_created = 0
+                auto_matched = 0
+                errors += 1
+
+            # ===== COMPLETION =====
+            db.jobs.update_processing_job(
+                job_id,
+                progress=100,
+                result={
+                    "current_stage": "Detection and clustering complete",
+                    "photos_processed": len(photos),
+                    "faces_detected": total_faces,
+                    "jersey_detections": total_jersey_detections,
+                    "matched_to_roster": jersey_matched,
+                    "clusters_created": clusters_created,
+                    "auto_matched": auto_matched,
+                    "photos_skipped_existing": skipped_existing,
+                    "errors": errors,
+                    "timestamp": time.time()
+                }
+            )
+
+            return {
+                "photos_processed": len(photos),
+                "faces_detected": total_faces,
+                "jersey_detections": total_jersey_detections,
+                "matched_to_roster": jersey_matched,
+                "clusters_created": clusters_created,
+                "auto_matched": auto_matched,
+                "photos_skipped_existing": skipped_existing,
+                "errors": errors,
+            }
+
+        job_id = app_job_runner.submit("detect_and_cluster", {"photo_ids": photo_ids, "threshold": threshold}, run_detection_and_clustering)
+        job = db.jobs.get_processing_job(job_id)
+        return jsonify({"success": True, "job_id": job_id, "job": job}), 202
+
+    except Exception as e:
+        logger.error(f"detect-faces-and-cluster error: {e}")
         return jsonify({"error": str(e)}), 500
 
 

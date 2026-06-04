@@ -210,6 +210,94 @@ export const PlayersPage: React.FC = () => {
     } finally { setIsClustering(false); }
   };
 
+  const handleDetectAndCluster = async () => {
+    setIsDetecting(true);
+    setDetectResult(null);
+    setError(null);
+    try {
+      // Check game context for jersey colors
+      const missingColors = gameContext.filter(team => !team.uniform_color || !team.uniform_color.trim());
+      if (missingColors.length > 0) {
+        const teamNames = missingColors.map(t => t.team_name || 'Unknown').join(', ');
+        setError(`Jersey colors required for player matching. Missing colors for: ${teamNames}. Please fill out the Game Context card in the Upload tab.`);
+        setIsDetecting(false);
+        return;
+      }
+
+      const response = await photoTaggerClient.detectFacesAndCluster();
+      setDetectResult('Face detection, jersey recognition, and clustering queued…');
+
+      // Track progress with ETA calculation
+      let lastProgress = 0;
+      let lastTime = Date.now();
+
+      const job = await photoTaggerClient.pollJob<any>(response.job_id, {
+        onUpdate: currentJob => {
+          if (currentJob.status === 'running') {
+            const stage = currentJob.result?.current_stage || 'Processing…';
+            const faces = currentJob.result?.faces_detected || 0;
+            const jerseys = currentJob.result?.jersey_detections || 0;
+            const progress = currentJob.progress || 0;
+            const now = Date.now();
+
+            // Calculate ETA based on progress rate
+            let etaText = '';
+            if (progress > 0 && progress < 100) {
+              const elapsed = (now - lastTime) / 1000; // seconds
+              const progressDelta = progress - lastProgress;
+
+              if (elapsed > 0 && progressDelta > 0) {
+                const rate = progressDelta / elapsed; // percent per second
+                const remaining = (100 - progress) / rate; // seconds
+                if (remaining > 0) {
+                  const minutes = Math.floor(remaining / 60);
+                  const seconds = Math.floor(remaining % 60);
+                  etaText = minutes > 0
+                    ? ` — ~${minutes}m ${seconds}s remaining`
+                    : ` — ~${seconds}s remaining`;
+                }
+              }
+
+              lastProgress = progress;
+              lastTime = now;
+            }
+
+            let message = `${stage} ${progress}%${etaText}`;
+            if (faces > 0) {
+              message = `${stage} (${faces} faces${jerseys > 0 ? `, ${jerseys} jerseys` : ''}) ${progress}%${etaText}`;
+            }
+            setDetectResult(message);
+          }
+        },
+      });
+
+      const result = job.result;
+      if (!result) {
+        throw new Error('Detection and clustering finished without a result');
+      }
+
+      // Update counts and show results
+      setFaceCount(result.faces_detected || 0);
+      setClusterCount(result.clusters_created || 0);
+
+      const skipped = result.photos_skipped_existing > 0
+        ? ` · ${result.photos_skipped_existing} already processed`
+        : '';
+      const jerseyInfo = result.jersey_detections
+        ? ` · ${result.jersey_detections} jerseys detected, ${result.matched_to_roster || 0} matched`
+        : '';
+      const clusterInfo = result.clusters_created
+        ? ` · ${result.clusters_created} players identified`
+        : '';
+
+      setDetectResult(`Detected ${result.faces_detected} faces in ${result.photos_processed} photos${jerseyInfo}${clusterInfo}${skipped}`);
+      await loadStatus();
+      await loadPlayers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Detection and clustering failed');
+    } finally { setIsDetecting(false); }
+  };
+
   const handlePlayerClick = async (player: PlayerCluster) => {
     navigate(`/player/${player.id}`);
     setSelectedPlayer(player);
@@ -492,92 +580,84 @@ export const PlayersPage: React.FC = () => {
         <h2 className="font-outfit text-lg font-bold text-foreground">Detection Pipeline</h2>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {/* Step 1 */}
-          <div className="border-2 border-frame rounded-xl p-4 space-y-3 relative">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 bg-accent rounded-full border-2 border-foreground flex items-center justify-center">
-                    <span className="text-white font-outfit font-bold text-xs">1</span>
+          {/* Unified Detect & Cluster Card */}
+          <div className="border-2 border-frame rounded-xl p-4 space-y-4 relative">
+            {/* Status Overview */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* Faces Status */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-accent rounded-full border-2 border-foreground flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-outfit font-bold text-xs">1</span>
+                    </div>
+                    <p className="font-outfit font-bold text-foreground text-sm">Detect</p>
                   </div>
-                  <p className="font-outfit font-bold text-foreground">Detect Faces</p>
+                  <p className="font-jakarta text-xs text-muted-fg pl-7">
+                    {faceCount > 0 ? `${faceCount} faces` : 'No faces yet'}
+                  </p>
                 </div>
-                <p className="font-jakarta text-xs text-muted-fg pl-8">
-                  {faceCount > 0 ? `${faceCount} faces stored` : 'No faces detected yet'}
-                </p>
+                {faceCount > 0 && (
+                  <div className="w-5 h-5 bg-quaternary rounded-full border-2 border-foreground flex items-center justify-center flex-shrink-0">
+                    <svg width="8" height="8" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10" aria-hidden="true">
+                      <polyline points="1.5,5.5 4,8 8.5,2" />
+                    </svg>
+                  </div>
+                )}
               </div>
-              {faceCount > 0 && (
-                <div className="w-6 h-6 bg-quaternary rounded-full border-2 border-foreground flex items-center justify-center">
-                  <svg width="10" height="10" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10" aria-hidden="true">
-                    <polyline points="1.5,5.5 4,8 8.5,2" />
-                  </svg>
+
+              {/* Clustering Status */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-secondary rounded-full border-2 border-foreground flex items-center justify-center flex-shrink-0">
+                      <span className="text-white font-outfit font-bold text-xs">2</span>
+                    </div>
+                    <p className="font-outfit font-bold text-foreground text-sm">Cluster</p>
+                  </div>
+                  <p className="font-jakarta text-xs text-muted-fg pl-7">
+                    {clusterCount > 0 ? `${clusterCount} players` : 'Not grouped yet'}
+                  </p>
                 </div>
-              )}
+                {clusterCount > 0 && (
+                  <div className="w-5 h-5 bg-quaternary rounded-full border-2 border-foreground flex items-center justify-center flex-shrink-0">
+                    <svg width="8" height="8" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10" aria-hidden="true">
+                      <polyline points="1.5,5.5 4,8 8.5,2" />
+                    </svg>
+                  </div>
+                )}
+              </div>
             </div>
+
+            {/* Unified Button */}
             {(() => {
               const missingColors = gameContext.filter(team => !team.uniform_color || !team.uniform_color.trim());
-              const isDisabled = isDetecting || isClustering || missingColors.length > 0;
+              const isDisabled = isDetecting || missingColors.length > 0;
               const tooltipText = missingColors.length > 0
                 ? `Jersey colors required: ${missingColors.map(t => t.team_name || 'Unknown').join(', ')}. Fill out Game Context in Upload tab.`
                 : '';
               return (
                 <button
-                  onClick={handleDetect}
+                  onClick={handleDetectAndCluster}
                   disabled={isDisabled}
                   title={tooltipText}
-                  className="btn-candy w-full bg-accent text-white font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="btn-candy w-full bg-accent text-white font-jakarta font-bold text-sm px-4 py-3 rounded-full border-2 border-foreground shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isDetecting ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Detecting… (few minutes)
+                      Detecting & Clustering…
                     </span>
-                  ) : faceCount > 0 ? 'Re-detect Faces' : 'Detect Faces'}
+                  ) : faceCount > 0 && clusterCount > 0 ? 'Re-detect & Cluster' : 'Detect & Cluster'}
                 </button>
               );
             })()}
+
+            {/* Progress/Results Display */}
             {detectResult && (
-              <p className="font-jakarta text-xs text-foreground bg-quaternary/20 rounded-lg px-2 py-1">✅ {detectResult}</p>
-            )}
-          </div>
-
-          {/* Step 2 */}
-          <div className="border-2 border-frame rounded-xl p-4 space-y-3">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="w-6 h-6 bg-secondary rounded-full border-2 border-foreground flex items-center justify-center">
-                    <span className="text-white font-outfit font-bold text-xs">2</span>
-                  </div>
-                  <p className="font-outfit font-bold text-foreground">Group Players</p>
-                </div>
-                <p className="font-jakarta text-xs text-muted-fg pl-8">
-                  {clusterCount > 0 ? `${clusterCount} players identified` : 'Not grouped yet'}
-                </p>
-              </div>
-              {clusterCount > 0 && (
-                <div className="w-6 h-6 bg-quaternary rounded-full border-2 border-foreground flex items-center justify-center">
-                  <svg width="10" height="10" fill="none" stroke="#1E293B" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 10 10" aria-hidden="true">
-                    <polyline points="1.5,5.5 4,8 8.5,2" />
-                  </svg>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={handleCluster}
-              disabled={faceCount === 0 || isDetecting || isClustering}
-              className="btn-candy w-full bg-secondary text-foreground font-jakarta font-bold text-sm px-4 py-2 rounded-full border-2 border-foreground shadow-pop-pink disabled:opacity-40"
-            >
-              {isClustering ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-foreground border-t-transparent rounded-full animate-spin" />
-                  Grouping…
-                </span>
-              ) : clusterCount > 0 ? 'Re-group Players' : 'Group Players'}
-            </button>
-
-            {faceCount === 0 && (
-              <p className="font-jakarta text-xs text-muted-fg">Run face detection first</p>
+              <p className="font-jakarta text-xs text-foreground bg-quaternary/20 rounded-lg px-2 py-1">
+                {isDetecting ? '⏳' : '✅'} {detectResult}
+              </p>
             )}
           </div>
         </div>
@@ -666,7 +746,7 @@ export const PlayersPage: React.FC = () => {
           </div>
           <h3 className="font-outfit text-xl font-bold text-foreground">No players yet</h3>
           <p className="mt-2 font-jakarta text-muted-fg max-w-xs mx-auto">
-            Run Detect Faces, then Group Players to see who's in your photos
+            Click "Detect & Cluster" to find faces, read jersey numbers, and group players
           </p>
         </div>
       ) : null}

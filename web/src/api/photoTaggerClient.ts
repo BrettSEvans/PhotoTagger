@@ -332,6 +332,20 @@ class PhotoTaggerClient {
   }
 
   /**
+   * Combined endpoint: detect faces, recognize jersey numbers, and cluster in one operation
+   * POST /api/detect-faces-and-cluster
+   *
+   * @param photoIds Optional list of specific photo IDs to process
+   * @param threshold Optional clustering similarity threshold (default 0.40)
+   */
+  async detectFacesAndCluster(photoIds?: number[], threshold = 0.40): Promise<JobSubmissionResponse<any>> {
+    const body: any = { threshold };
+    if (photoIds) body.photo_ids = photoIds;
+    const response = await this.client.post<JobSubmissionResponse<any>>('/api/detect-faces-and-cluster', body);
+    return response.data;
+  }
+
+  /**
    * Get all player clusters
    * GET /api/players
    */

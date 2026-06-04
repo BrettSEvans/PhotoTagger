@@ -33,15 +33,17 @@ class FaceClusterer:
     After clustering, auto-match clusters to roster players based on jersey numbers and colors.
     """
 
-    def __init__(self, db: Database, similarity_threshold: float = 0.40):
+    def __init__(self, db: Database, similarity_threshold: float = 0.40, job_id: int = None):
         """
         Args:
             db: Database instance
             similarity_threshold: Minimum cosine similarity to join an existing cluster (0-1)
                                   Higher = stricter identity matching
+            job_id: Optional job ID for progress tracking
         """
         self.db = db
         self.threshold = similarity_threshold
+        self.job_id = job_id
 
     def _resolve_team_colors(self, faces: List[Dict]) -> set:
         """
@@ -187,8 +189,9 @@ class FaceClusterer:
         # Greedy nearest-centroid clustering
         # clusters: List of (centroid np.ndarray, List[face_dict], set of photo_ids)
         clusters: List[Tuple[np.ndarray, List[Dict], set]] = []
+        import time
 
-        for face in all_faces:
+        for idx, face in enumerate(all_faces):
             emb = np.array(face["embedding"], dtype=np.float32)
 
             best_idx = -1
@@ -211,6 +214,20 @@ class FaceClusterer:
             else:
                 # New cluster
                 clusters.append((emb, [face], {face["photo_id"]}))
+
+            # Update progress every 50 faces or 10% of total
+            if self.job_id and (idx + 1) % max(50, len(all_faces) // 10) == 0:
+                progress = int((idx + 1) / len(all_faces) * 20 + 80)  # Maps 81-100% range
+                self.db.jobs.update_processing_job(
+                    self.job_id,
+                    progress=progress,
+                    result={
+                        "current_stage": "Clustering faces",
+                        "faces_processed": idx + 1,
+                        "clusters_created": len(clusters),
+                        "timestamp": time.time()
+                    }
+                )
 
         # Persist clusters to database
         total_faces = 0
