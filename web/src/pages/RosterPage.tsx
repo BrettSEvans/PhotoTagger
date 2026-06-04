@@ -499,12 +499,19 @@ export const RosterPage: React.FC = () => {
         });
         if (inferResponse.ok) {
           const inferred = await inferResponse.json();
-          if (inferred.team_name) teamName = inferred.team_name;
-          if (inferred.team_year) teamYear = inferred.team_year;
-          setImportTeam(teamName);
-          setImportTeamYear(teamYear);
+          if (inferred.team_name) {
+            teamName = inferred.team_name;
+            setImportTeam(teamName);
+          }
+          if (inferred.team_year) {
+            teamYear = inferred.team_year;
+            setImportTeamYear(teamYear);
+          }
+        } else {
+          console.warn('Inference failed with status:', inferResponse.status);
         }
-      } catch {
+      } catch (err) {
+        console.warn('Inference error:', err);
         // Inference failed, continue with current values
       }
 
@@ -534,12 +541,19 @@ export const RosterPage: React.FC = () => {
         });
         if (inferResponse.ok) {
           const inferred = await inferResponse.json();
-          if (inferred.team_name) teamName = inferred.team_name;
-          if (inferred.team_year) teamYear = inferred.team_year;
-          setImportTeam(teamName);
-          setImportTeamYear(teamYear);
+          if (inferred.team_name) {
+            teamName = inferred.team_name;
+            setImportTeam(teamName);
+          }
+          if (inferred.team_year) {
+            teamYear = inferred.team_year;
+            setImportTeamYear(teamYear);
+          }
+        } else {
+          console.warn('URL inference failed with status:', inferResponse.status);
         }
-      } catch {
+      } catch (err) {
+        console.warn('URL inference error:', err);
         // Inference failed, continue with current values
       }
 
