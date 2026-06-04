@@ -117,12 +117,28 @@ def detect_faces_endpoint():
 
             # Phase 2: Jersey number recognition and roster matching
             logger.info("Starting jersey number recognition...")
+            db.jobs.update_processing_job(
+                job_id,
+                progress=71,
+                result={"current_stage": "Reading jersey numbers…", "faces_detected": total_faces}
+            )
             try:
                 photo_ids_to_process = [p["id"] for p in photos]
                 jersey_matches = recognizer.process_photos(photo_ids_to_process, game_context)
                 for detections in jersey_matches.values():
                     total_jersey_detections += len(detections)
                     jersey_matched += sum(1 for d in detections if d.get("roster_entry_id"))
+
+                # Update progress midway through Phase 2
+                db.jobs.update_processing_job(
+                    job_id,
+                    progress=85,
+                    result={
+                        "current_stage": "Matching jerseys to roster…",
+                        "faces_detected": total_faces,
+                        "jersey_detections": total_jersey_detections
+                    }
+                )
             except Exception as e:
                 logger.error(f"Jersey recognition error: {e}")
                 errors += 1

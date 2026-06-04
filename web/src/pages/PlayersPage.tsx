@@ -162,7 +162,15 @@ export const PlayersPage: React.FC = () => {
       const job = await photoTaggerClient.pollJob<FaceDetectionResult>(response.job_id, {
         onUpdate: currentJob => {
           if (currentJob.status === 'running') {
-            setDetectResult(`Detecting faces and reading jerseys… ${currentJob.progress}%`);
+            const stage = currentJob.result?.current_stage || 'Processing…';
+            const faces = currentJob.result?.faces_detected || 0;
+            const jerseys = currentJob.result?.jersey_detections || 0;
+
+            let message = `${stage} ${currentJob.progress}%`;
+            if (faces > 0) {
+              message = `${stage} (${faces} faces${jerseys > 0 ? `, ${jerseys} jerseys` : ''}) ${currentJob.progress}%`;
+            }
+            setDetectResult(message);
           }
         },
       });
