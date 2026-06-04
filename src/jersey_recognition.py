@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import time
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
 import cv2
@@ -260,12 +261,15 @@ class JerseyRecognizer:
             logger.warning("No game context provided for jersey matching")
             return {}
 
+        t_batch_start = time.time()
+        logger.info(f"[TIMING] Jersey recognition batch start: {len(photo_ids)} photos")
+
         photos_by_id = {p["id"]: p for p in self.db.photos.get_all_photos()}
         matches_by_photo = {}
         matched_count = 0
         total_detected = 0
 
-        for photo_id in photo_ids:
+        for i, photo_id in enumerate(photo_ids):
             photo = photos_by_id.get(photo_id)
             if not photo:
                 logger.warning(f"Photo ID {photo_id} not found in database")
@@ -277,19 +281,101 @@ class JerseyRecognizer:
                 continue
 
             try:
+                t_photo_start = time.time()
                 detections = self._process_photo_for_jerseys(photo_id, photo_path, game_context)
+                t_photo = time.time() - t_photo_start
+
                 matches_by_photo[photo_id] = detections
                 total_detected += len(detections)
-                for det in detections:
-                    if det.get("roster_entry_id"):
-                        matched_count += 1
+                matched_in_photo = sum(1 for d in detections if d.get("roster_entry_id"))
+                matched_count += matched_in_photo
+
+                logger.info(f"[TIMING] Photo {photo_id} ({i+1}/{len(photo_ids)}): {t_photo:.2f}s "
+                           f"({len(detections)} detections, {matched_in_photo} matched)")
             except Exception as e:
                 logger.error(f"Error processing photo {photo_id}: {e}")
                 matches_by_photo[photo_id] = []
 
-        logger.info(f"Jersey recognition complete: {len(matches_by_photo)} photos, "
-                    f"{total_detected} detections, {matched_count} matched to roster")
+        t_batch = time.time() - t_batch_start
+        logger.info(f"[TIMING] Jersey recognition batch complete: {t_batch:.2f}s total, "
+                   f"{len(matches_by_photo)} photos, {total_detected} detections, {matched_count} matched to roster")
         return matches_by_photo
+
+    def _find_uncovered_torso_regions(
+        self,
+        img_bgr: np.ndarray,
+        detected_face_bboxes: List[List[int]],
+    ) -> List[List[int]]:
+        """
+        Find torso-height regions not covered by detected faces.
+
+        Jersey numbers always appear in the torso region (between arms, head on top, waist on bottom).
+        This method identifies vertical bands that don't have a detected face in the torso zone,
+        then returns torso-height crops to OCR for back-facing players.
+
+        Args:
+            img_bgr: Full image (BGR)
+            detected_face_bboxes: List of face bboxes [x0, y0, x1, y1]
+
+        Returns:
+            List of torso region crops [x0, y0, x1, y1] to OCR
+        """
+        h, w = img_bgr.shape[:2]
+        uncovered = []
+
+        if not detected_face_bboxes:
+            # No faces detected, scan the entire torso region
+            # Torso region: from ~head height to waist (y=30% to y=80% of image)
+            y0 = int(h * 0.20)
+            y1 = int(h * 0.85)
+
+            # Divide into 2-3 vertical bands to scan
+            band_width = w // 3
+            for x in range(0, w, band_width):
+                x0 = x
+                x1 = min(x + band_width + 20, w)  # Small overlap for continuity
+                uncovered.append([x0, y0, x1, y1])
+            return uncovered
+
+        # Mark torso zones covered by detected faces
+        # For each face, the torso extends below it
+        covered_zones = []
+        for face_bbox in detected_face_bboxes:
+            x0, y0, x1, y1 = [int(v) for v in face_bbox]
+            fw = max(1, x1 - x0)
+            fh = max(1, y1 - y0)
+
+            # Torso zone: from neck (y1) to waist (y1 + 2.0*fh)
+            # Horizontal: from shoulders (x0 - 0.5*fw) to (x1 + 0.5*fw)
+            torso_x0 = max(0, x0 - int(0.5 * fw))
+            torso_x1 = min(w, x1 + int(0.5 * fw))
+            torso_y0 = y1  # Start at neck
+            torso_y1 = min(h, y1 + int(2.0 * fh))  # End at waist
+
+            covered_zones.append([torso_x0, torso_y0, torso_x1, torso_y1])
+
+        # Find horizontal bands not covered
+        # Strategy: scan vertical bands and skip those with face coverage
+        band_width = max(60, w // 4)  # Scan bands of ~60px or image-width/4
+
+        for x_start in range(0, w, band_width):
+            x_end = min(x_start + band_width, w)
+            band_center_x = (x_start + x_end) / 2
+
+            # Check if this x-band has face coverage
+            has_face_coverage = False
+            for cx0, cy0, cx1, cy1 in covered_zones:
+                if cx0 <= band_center_x <= cx1:
+                    has_face_coverage = True
+                    break
+
+            if not has_face_coverage:
+                # This band has no face; scan the torso region vertically
+                torso_y0 = int(h * 0.20)  # Top of torso (below head)
+                torso_y1 = int(h * 0.85)  # Bottom of torso (above legs)
+                uncovered.append([x_start, torso_y0, x_end, torso_y1])
+
+        return uncovered
 
     def _process_photo_for_jerseys(
         self,
@@ -324,6 +410,7 @@ class JerseyRecognizer:
         detections = []
 
         # ─── PHASE 1: Torso-under-face OCR (front-facing players) ───
+        t_phase1 = time.time()
         try:
             faces = self.db.faces.get_faces_by_photo(photo_id)
             for face in faces:
@@ -387,25 +474,64 @@ class JerseyRecognizer:
         except Exception as e:
             logger.warning(f"Torso-under-face OCR failed for photo {photo_id}: {e}")
 
-        # ─── PHASE 2: Standalone number regions (back-facing players) ───
-        # Scan the full frame for standalone digit regions not under a detected face.
-        # Accept only if background is a team jersey color.
+        t_phase1_duration = time.time() - t_phase1
+        logger.info(f"[TIMING] Photo {photo_id} Phase 1 (torso-under-face): {t_phase1_duration:.2f}s ({len(detections)} detections)")
+
+        # ─── PHASE 2: Uncovered-region OCR (back-facing players) ───
+        # Find torso regions not covered by detected faces and scan those for jersey numbers.
+        # This avoids expensive full-frame preprocessing.
+        t_phase2 = time.time()
         try:
-            preprocessed = self._preprocess_for_ocr(photo_path)
-            if preprocessed is not None:
-                ocr_results = self.reader.readtext(preprocessed, allowlist='0123456789', paragraph=False)
+            detected_face_bboxes = [f['bbox'] for f in self.db.faces.get_faces_by_photo(photo_id)]
+            uncovered_regions = self._find_uncovered_torso_regions(img_original, detected_face_bboxes)
+
+            for region_bbox in uncovered_regions:
+                x0, y0, x1, y1 = region_bbox
+                x0, y0, x1, y1 = int(x0), int(y0), int(x1), int(y1)
+
+                # Clamp to image bounds
+                x0 = max(0, x0)
+                y0 = max(0, y0)
+                x1 = min(width_orig, x1)
+                y1 = min(height_orig, y1)
+
+                if x1 <= x0 or y1 <= y0:
+                    continue
+
+                # Extract torso-region crop
+                region_crop = img_original[y0:y1, x0:x1]
+                if region_crop.size == 0:
+                    continue
+
+                # Upscale the region 4x (not the whole frame)
+                upscaled = cv2.resize(region_crop, None, fx=4, fy=4, interpolation=cv2.INTER_LANCZOS4)
+
+                # Preprocess: grayscale + CLAHE + sharpening
+                gray = cv2.cvtColor(upscaled, cv2.COLOR_BGR2GRAY)
+                clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(4, 4))
+                enhanced = clahe.apply(gray)
+                blurred = cv2.GaussianBlur(enhanced, (0, 0), 2)
+                sharpened = cv2.addWeighted(enhanced, 1.5, blurred, -0.5, 0)
+
+                # Run OCR on the preprocessed region crop
+                try:
+                    ocr_results = self.reader.readtext(sharpened, allowlist='0123456789', paragraph=False)
+                except Exception as e:
+                    logger.debug(f"OCR failed on region [{x0}:{x1}, {y0}:{y1}] for photo {photo_id}: {e}")
+                    continue
 
                 for bbox_ocr, text, confidence in ocr_results:
-                    is_valid, x0, y0, x1, y1 = self._validate_detection(
+                    is_valid, rx0, ry0, rx1, ry1 = self._validate_detection(
                         bbox_ocr, text, confidence,
                         scale_factor=4,
-                        img_height=height_orig
+                        img_height=(y1 - y0)  # Region height, not full image
                     )
 
                     if not is_valid:
                         continue
 
-                    bbox = [x0, y0, x1, y1]
+                    # Translate region-relative coords back to full-image space
+                    bbox = [x0 + rx0, y0 + ry0, x0 + rx1, y0 + ry1]
 
                     # Check if this bbox is already covered by a torso-under-face detection
                     already_detected = False
@@ -418,19 +544,7 @@ class JerseyRecognizer:
                         continue
 
                     # Validate jersey color background
-                    # Sample color around the detected region
-                    margin_x = max(5, (x1 - x0) // 2)
-                    margin_y = max(5, (y1 - y0) // 2)
-                    sample_x0 = max(0, x0 - margin_x)
-                    sample_y0 = max(0, y0 - margin_y)
-                    sample_x1 = min(width_orig, x1 + margin_x)
-                    sample_y1 = min(height_orig, y1 + margin_y)
-
-                    sample_region = img_original[sample_y0:sample_y1, sample_x0:sample_x1]
-                    if sample_region.size == 0:
-                        continue
-
-                    color, color_conf, _ = self.uniform_detector.sample_face_jersey(img_original, [x0, y0, x1, y1])
+                    color, color_conf, _ = self.uniform_detector.sample_face_jersey(img_original, bbox)
 
                     # Only accept if color matches a game context uniform color
                     color_is_valid = False
@@ -462,9 +576,13 @@ class JerseyRecognizer:
                     detections.append(detection)
 
         except Exception as e:
-            logger.warning(f"Standalone region OCR failed for photo {photo_id}: {e}")
+            logger.warning(f"Uncovered-region OCR failed for photo {photo_id}: {e}")
+
+        t_phase2_duration = time.time() - t_phase2
+        logger.info(f"[TIMING] Photo {photo_id} Phase 2 (uncovered regions): {t_phase2_duration:.2f}s")
 
         # ─── PHASE 3: Spatial dedup and roster matching ───
+        t_phase3 = time.time()
         detections = self._spatial_dedup(detections)
 
         final_detections = []
@@ -514,6 +632,8 @@ class JerseyRecognizer:
                 "roster_entry_id": roster_entry_id,
             })
 
+        t_phase3_duration = time.time() - t_phase3
+        logger.info(f"[TIMING] Photo {photo_id} Phase 3 (dedup + matching): {t_phase3_duration:.2f}s")
         logger.info(f"Found {len(final_detections)} jersey detections in {path.name} (after filtering and dedup)")
         return final_detections
 
