@@ -85,6 +85,9 @@ def crawl():
     crawler = current_app.crawler
     app_job_runner = current_app.job_runner
 
+    if not app_job_runner or not crawler:
+        return jsonify({"error": "Photo crawling is not available in this deployment"}), 503
+
     data = request.get_json() or {}
     photo_dir = data.get("photo_dir", "./photos")
 
@@ -134,6 +137,9 @@ def upload_photos():
     db = current_app.db
     crawler = current_app.crawler
     app_job_runner = current_app.job_runner
+
+    if not app_job_runner:
+        return jsonify({"error": "Photo processing is not available in this deployment"}), 503
 
     if 'files' not in request.files:
         return jsonify({"error": "No files provided"}), 400
@@ -258,6 +264,9 @@ def process_ocr():
     db = current_app.db
     ocr_engine = current_app.ocr_engine
     app_job_runner = current_app.job_runner
+
+    if not app_job_runner or not ocr_engine:
+        return jsonify({"error": "OCR processing is not available in this deployment"}), 503
 
     data = request.get_json() or {}
     photo_ids = data.get("photo_ids", None)

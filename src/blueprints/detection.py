@@ -36,6 +36,9 @@ def detect_faces_endpoint():
     db = current_app.db
     app_job_runner = current_app.job_runner
 
+    if not app_job_runner:
+        return jsonify({"error": "Face detection is not available in this deployment"}), 503
+
     data = request.get_json() or {}
     photo_ids = data.get("photo_ids", None)
 
@@ -170,6 +173,9 @@ def backfill_jersey_colors():
     db = current_app.db
     app_job_runner = current_app.job_runner
 
+    if not app_job_runner:
+        return jsonify({"error": "Backfill processing is not available in this deployment"}), 503
+
     try:
         def run_backfill(job_id: int):
             uniform = UniformDetector()
@@ -218,6 +224,9 @@ def cluster_players():
 
     db = current_app.db
     app_job_runner = current_app.job_runner
+
+    if not app_job_runner:
+        return jsonify({"error": "Player clustering is not available in this deployment"}), 503
 
     data = request.get_json() or {}
     threshold = parse_float(data.get("threshold", 0.40))
