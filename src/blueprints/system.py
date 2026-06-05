@@ -11,6 +11,21 @@ logger = logging.getLogger(__name__)
 bp = Blueprint("system", __name__)
 
 
+@bp.route("/logs", methods=["GET"])
+def get_logs():
+    """Return the last ≤3000 log lines as plain text.
+
+    Intended for operator/Claude use only — no link is exposed in the UI.
+    The ring buffer is capped at 3000 lines so the response stays small.
+    """
+    from src.api import ring_log
+    lines = ring_log.get_lines()
+    return "\n".join(lines) + ("\n" if lines else ""), 200, {
+        "Content-Type": "text/plain; charset=utf-8",
+        "X-Log-Lines": str(len(lines)),
+    }
+
+
 @bp.route("/health", methods=["GET"])
 def health():
     """Health check endpoint."""

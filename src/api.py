@@ -1,3 +1,4 @@
+import collections
 import io
 import logging
 import os
@@ -13,6 +14,36 @@ from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
 from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
 from src.utils import parse_float, parse_int_arg, configured_photo_roots, is_allowed_photo_path, is_allowed_photo_directory
+
+# ── In-memory ring-buffer log handler (last 3000 lines) ──────────────────────
+# Captured by GET /logs so Claude (and operators) can read live logs without
+# SSH access.  No UI link is exposed to end-users.
+
+_LOG_MAX_LINES = 3000
+
+class _RingBufferHandler(logging.Handler):
+    """Thread-safe deque-backed handler — oldest lines drop off automatically."""
+    def __init__(self, maxlines: int = _LOG_MAX_LINES):
+        super().__init__()
+        self._buf: collections.deque[str] = collections.deque(maxlen=maxlines)
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._buf.append(self.format(record))
+        except Exception:
+            self.handleError(record)
+
+    def get_lines(self) -> list[str]:
+        return list(self._buf)
+
+
+# Singleton — imported by system.py blueprint for the /logs endpoint
+ring_log = _RingBufferHandler()
+ring_log.setFormatter(logging.Formatter(
+    "%(asctime)s %(levelname)-8s %(name)s: %(message)s",
+    datefmt="%Y-%m-%dT%H:%M:%S",
+))
+logging.getLogger().addHandler(ring_log)   # attach to root → captures everything
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
