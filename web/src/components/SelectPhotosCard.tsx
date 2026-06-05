@@ -107,18 +107,11 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => {
-            onModeChange('google-drive');
-            onClear();
-            onDirectoryChange('');
-          }}
-          className={`px-4 py-2 rounded-full border-2 font-jakarta text-sm font-semibold transition-colors flex items-center gap-1.5 ${
-            uploadMode === 'google-drive'
-              ? 'bg-accent text-white border-foreground'
-              : 'bg-white text-foreground border-frame hover:bg-quaternary/5'
-          }`}
+          disabled
+          title="Google Drive import coming soon"
+          className="px-4 py-2 rounded-full border-2 font-jakarta text-sm font-semibold flex items-center gap-1.5 opacity-40 cursor-not-allowed bg-white text-foreground border-frame"
         >
-          <DriveTabIcon active={uploadMode === 'google-drive'} />
+          <DriveTabIcon active={false} />
           Google Drive
         </button>
       </div>
