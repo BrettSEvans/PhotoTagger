@@ -379,9 +379,14 @@ class PhotoTaggerClient {
   /**
    * Consolidate all clusters with the same player_name into one
    */
-  async consolidatePlayerClusters(playerName: string): Promise<{ merged: boolean; primary_id?: number; merged_count?: number }> {
-    const response = await this.client.post<{ merged: boolean; primary_id?: number; merged_count?: number }>(
-      `/api/consolidate-player/${encodeURIComponent(playerName)}`
+  async consolidatePlayerClusters(
+    playerName: string,
+    preferClusterId?: number,
+  ): Promise<{ merged: boolean; primary_id?: number; merged_count?: number; new_face_count?: number; new_photo_count?: number }> {
+    const body = preferClusterId !== undefined ? { prefer_cluster_id: preferClusterId } : undefined;
+    const response = await this.client.post<{ merged: boolean; primary_id?: number; merged_count?: number; new_face_count?: number; new_photo_count?: number }>(
+      `/api/consolidate-player/${encodeURIComponent(playerName)}`,
+      body,
     );
     return response.data;
   }

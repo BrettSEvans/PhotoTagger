@@ -153,7 +153,7 @@ def test_roster_thumbnail_uses_roster_entry_id_when_jersey_changes(test_db, tmp_
     )
 
     entries = test_db.roster.get_all_roster_entries()
-    assert entries[0]["jersey_number"] == "22"
+    assert int(entries[0]["jersey_number"]) == 22
     assert entries[0]["thumbnail_face_id"] == face_id
 
 def test_get_player_name_not_found(test_db):

@@ -14,16 +14,24 @@ bp = Blueprint("system", __name__)
 @bp.route("/health", methods=["GET"])
 def health():
     """Health check endpoint."""
-    return jsonify({"status": "ok", "mode": get_runtime_mode()}), 200
+    return jsonify({
+        "status": "ok",
+        "mode": get_runtime_mode(),
+        "ocr_ok": current_app.config.get("ocr_ok"),
+    }), 200
 
 
 @bp.route("/api/app-config", methods=["GET"])
 def app_config():
-    """Return app configuration."""
+    """Return app configuration (safe, public values only)."""
     return jsonify({
         "mode": get_runtime_mode(),
         "local_agent_default_url": "http://127.0.0.1:5001",
         "requires_agent_token": bool(os.environ.get("PHOTOTAGGER_AGENT_TOKEN")),
+        # OAuth2 client ID for Google Drive / SSO.
+        # Set GOOGLE_CLIENT_ID in the Railway (or local) environment.
+        # This is a PUBLIC credential — safe to expose to the browser.
+        "google_client_id": os.environ.get("GOOGLE_CLIENT_ID", ""),
     }), 200
 
 

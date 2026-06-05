@@ -168,6 +168,8 @@ export interface FaceDetectionResult {
   matched_to_roster?: number;
   photos_skipped_existing: number;
   errors: number;
+  current_stage?: string;
+  timestamp?: number;
 }
 
 export interface ClusterPlayersResult {

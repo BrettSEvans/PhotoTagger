@@ -19,6 +19,24 @@ def _make_jpeg_bytes(color: str = "red") -> bytes:
     return buf.getvalue()
 
 
+def _make_unique_jpeg(index: int) -> bytes:
+    """Return PNG bytes unique to *index* so file hashes never collide.
+    Uses lossless PNG to guarantee distinct content for each index.
+    Saved as .jpg in tests but file_hash is computed from content, not name.
+    """
+    import struct
+    # Embed index directly into pixels to guarantee unique content
+    colour = (index % 256, (index // 256) % 256, (index // 65536) % 256)
+    img = Image.new("RGB", (32, 32), color=colour)
+    # Draw a unique pixel to ensure hash uniqueness even for close colors
+    pixels = img.load()
+    pixels[0, 0] = (index % 256, (index * 7) % 256, (index * 13) % 256)
+    pixels[1, 0] = ((index + 1) % 256, (index * 3) % 256, (index * 17) % 256)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")  # lossless — guarantees unique hash
+    return buf.getvalue()
+
+
 def wait_for_job(db: Database, job_id: int, timeout: float = 30.0):
     """Poll job status until completion."""
     import time
@@ -29,6 +47,29 @@ def wait_for_job(db: Database, job_id: int, timeout: float = 30.0):
             return job
         time.sleep(0.1)
     raise AssertionError(f"Timed out waiting for job {job_id}")
+
+
+# ── Compatibility helpers ──────────────────────────────────────────────────────
+
+def _create_cluster(db):
+    return db.clusters.add_player_cluster(face_count=0, photo_count=0, thumbnail_face_id=None)
+
+
+def _add_face(db, photo_id, bbox, embedding, confidence=0.9, sharpness=None):
+    return db.faces.add_face(
+        photo_id=photo_id,
+        embedding=embedding,
+        bbox=bbox,
+        confidence=confidence,
+        sharpness=sharpness,
+    )
+
+
+def _add_face_to_cluster(db, cluster_id, face_id):
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestPhotoIngestionPerformance:
@@ -46,15 +87,13 @@ class TestPhotoIngestionPerformance:
 
         for i in range(500):
             photo_file = photo_dir / f"photo_{i:04d}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes(
-                color=["red", "green", "blue"][i % 3]
-            ))
+            photo_file.write_bytes(_make_unique_jpeg(i))
 
         start = time.time()
         for i in range(500):
             db.photos.add_photo(
                 file_path=str(photo_dir / f"photo_{i:04d}.jpg"),
-                source_folder=str(photo_dir)
+                source_folder=str(photo_dir),
             )
         elapsed = time.time() - start
 
@@ -76,17 +115,18 @@ class TestPhotoIngestionPerformance:
 
         for i in range(500):
             photo_file = photo_dir / f"photo_{i:04d}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes())
+            photo_file.write_bytes(_make_unique_jpeg(i))
             db.photos.add_photo(
                 file_path=str(photo_file),
                 source_folder=str(photo_dir)
             )
 
-        # Query with pagination
+        # Query with pagination using page/per_page (current API)
         all_photos = []
-        for offset in range(0, 500, 50):
+        per_page = 50
+        for page in range(1, 11):
             response = client.get(
-                f"/api/photos?offset={offset}&limit=50"
+                f"/api/photos?page={page}&per_page={per_page}"
             )
             assert response.status_code == 200
             all_photos.extend(response.json["photos"])
@@ -94,7 +134,7 @@ class TestPhotoIngestionPerformance:
         assert len(all_photos) == 500
 
     def test_large_offset_query_efficiency(self, tmp_path):
-        """Query with large offset (LIMIT/OFFSET in SQL)."""
+        """Query with large page offset."""
         app = create_app(db_path=":memory:")
         app.config["TESTING"] = True
         client = app.test_client()
@@ -106,15 +146,15 @@ class TestPhotoIngestionPerformance:
 
         for i in range(1000):
             photo_file = photo_dir / f"photo_{i:04d}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes())
+            photo_file.write_bytes(_make_unique_jpeg(i))
             db.photos.add_photo(
                 file_path=str(photo_file),
                 source_folder=str(photo_dir)
             )
 
-        # Query middle of dataset
+        # Query middle of dataset — page 11 with per_page=50 is offset 500
         start = time.time()
-        response = client.get("/api/photos?offset=500&limit=50")
+        response = client.get("/api/photos?page=11&per_page=50")
         elapsed = time.time() - start
 
         assert response.status_code == 200
@@ -133,18 +173,13 @@ class TestFaceClusteringPerformance:
         db = app.db
 
         # Create 1000 faces
-        cluster_id = db.clusters.create_cluster()
+        cluster_id = _create_cluster(db)
 
         for i in range(1000):
             # Create similar but varying embeddings
             embedding = [0.5 + (i * 0.0001) % 0.1] * 512
-            face_id = db.faces.add_face(
-                photo_id=i,
-                face_bbox=[10, 10, 20, 20],
-                embedding=embedding,
-                sharpness_score=0.8,
-            )
-            db.clusters.add_face_to_cluster(cluster_id, face_id)
+            face_id = _add_face(db, photo_id=i, bbox=[10, 10, 20, 20], embedding=embedding)
+            _add_face_to_cluster(db, cluster_id, face_id)
 
         # Verify cluster stats
         cluster = db.clusters.get_cluster_by_id(cluster_id)
@@ -167,27 +202,21 @@ class TestFaceClusteringPerformance:
         db = app.db
 
         # Create assigned cluster with embeddings
-        assigned_cluster = db.clusters.create_cluster()
-        assigned_face = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.5] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(assigned_cluster, assigned_face)
+        assigned_cluster = _create_cluster(db)
+        assigned_face = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.5] * 512)
+        _add_face_to_cluster(db, assigned_cluster, assigned_face)
         db.clusters.assign_cluster_to_player(assigned_cluster, "Player1", "1", None)
 
         # Create 100 unidentified clusters (1000+ faces total)
         for i in range(100):
-            cluster = db.clusters.create_cluster()
+            cluster = _create_cluster(db)
             for j in range(10):
-                face = db.faces.add_face(
-                    photo_id=1000 + i * 10 + j,
-                    face_bbox=[10, 10, 20, 20],
-                    embedding=[0.5 + (i * 0.001)] * 512,  # Slightly different
-                    sharpness_score=0.8,
+                face = _add_face(
+                    db, photo_id=1000 + i * 10 + j,
+                    bbox=[10, 10, 20, 20],
+                    embedding=[0.5 + (i * 0.001)] * 512,
                 )
-                db.clusters.add_face_to_cluster(cluster, face)
+                _add_face_to_cluster(db, cluster, face)
 
         # Run similarity match
         start = time.time()
@@ -253,17 +282,16 @@ class TestClusteringHierarchy:
         cluster_ids = []
 
         for cluster_num in range(10):
-            cluster_id = db.clusters.create_cluster()
+            cluster_id = _create_cluster(db)
             cluster_ids.append(cluster_id)
 
             for face_num in range(50):
-                face_id = db.faces.add_face(
-                    photo_id=cluster_num * 50 + face_num,
-                    face_bbox=[10, 10, 20, 20],
+                face_id = _add_face(
+                    db, photo_id=cluster_num * 50 + face_num,
+                    bbox=[10, 10, 20, 20],
                     embedding=[0.5] * 512,
-                    sharpness_score=0.8,
                 )
-                db.clusters.add_face_to_cluster(cluster_id, face_id)
+                _add_face_to_cluster(db, cluster_id, face_id)
 
         # Assign some clusters to players
         for i, cluster_id in enumerate(cluster_ids[:5]):
@@ -272,7 +300,7 @@ class TestClusteringHierarchy:
             )
 
         # Get all clusters and verify structure
-        clusters = db.clusters.get_all_clusters()
+        clusters = db.clusters.get_all_player_clusters()
         assert len(clusters) == 10
 
         assigned = [c for c in clusters if c["player_name"]]
@@ -286,27 +314,21 @@ class TestClusteringHierarchy:
         db = app.db
 
         # Create assigned cluster
-        assigned_cluster = db.clusters.create_cluster()
-        assigned_face = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.5] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(assigned_cluster, assigned_face)
+        assigned_cluster = _create_cluster(db)
+        assigned_face = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.5] * 512)
+        _add_face_to_cluster(db, assigned_cluster, assigned_face)
         db.clusters.assign_cluster_to_player(assigned_cluster, "Player1", "1", None)
 
         # Create 50 nested clusters
         for i in range(50):
-            cluster = db.clusters.create_cluster()
+            cluster = _create_cluster(db)
             for j in range(10):
-                face = db.faces.add_face(
-                    photo_id=100 + i * 10 + j,
-                    face_bbox=[10, 10, 20, 20],
+                face = _add_face(
+                    db, photo_id=100 + i * 10 + j,
+                    bbox=[10, 10, 20, 20],
                     embedding=[0.5] * 512,
-                    sharpness_score=0.8,
                 )
-                db.clusters.add_face_to_cluster(cluster, face)
+                _add_face_to_cluster(db, cluster, face)
 
         # Run auto-match
         start = time.time()
@@ -333,14 +355,14 @@ class TestQueryPerformanceMetrics:
 
         for i in range(1000):
             photo_file = photo_dir / f"photo_{i:04d}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes())
+            photo_file.write_bytes(_make_unique_jpeg(i))
             photo_id = db.photos.add_photo(
                 file_path=str(photo_file),
                 source_folder=str(photo_dir)
             )
-            # Add OCR result
+            # Add OCR result — raw_text is now required
             jersey = 1 + (i % 20)  # Jersey numbers 1-20 repeated
-            db.photos.add_ocr_result(photo_id, jersey, 0.95)
+            db.photos.add_ocr_result(photo_id, str(jersey), 0.95, raw_text=str(jersey))
 
         # Search for specific jersey
         start = time.time()
@@ -348,7 +370,7 @@ class TestQueryPerformanceMetrics:
         elapsed = time.time() - start
 
         assert response.status_code == 200
-        results = response.json["photos"]
+        results = response.json.get("results", response.json.get("photos", []))
         # Should find ~50 photos with jersey 5
         assert len(results) > 0
         assert elapsed < 2.0
@@ -366,18 +388,18 @@ class TestQueryPerformanceMetrics:
 
         for i in range(100):
             photo_file = photo_dir / f"photo_{i:02d}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes())
+            photo_file.write_bytes(_make_unique_jpeg(i))
             db.photos.add_photo(
                 file_path=str(photo_file),
                 source_folder=str(photo_dir)
             )
 
-        # Retrieve in batches
+        # Retrieve in batches using page/per_page (current API)
         total_retrieved = 0
         start = time.time()
 
-        for offset in range(0, 100, 10):
-            response = client.get(f"/api/photos?offset={offset}&limit=10")
+        for page in range(1, 11):
+            response = client.get(f"/api/photos?page={page}&per_page=10")
             assert response.status_code == 200
             total_retrieved += len(response.json["photos"])
 

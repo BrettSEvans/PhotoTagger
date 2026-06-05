@@ -167,7 +167,8 @@ def test_update_roster_entry(conn_and_repo):
     updated = repo.update_roster_entry(entry_id, player_name="Alice Updated")
 
     assert updated["player_name"] == "Alice Updated"
-    assert updated["jersey_number"] == "23"
+    # jersey_number is stored as INTEGER in the DB; update returns it as int.
+    assert str(updated["jersey_number"]) == "23"
 
 
 def test_update_roster_entry_nonexistent(conn_and_repo):
@@ -219,3 +220,107 @@ def test_get_roster_entry_by_id(conn_and_repo):
 
     missing = repo.get_roster_entry_by_id(999)
     assert missing is None
+
+
+# ---------------------------------------------------------------------------
+# find_by_jersey_color_and_team (lines 358-373)
+# ---------------------------------------------------------------------------
+
+def test_find_by_jersey_color_and_team_found(conn_and_repo):
+    repo, _ = conn_and_repo
+    repo.add_roster_entry("Team A", 2024, "23", "Alice", uniform_color="red")
+    result = repo.find_by_jersey_color_and_team(23, "Team A", "red", 2024)
+    assert result is not None
+    assert result["player_name"] == "Alice"
+
+
+def test_find_by_jersey_color_and_team_not_found(conn_and_repo):
+    repo, _ = conn_and_repo
+    result = repo.find_by_jersey_color_and_team(99, "Team A", "red", 2024)
+    assert result is None
+
+
+def test_find_by_jersey_color_wrong_color(conn_and_repo):
+    repo, _ = conn_and_repo
+    repo.add_roster_entry("Team A", 2024, "23", "Alice", uniform_color="red")
+    result = repo.find_by_jersey_color_and_team(23, "Team A", "blue", 2024)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _color_match_score (lines 386, 405)
+# ---------------------------------------------------------------------------
+
+def test_color_match_score_none_input(conn_and_repo):
+    from src.repositories.roster import RosterRepository
+    # None detected → return 0.0 (line 386)
+    score = RosterRepository._color_match_score(None, "red")
+    assert score == 0.0
+
+
+def test_color_match_score_family_match(conn_and_repo):
+    from src.repositories.roster import RosterRepository
+    # "crimson" is in the red family → 0.9 (line 405)
+    score = RosterRepository._color_match_score("crimson", "dark red")
+    assert score == 0.9
+
+
+def test_color_match_score_exact(conn_and_repo):
+    from src.repositories.roster import RosterRepository
+    score = RosterRepository._color_match_score("red", "red")
+    assert score == 1.0
+
+
+# ---------------------------------------------------------------------------
+# import_roster_entries error paths (lines 67-70, 73-75, 84-86)
+# ---------------------------------------------------------------------------
+
+def test_import_invalid_jersey_number_increments_failed(conn_and_repo):
+    repo, _ = conn_and_repo
+    rows = [{"jersey_number": "not_a_number", "player_name": "Alice"}]
+    result = repo.import_roster_entries("Team A", 2024, rows)
+    assert result["failed"] == 1
+    assert result["imported"] == 0
+
+
+def test_import_missing_player_name_increments_failed(conn_and_repo):
+    repo, _ = conn_and_repo
+    rows = [{"jersey_number": "7", "player_name": ""}]
+    result = repo.import_roster_entries("Team A", 2024, rows)
+    assert result["failed"] == 1
+
+
+# ---------------------------------------------------------------------------
+# update_roster_entry error paths (lines 190-191, 203, 219)
+# ---------------------------------------------------------------------------
+
+def test_update_roster_invalid_jersey_raises(conn_and_repo):
+    repo, conn = conn_and_repo
+    repo.add_roster_entry("Team A", 2024, "23", "Alice")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM rosters WHERE player_name = ?", ("Alice",))
+    entry_id = cursor.fetchone()[0]
+    with pytest.raises(ValueError):
+        repo.update_roster_entry(entry_id, jersey_number="notanint")
+
+
+def test_update_roster_empty_player_name_raises(conn_and_repo):
+    repo, conn = conn_and_repo
+    repo.add_roster_entry("Team A", 2024, "23", "Alice")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM rosters WHERE player_name = ?", ("Alice",))
+    entry_id = cursor.fetchone()[0]
+    with pytest.raises(ValueError, match="player_name"):
+        repo.update_roster_entry(entry_id, player_name="")
+
+
+def test_update_roster_duplicate_jersey_raises(conn_and_repo):
+    repo, conn = conn_and_repo
+    repo.add_roster_entry("Team A", 2024, "7", "Alice")
+    repo.add_roster_entry("Team A", 2024, "15", "Bob")
+    cursor = conn.cursor()
+    cursor.execute("SELECT id FROM rosters WHERE player_name = ?", ("Alice",))
+    alice_id = cursor.fetchone()[0]
+    # Try to change Alice to jersey 15 (Bob's jersey) → unique constraint
+    with pytest.raises(ValueError):
+        repo.update_roster_entry(alice_id, jersey_number=15)
