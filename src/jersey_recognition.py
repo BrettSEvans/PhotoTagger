@@ -3,6 +3,7 @@
 import logging
 import os
 import re
+import tempfile
 import time
 from typing import List, Dict, Optional, Tuple
 from pathlib import Path
@@ -18,6 +19,84 @@ from src.uniform_detector import UniformDetector
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# Module-level OCR readiness — set up once, cached forever
+# ---------------------------------------------------------------------------
+_ocr_ready: bool = False
+_ocr_ok: Optional[bool] = None
+
+
+def ensure_ocr_ready(project_root: Optional[str] = None) -> bool:
+    """Set up a Tesseract-readable temp dir and run a self-test once.
+
+    pytesseract round-trips images through ``$TMPDIR``.  On some systems
+    (e.g. macOS sandbox envs) Leptonica cannot open files in the default
+    ``/tmp/…`` or ``/var/folders/…`` paths — it reads the bytes as a filename
+    and emits "image file not found", causing a non-zero exit and a
+    ``UnicodeDecodeError`` in pytesseract.  Pointing the temp dir to a
+    project-local path that Leptonica *can* read fixes this.
+
+    This function is idempotent: the first call does the work, subsequent
+    calls return the cached result immediately.
+
+    Args:
+        project_root: Absolute path to use as base for ``.ocr_tmp``.
+                      Defaults to two levels above this file (the repo root).
+
+    Returns:
+        True if Tesseract can OCR a synthetic digit image, False otherwise.
+    """
+    global _ocr_ready, _ocr_ok
+    if _ocr_ready:
+        return bool(_ocr_ok)
+
+    if project_root is None:
+        project_root = Path(__file__).resolve().parent.parent
+
+    ocr_tmp = Path(project_root) / ".ocr_tmp"
+    try:
+        ocr_tmp.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        logger.error(f"Could not create OCR temp dir {ocr_tmp}: {e}")
+        _ocr_ready = True
+        _ocr_ok = False
+        return False
+
+    # Point pytesseract (and Leptonica) at the readable dir.
+    tempfile.tempdir = str(ocr_tmp)
+    os.environ["TMPDIR"] = str(ocr_tmp)
+
+    # Self-test: synthesise a "19" image and verify OCR returns at least one digit.
+    _ocr_ok = _self_test_ocr()
+    _ocr_ready = True
+
+    if _ocr_ok:
+        logger.info(f"OCR self-test PASSED (temp dir: {ocr_tmp})")
+    else:
+        logger.error(
+            f"OCR self-test FAILED — Tesseract cannot process images via temp dir "
+            f"{ocr_tmp}.  Jersey detection will produce 0 results.  "
+            f"Check that Tesseract is installed and $TMPDIR is accessible."
+        )
+    return bool(_ocr_ok)
+
+
+def _self_test_ocr() -> bool:
+    """OCR a synthetic '19' image. Returns True if any digits are read back."""
+    try:
+        # Build a white-on-black digit image with OpenCV (no font file needed).
+        img = np.ones((80, 120), dtype=np.uint8) * 255
+        cv2.putText(img, "19", (8, 62), cv2.FONT_HERSHEY_SIMPLEX, 2.0, 0, 3)
+        pil = Image.fromarray(img)
+        result = pytesseract.image_to_string(
+            pil,
+            config="--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789",
+        ).strip()
+        return len(result) > 0
+    except Exception as e:
+        logger.error(f"OCR self-test exception: {type(e).__name__}: {e}")
+        return False
+
 
 class JerseyRecognizer:
     """Extract jersey numbers from photos and match to roster using color and team context."""
@@ -32,65 +111,75 @@ class JerseyRecognizer:
         """
         self.db = db
         self.languages = languages or ["en"]
-        logger.info(f"Initializing JerseyRecognizer with Tesseract OCR backend")
+        # Ensure temp dir is readable and backend is functional (idempotent).
+        ensure_ocr_ready()
+        logger.info(f"Initializing JerseyRecognizer with Tesseract OCR backend (ocr_ok={_ocr_ok})")
         self.uniform_detector = UniformDetector()
         # Per-game color-scheme learning (stubbed for now; would accumulate per team)
         self.learned_number_colors = {}
 
     @staticmethod
-    def _tesseract_ocr_digits(image_bgr: np.ndarray) -> List[Tuple]:
+    def _tesseract_ocr_digits(image_bgr: np.ndarray, psm: int = 8) -> List[Tuple]:
         """
         Run Tesseract OCR on preprocessed image to extract digit numbers.
 
         Args:
-            image_bgr: Preprocessed image (BGR numpy array, already upscaled and enhanced)
+            image_bgr: Preprocessed image (BGR numpy array OR grayscale, already upscaled
+                       and enhanced).
+            psm: Tesseract page-segmentation mode.
+                 8 = single word (tight torso crops, Phase 1).
+                 11 = sparse text (wide uncovered-region bands, Phase 2).
 
         Returns:
-            List of (bbox, text, confidence) tuples
+            List of (bbox, text, confidence) tuples.
+
+        Raises:
+            Any exception from pytesseract so callers can log it at the appropriate
+            level and decide whether to skip the crop or abort the photo.  We no
+            longer silently swallow backend failures.
         """
-        try:
-            # Convert BGR to RGB for PIL
+        # Handle both BGR (3-channel) and grayscale (1-channel) arrays.
+        if image_bgr.ndim == 2:
+            pil_image = Image.fromarray(image_bgr)
+        else:
             image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
 
-            # Configure Tesseract for digit-only detection
-            # --psm 8: Treat image as a single word
-            # --oem 3: Use both legacy and LSTM engine
-            config_str = r'--psm 8 --oem 3 -c tessedit_char_whitelist=0123456789'
+        # Configure Tesseract for digit-only detection.
+        # --oem 3: Use both legacy and LSTM engine.
+        config_str = f"--psm {psm} --oem 3 -c tessedit_char_whitelist=0123456789"
 
-            # Get detailed results including bounding boxes and confidence
-            ocr_results = pytesseract.image_to_data(
-                pil_image,
-                config=config_str,
-                output_type=pytesseract.Output.DICT
-            )
+        # Get detailed results including bounding boxes and confidence.
+        # NOTE: pytesseract writes the image to $TMPDIR before calling tesseract.
+        # If $TMPDIR is not readable by Leptonica this will raise; ensure_ocr_ready()
+        # must have been called first.
+        ocr_results = pytesseract.image_to_data(
+            pil_image,
+            config=config_str,
+            output_type=pytesseract.Output.DICT,
+        )
 
-            detections = []
-            if ocr_results['text']:
-                for i, text in enumerate(ocr_results['text']):
-                    if not text.strip():  # Skip empty detections
-                        continue
+        detections = []
+        if ocr_results["text"]:
+            for i, text in enumerate(ocr_results["text"]):
+                if not text.strip():  # Skip empty detections
+                    continue
 
-                    confidence = int(ocr_results['conf'][i]) / 100.0
-                    if confidence < 0.3:  # Skip very low confidence
-                        continue
+                confidence = int(ocr_results["conf"][i]) / 100.0
+                if confidence < 0.3:  # Skip very low confidence
+                    continue
 
-                    # Extract bbox from Tesseract output
-                    x0 = ocr_results['left'][i]
-                    y0 = ocr_results['top'][i]
-                    x1 = x0 + ocr_results['width'][i]
-                    y1 = y0 + ocr_results['height'][i]
+                # Extract bbox from Tesseract output
+                x0 = ocr_results["left"][i]
+                y0 = ocr_results["top"][i]
+                x1 = x0 + ocr_results["width"][i]
+                y1 = y0 + ocr_results["height"][i]
 
-                    # Return in format compatible with previous EasyOCR code
-                    # bbox_ocr is dummy (not used in validation), text is digit string, confidence is float
-                    bbox_ocr = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
-                    detections.append((bbox_ocr, text, confidence))
+                # Return in format compatible with previous EasyOCR code.
+                bbox_ocr = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]]
+                detections.append((bbox_ocr, text, confidence))
 
-            return detections
-
-        except Exception as e:
-            logger.error(f"Tesseract OCR error: {e}")
-            return []
+        return detections
 
     @staticmethod
     def _compute_iou(box1: List[int], box2: List[int]) -> float:
@@ -475,11 +564,11 @@ class JerseyRecognizer:
                 if torso_crop is None:
                     continue
 
-                # Run OCR on the torso crop using Tesseract
+                # Run OCR on the torso crop using Tesseract (psm 8 = single word)
                 try:
-                    ocr_results = self._tesseract_ocr_digits(torso_crop)
+                    ocr_results = self._tesseract_ocr_digits(torso_crop, psm=8)
                 except Exception as e:
-                    logger.debug(f"OCR failed on torso crop for face {face['id']}: {e}")
+                    logger.warning(f"OCR failed on torso crop for face {face['id']}: {type(e).__name__}: {e}")
                     continue
 
                 for bbox_ocr, text, confidence in ocr_results:
@@ -568,11 +657,12 @@ class JerseyRecognizer:
                 blurred = cv2.GaussianBlur(enhanced, (0, 0), 2)
                 sharpened = cv2.addWeighted(enhanced, 1.5, blurred, -0.5, 0)
 
-                # Run OCR on the preprocessed region crop using Tesseract
+                # Run OCR on the preprocessed region crop using Tesseract.
+                # psm 11 (sparse text) is better for wide bands with multiple sparse numbers.
                 try:
-                    ocr_results = self._tesseract_ocr_digits(sharpened)
+                    ocr_results = self._tesseract_ocr_digits(sharpened, psm=11)
                 except Exception as e:
-                    logger.debug(f"OCR failed on region [{x0}:{x1}, {y0}:{y1}] for photo {photo_id}: {e}")
+                    logger.warning(f"OCR failed on region [{x0}:{x1}, {y0}:{y1}] for photo {photo_id}: {type(e).__name__}: {e}")
                     continue
 
                 for bbox_ocr, text, confidence in ocr_results:

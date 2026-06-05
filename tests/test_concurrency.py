@@ -17,6 +17,17 @@ def _make_jpeg_bytes(color: str = "red") -> bytes:
     return buf.getvalue()
 
 
+def _make_unique_jpeg(index: int) -> bytes:
+    """Return unique PNG bytes so file hashes never collide."""
+    colour = (index % 256, (index * 7 + 10) % 256, (index * 13 + 20) % 256)
+    img = Image.new("RGB", (32, 32), color=colour)
+    pixels = img.load()
+    pixels[0, 0] = (index % 256, (index * 3) % 256, (index * 17) % 256)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
+
+
 def wait_for_job(db: Database, job_id: int, timeout: float = 5.0):
     """Poll job status until completion."""
     deadline = time.time() + timeout
@@ -26,6 +37,29 @@ def wait_for_job(db: Database, job_id: int, timeout: float = 5.0):
             return job
         time.sleep(0.05)
     raise AssertionError(f"Timed out waiting for job {job_id}")
+
+
+# ── Compatibility helpers ──────────────────────────────────────────────────────
+
+def _create_cluster(db):
+    return db.clusters.add_player_cluster(face_count=0, photo_count=0, thumbnail_face_id=None)
+
+
+def _add_face(db, photo_id, bbox, embedding, confidence=0.9, sharpness=None):
+    return db.faces.add_face(
+        photo_id=photo_id,
+        embedding=embedding,
+        bbox=bbox,
+        confidence=confidence,
+        sharpness=sharpness,
+    )
+
+
+def _add_face_to_cluster(db, cluster_id, face_id):
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 
 
 class TestConcurrentUploads:
@@ -44,18 +78,21 @@ class TestConcurrentUploads:
             photo_dir = tmp_path / f"photos_{i}"
             photo_dir.mkdir()
             photo_file = photo_dir / f"photo_{i}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes(color="red"))
+            photo_file.write_bytes(_make_unique_jpeg(i))
             photo_dirs.append(str(photo_dir))
 
-        # Upload each directory concurrently
+        # Upload each directory concurrently via multipart
         job_ids = []
         errors = []
 
-        def upload(photo_path):
+        def upload(index, photo_dir):
             try:
+                # Read the unique image for this dir
+                photo_file = Path(photo_dir) / f"photo_{index}.jpg"
                 response = client.post(
                     "/api/upload-photos",
-                    json={"photo_directory": photo_path}
+                    data={"files": (io.BytesIO(photo_file.read_bytes()), f"photo_{index}.jpg")},
+                    content_type="multipart/form-data",
                 )
                 if response.status_code != 202:
                     errors.append(f"Upload failed: {response.status_code}")
@@ -65,7 +102,7 @@ class TestConcurrentUploads:
             except Exception as e:
                 errors.append(str(e))
 
-        threads = [threading.Thread(target=upload, args=(d,)) for d in photo_dirs]
+        threads = [threading.Thread(target=upload, args=(i, d)) for i, d in enumerate(photo_dirs)]
         for t in threads:
             t.start()
         for t in threads:
@@ -84,19 +121,20 @@ class TestConcurrentUploads:
         assert len(photos) == 5
 
     def test_concurrent_uploads_same_dir_no_duplicates(self, tmp_path):
-        """Concurrent uploads of same directory don't create duplicates."""
+        """Concurrent uploads of same photo don't create duplicates."""
         app = create_app(db_path=":memory:")
         app.config["TESTING"] = True
         client = app.test_client()
         db = app.db
 
-        # Create directory with single photo
+        # Create a single photo
         photo_dir = tmp_path / "photos"
         photo_dir.mkdir()
         photo_file = photo_dir / "photo.jpg"
-        photo_file.write_bytes(_make_jpeg_bytes())
+        photo_bytes = _make_jpeg_bytes()
+        photo_file.write_bytes(photo_bytes)
 
-        # Try uploading same dir from 3 threads simultaneously
+        # Try uploading same file from 3 threads simultaneously
         job_ids = []
         errors = []
 
@@ -104,7 +142,8 @@ class TestConcurrentUploads:
             try:
                 response = client.post(
                     "/api/upload-photos",
-                    json={"photo_directory": str(photo_dir)}
+                    data={"files": (io.BytesIO(photo_bytes), "photo.jpg")},
+                    content_type="multipart/form-data",
                 )
                 if response.status_code == 202:
                     job_ids.append(response.json["job_id"])
@@ -126,7 +165,7 @@ class TestConcurrentUploads:
         for job_id in job_ids:
             wait_for_job(db, job_id, timeout=10.0)
 
-        # Should still have only 1 photo (hash-based dedup)
+        # Should have only 1 photo (hash-based dedup)
         photos = db.photos.get_all_photos()
         assert len(photos) == 1
 
@@ -141,22 +180,13 @@ class TestConcurrentClusterAssignments:
         client = app.test_client()
         db = app.db
 
-        # Set up test data: create clusters
+        # Set up test data: create 5 clusters
+        cluster_ids = []
         for i in range(5):
-            # Create faces and cluster
-            for j in range(3):
-                face_id = db.faces.add_face(
-                    photo_id=i,
-                    face_bbox=[10, 10, 20, 20],
-                    embedding=[0.1] * 512,
-                    sharpness_score=0.8,
-                )
-            # Create cluster from faces
-            cluster_id = db.clusters.create_cluster()
-            db.clusters.add_face_to_cluster(cluster_id, face_id)
-
-        clusters = db.clusters.get_all_clusters()
-        cluster_ids = [c["id"] for c in clusters[:5]]
+            face_id = _add_face(db, photo_id=i, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+            cluster_id = _create_cluster(db)
+            _add_face_to_cluster(db, cluster_id, face_id)
+            cluster_ids.append(cluster_id)
 
         # Assign each cluster concurrently
         errors = []
@@ -192,7 +222,7 @@ class TestConcurrentClusterAssignments:
         assert not errors, f"Assignment errors: {errors}"
 
         # Verify all clusters assigned
-        clusters = db.clusters.get_all_clusters()
+        clusters = db.clusters.get_all_player_clusters()
         assigned = [c for c in clusters if c["player_name"]]
         assert len(assigned) >= 5
 
@@ -204,14 +234,9 @@ class TestConcurrentClusterAssignments:
         db = app.db
 
         # Create one cluster
-        cluster_id = db.clusters.create_cluster()
-        face_id = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(cluster_id, face_id)
+        cluster_id = _create_cluster(db)
+        face_id = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+        _add_face_to_cluster(db, cluster_id, face_id)
 
         # Try assigning to 3 different players concurrently
         responses = []
@@ -260,25 +285,15 @@ class TestConcurrentDeassignAndAutoMatch:
         db = app.db
 
         # Create assigned cluster
-        cluster_id = db.clusters.create_cluster()
-        face_id = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(cluster_id, face_id)
+        cluster_id = _create_cluster(db)
+        face_id = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+        _add_face_to_cluster(db, cluster_id, face_id)
         db.clusters.assign_cluster_to_player(cluster_id, "Player1", "1", None)
 
         # Create unidentified cluster for matching
-        unid_cluster = db.clusters.create_cluster()
-        unid_face = db.faces.add_face(
-            photo_id=2,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,  # Similar embedding
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(unid_cluster, unid_face)
+        unid_cluster = _create_cluster(db)
+        unid_face = _add_face(db, photo_id=2, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+        _add_face_to_cluster(db, unid_cluster, unid_face)
 
         # Deassign and match_similar concurrently
         deassign_error = None
@@ -337,7 +352,7 @@ class TestConcurrentJobSubmissions:
         photo_dir.mkdir()
         for i in range(3):
             photo_file = photo_dir / f"photo_{i}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes())
+            photo_file.write_bytes(_make_unique_jpeg(i))
 
         job_ids = []
         errors = []
@@ -346,7 +361,7 @@ class TestConcurrentJobSubmissions:
             try:
                 response = client.post(
                     "/api/crawl",
-                    json={"photo_directory": str(photo_dir)}
+                    json={"photo_dir": str(photo_dir)}
                 )
                 if response.status_code == 202:
                     job_ids.append(response.json["job_id"])
@@ -357,7 +372,12 @@ class TestConcurrentJobSubmissions:
 
         def submit_detect():
             try:
-                response = client.post("/api/detect-faces")
+                # detect-faces requires game context and json body
+                db.context.set_game_context([
+                    {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
+                    {"team_name": "Team2", "team_year": 2024, "uniform_color": "blue"},
+                ])
+                response = client.post("/api/detect-faces", json={})
                 if response.status_code == 202:
                     job_ids.append(response.json["job_id"])
                 else:
@@ -399,7 +419,7 @@ class TestConcurrentJobSubmissions:
             try:
                 response = client.post(
                     "/api/crawl",
-                    json={"photo_directory": str(photo_dir)}
+                    json={"photo_dir": str(photo_dir)}
                 )
                 if response.status_code == 202:
                     job_ids.append(response.json["job_id"])
@@ -429,14 +449,6 @@ class TestConcurrentRosterUpdates:
         client = app.test_client()
         db = app.db
 
-        # Set game context
-        context = [
-            {"team_name": "Team1", "team_year": "2024"},
-            {"team_name": "Team2", "team_year": "2024"},
-        ]
-        for ctx in context:
-            db.context.set_game_context(ctx)
-
         roster_ids = []
         errors = []
 
@@ -451,10 +463,15 @@ class TestConcurrentRosterUpdates:
                         "jersey_number": str(jersey),
                     }
                 )
-                if response.status_code == 200:
-                    roster_ids.append(response.json["entry"]["id"])
+                if response.status_code in {200, 201}:
+                    # API may return 201 without entry id — fetch last entry
+                    entries = db.roster.get_all_roster_entries()
+                    for e in reversed(entries):
+                        if e["player_name"] == player_name:
+                            roster_ids.append(e["id"])
+                            break
                 else:
-                    errors.append(f"Add entry failed: {response.status_code}")
+                    errors.append(f"Add entry failed: {response.status_code} {response.json}")
             except Exception as e:
                 errors.append(str(e))
 

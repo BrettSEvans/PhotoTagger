@@ -656,10 +656,16 @@ def remove_face_from_cluster(cluster_id: int, face_id: int):
 
 @bp.route("/api/consolidate-player/<string:player_name>", methods=["POST"])
 def consolidate_player_clusters(player_name: str):
-    """Merge all clusters with the same player_name into one primary cluster."""
+    """Merge all clusters with the same player_name into one primary cluster.
+
+    Optional JSON body: {"prefer_cluster_id": <int>} keeps that cluster as the
+    surviving primary (e.g. the cluster the user is currently viewing/tagging).
+    """
     db = current_app.db
+    data = request.get_json(silent=True) or {}
+    prefer_cluster_id = data.get("prefer_cluster_id")
     try:
-        result = db.clusters.consolidate_player_clusters(player_name)
+        result = db.clusters.consolidate_player_clusters(player_name, prefer_cluster_id)
         return jsonify(result), 200
     except Exception as e:
         logger.error(f"Error consolidating clusters for player {player_name}: {e}")

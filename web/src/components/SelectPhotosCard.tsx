@@ -1,16 +1,20 @@
 import React, { useRef } from 'react';
+import GoogleDrivePicker from './GoogleDrivePicker';
+
+export type UploadMode = 'files' | 'directory' | 'google-drive';
 
 interface SelectPhotosCardProps {
   selectedFiles: File[];
-  uploadMode: 'files' | 'directory';
+  uploadMode: UploadMode;
   photoDirectory: string;
   isDragging: boolean;
   message: { type: 'success' | 'error'; text: string } | null;
   isLoading: boolean;
   onFilesSelected: (files: File[]) => void;
-  onModeChange: (mode: 'files' | 'directory') => void;
+  onModeChange: (mode: UploadMode) => void;
   onDirectoryChange: (path: string) => void;
   onClear: () => void;
+  onError?: (msg: string) => void;
   onDragOver: (e: React.DragEvent<HTMLDivElement>) => void;
   onDragLeave: (e: React.DragEvent<HTMLDivElement>) => void;
   onDrop: (e: React.DragEvent<HTMLDivElement>) => void;
@@ -27,6 +31,7 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
   onModeChange,
   onDirectoryChange,
   onClear,
+  onError,
   onDragOver,
   onDragLeave,
   onDrop,
@@ -70,8 +75,8 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
         </div>
       </div>
 
-      {/* Upload mode toggle */}
-      <div className="flex gap-2 mb-4">
+      {/* Upload mode tabs */}
+      <div className="flex gap-2 mb-4 flex-wrap">
         <button
           type="button"
           onClick={() => {
@@ -100,9 +105,25 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
         >
           📂 From Directory
         </button>
+        <button
+          type="button"
+          onClick={() => {
+            onModeChange('google-drive');
+            onClear();
+            onDirectoryChange('');
+          }}
+          className={`px-4 py-2 rounded-full border-2 font-jakarta text-sm font-semibold transition-colors flex items-center gap-1.5 ${
+            uploadMode === 'google-drive'
+              ? 'bg-accent text-white border-foreground'
+              : 'bg-white text-foreground border-frame hover:bg-quaternary/5'
+          }`}
+        >
+          <DriveTabIcon active={uploadMode === 'google-drive'} />
+          Google Drive
+        </button>
       </div>
 
-      {/* File Upload Mode */}
+      {/* ── File Upload Mode ─────────────────────────────────────── */}
       {uploadMode === 'files' && (
         <>
           {/* Drop zone */}
@@ -200,7 +221,7 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
         </>
       )}
 
-      {/* Directory Upload Mode */}
+      {/* ── Directory Upload Mode ────────────────────────────────── */}
       {uploadMode === 'directory' && (
         <div className="space-y-3">
           <label className="block">
@@ -218,6 +239,47 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
             </p>
           </label>
         </div>
+      )}
+
+      {/* ── Google Drive Mode ────────────────────────────────────── */}
+      {uploadMode === 'google-drive' && (
+        <>
+          <GoogleDrivePicker
+            onFilesReady={(files) => {
+              onFilesSelected(files);
+            }}
+            onError={(msg) => {
+              onError?.(msg);
+            }}
+            disabled={isLoading}
+          />
+
+          {/* Show downloaded file list (same as files mode) */}
+          {selectedFiles.length > 0 && (
+            <div className="mt-4 bg-quaternary/5 border-2 border-quaternary rounded-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="font-jakarta text-sm font-semibold text-foreground">
+                  {selectedFiles.length} photo{selectedFiles.length !== 1 ? 's' : ''} ready from Drive
+                </p>
+                <button
+                  type="button"
+                  onClick={onClear}
+                  disabled={isLoading}
+                  className="text-xs font-jakarta text-muted-fg hover:text-foreground disabled:opacity-50"
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                {selectedFiles.map((file, idx) => (
+                  <p key={idx} className="font-jakarta text-xs text-foreground truncate">
+                    • {file.name}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
       )}
 
       {/* Message display */}
@@ -238,5 +300,38 @@ export const SelectPhotosCard: React.FC<SelectPhotosCardProps> = ({
     </div>
   );
 };
+
+// Small Drive triangle icon for the tab pill — keeps the bundle tiny.
+function DriveTabIcon({ active }: { active: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 87.3 78"
+      xmlns="http://www.w3.org/2000/svg"
+      className="w-3.5 h-3.5 flex-shrink-0"
+    >
+      {active ? (
+        // White-tinted version when active (tab is filled with accent colour)
+        <>
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="rgba(255,255,255,0.8)" />
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="rgba(255,255,255,0.8)" />
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="rgba(255,255,255,0.8)" />
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="rgba(255,255,255,0.9)" />
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="rgba(255,255,255,0.8)" />
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="rgba(255,255,255,0.85)" />
+        </>
+      ) : (
+        // Full-colour version when inactive
+        <>
+          <path d="m6.6 66.85 3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3l13.75-23.8h-27.5c0 1.55.4 3.1 1.2 4.5z" fill="#0066da" />
+          <path d="m43.65 25-13.75-23.8c-1.35.8-2.5 1.9-3.3 3.3l-25.4 44a9.06 9.06 0 0 0-1.2 4.5h27.5z" fill="#00ac47" />
+          <path d="m73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5h-27.502l5.852 11.5z" fill="#ea4335" />
+          <path d="m43.65 25 13.75-23.8c-1.35-.8-2.9-1.2-4.5-1.2h-18.5c-1.6 0-3.15.45-4.5 1.2z" fill="#00832d" />
+          <path d="m59.8 53h-32.3l-13.75 23.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2z" fill="#2684fc" />
+          <path d="m73.4 26.5-12.7-22c-.8-1.4-1.95-2.5-3.3-3.3l-13.75 23.8 16.15 28h27.45c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00" />
+        </>
+      )}
+    </svg>
+  );
+}
 
 export default SelectPhotosCard;

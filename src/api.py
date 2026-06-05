@@ -245,6 +245,16 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
     app.register_blueprint(detection_bp)
     app.register_blueprint(review_bp)
 
+    # Run OCR self-test once at startup and expose result via /health.
+    # This surfaces a dead Tesseract backend immediately rather than silently
+    # producing 0 detections for every photo.
+    try:
+        from src.jersey_recognition import ensure_ocr_ready
+        app.config["ocr_ok"] = ensure_ocr_ready()
+    except Exception as _ocr_err:
+        logger.error(f"OCR startup check failed: {_ocr_err}")
+        app.config["ocr_ok"] = False
+
     return app
 
 if __name__ == "__main__":

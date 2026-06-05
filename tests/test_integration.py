@@ -27,6 +27,43 @@ def wait_for_job(db: Database, job_id: int, timeout: float = 10.0):
     raise AssertionError(f"Timed out waiting for job {job_id}")
 
 
+# ── Compatibility helpers ──────────────────────────────────────────────────────
+
+def _create_cluster(db):
+    """Compat: create an empty player cluster and return its id."""
+    return db.clusters.add_player_cluster(face_count=0, photo_count=0, thumbnail_face_id=None)
+
+
+def _add_face(db, photo_id, bbox, embedding, confidence=0.9, sharpness=None):
+    """Compat: add a face using current signature."""
+    return db.faces.add_face(
+        photo_id=photo_id,
+        embedding=embedding,
+        bbox=bbox,
+        confidence=confidence,
+        sharpness=sharpness,
+    )
+
+
+def _add_face_to_cluster(db, cluster_id, face_id):
+    """Compat: assign face to cluster."""
+    db.clusters.assign_face_to_cluster(face_id, cluster_id)
+
+
+def _add_roster_entry(db, team_name, team_year, player_name, jersey_number):
+    """Compat: add a roster entry and return its row dict."""
+    db.roster.add_roster_entry(team_name, int(team_year), int(jersey_number) if jersey_number else None, player_name)
+    entries = db.roster.get_all_roster_entries()
+    # Return the last inserted entry matching this player
+    for e in reversed(entries):
+        if e["player_name"] == player_name and e["team_name"] == team_name:
+            return e
+    return entries[-1]
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+
+
 class TestPhotosToDetectionToReviewWorkflow:
     """Test complete workflow from photos through review."""
 
@@ -37,17 +74,16 @@ class TestPhotosToDetectionToReviewWorkflow:
         client = app.test_client()
         db = app.db
 
-        # Step 1: Upload photos
-        photo_dir = tmp_path / "photos"
-        photo_dir.mkdir()
-
+        # Step 1: Upload photos via multipart (current API)
+        photo_files = []
         for i in range(3):
-            photo_file = photo_dir / f"photo_{i}.jpg"
-            photo_file.write_bytes(_make_jpeg_bytes(color=["red", "green", "blue"][i]))
+            color = ["red", "green", "blue"][i]
+            photo_files.append((io.BytesIO(_make_jpeg_bytes(color=color)), f"photo_{i}.jpg"))
 
         response = client.post(
             "/api/upload-photos",
-            json={"photo_directory": str(photo_dir)}
+            data={"files": photo_files},
+            content_type="multipart/form-data",
         )
         assert response.status_code == 202
         upload_job_id = response.json["job_id"]
@@ -59,8 +95,12 @@ class TestPhotosToDetectionToReviewWorkflow:
         photos = db.photos.get_all_photos()
         assert len(photos) >= 1
 
-        # Step 2: Detect faces
-        response = client.post("/api/detect-faces")
+        # Step 2: Detect faces — requires game context with jersey colors
+        db.context.set_game_context([
+            {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
+            {"team_name": "Team2", "team_year": 2024, "uniform_color": "blue"},
+        ])
+        response = client.post("/api/detect-faces", json={})
         assert response.status_code == 202
         detect_job_id = response.json["job_id"]
 
@@ -68,7 +108,7 @@ class TestPhotosToDetectionToReviewWorkflow:
         assert detect_job["status"] in {"succeeded", "failed"}
 
         # Step 3: Cluster
-        response = client.post("/api/cluster-players")
+        response = client.post("/api/cluster-players", json={})
         assert response.status_code == 202
         cluster_job_id = response.json["job_id"]
 
@@ -80,12 +120,7 @@ class TestPhotosToDetectionToReviewWorkflow:
         assert response.status_code == 200
 
         # Step 5: Assign to roster
-        db.context.set_game_context({
-            "team_name": "Team1",
-            "team_year": "2024"
-        })
-
-        clusters = db.clusters.get_all_clusters()
+        clusters = db.clusters.get_all_player_clusters()
         if clusters:
             cluster = clusters[0]
             response = client.post(
@@ -115,39 +150,28 @@ class TestPhotosToDetectionToReviewWorkflow:
         photo_file = photo_dir / "photo.jpg"
         photo_file.write_bytes(_make_jpeg_bytes())
 
-        photo_id = db.photos.add_photo(str(photo_file), str(photo_dir))
+        photo_id = db.photos.add_photo(str(photo_file), source_folder=str(photo_dir))
 
-        # Add OCR result (jersey 5)
-        db.photos.add_ocr_result(photo_id, 5, 0.95)
+        # Add OCR result (jersey 5) — raw_text is now required
+        db.photos.add_ocr_result(photo_id, "5", 0.95, raw_text="5")
 
         # Assign photo to roster
-        db.context.set_game_context({
-            "team_name": "Team1",
-            "team_year": "2024"
-        })
+        db.context.set_game_context([
+            {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
+        ])
 
-        entry = db.roster.add_roster_entry(
-            team_name="Team1",
-            team_year="2024",
-            player_name="Player5",
-            jersey_number="5"
-        )
+        entry = _add_roster_entry(db, "Team1", 2024, "Player5", "5")
 
         # Create cluster with face
-        cluster = db.clusters.create_cluster()
-        face = db.faces.add_face(
-            photo_id=photo_id,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(cluster, face)
+        cluster = _create_cluster(db)
+        face = _add_face(db, photo_id=photo_id, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+        _add_face_to_cluster(db, cluster, face)
         db.clusters.assign_cluster_to_player(cluster, "Player5", "5", entry["id"])
 
         # Search by jersey
         response = client.get("/api/search?jersey=5")
         assert response.status_code == 200
-        results = response.json.get("photos", [])
+        results = response.json.get("results", response.json.get("photos", []))
         assert len(results) > 0
 
 
@@ -162,27 +186,16 @@ class TestRosterChangeAffectingAssignments:
         db = app.db
 
         # Create roster entry
-        db.context.set_game_context({
-            "team_name": "Team1",
-            "team_year": "2024"
-        })
+        db.context.set_game_context([
+            {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
+        ])
 
-        entry = db.roster.add_roster_entry(
-            team_name="Team1",
-            team_year="2024",
-            player_name="Player1",
-            jersey_number="1"
-        )
+        entry = _add_roster_entry(db, "Team1", 2024, "Player1", "1")
 
         # Create cluster and assign
-        cluster = db.clusters.create_cluster()
-        face = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(cluster, face)
+        cluster = _create_cluster(db)
+        face = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+        _add_face_to_cluster(db, cluster, face)
         db.clusters.assign_cluster_to_player(cluster, "Player1", "1", entry["id"])
 
         # Verify assignment
@@ -221,27 +234,22 @@ class TestBatchOperationCascade:
         photo_file = photo_dir / "photo.jpg"
         photo_file.write_bytes(_make_jpeg_bytes())
 
-        photo_id = db.photos.add_photo(str(photo_file), str(photo_dir))
+        photo_id = db.photos.add_photo(str(photo_file), source_folder=str(photo_dir))
 
         # Add face to photo
-        face_id = db.faces.add_face(
-            photo_id=photo_id,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
+        _add_face(db, photo_id=photo_id, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
 
-        # Create batch
+        # Create batch — source_folder is required
         batch = db.batches.create_batch(
+            source_folder=str(photo_dir),
             team_name="Team1",
-            team_year="2024",
-            team_color="blue"
+            team_year=2024,
         )
 
         # Add photo to batch (if supported)
         try:
             db.batches.add_photo_to_batch(batch, photo_id)
-        except:
+        except Exception:
             pass  # Batch photo linking might not be implemented
 
         # Delete batch
@@ -264,24 +272,14 @@ class TestMultiStepAssignmentWorkflow:
         db = app.db
 
         # Create assigned cluster
-        assigned_cluster = db.clusters.create_cluster()
-        assigned_face = db.faces.add_face(
-            photo_id=1,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.5] * 512,
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(assigned_cluster, assigned_face)
+        assigned_cluster = _create_cluster(db)
+        assigned_face = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.5] * 512)
+        _add_face_to_cluster(db, assigned_cluster, assigned_face)
 
         # Create unidentified cluster
-        unid_cluster = db.clusters.create_cluster()
-        unid_face = db.faces.add_face(
-            photo_id=2,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.5] * 512,  # Very similar
-            sharpness_score=0.8,
-        )
-        db.clusters.add_face_to_cluster(unid_cluster, unid_face)
+        unid_cluster = _create_cluster(db)
+        unid_face = _add_face(db, photo_id=2, bbox=[10, 10, 20, 20], embedding=[0.5] * 512)
+        _add_face_to_cluster(db, unid_cluster, unid_face)
 
         # Assign cluster
         response = client.post(
@@ -313,18 +311,13 @@ class TestEndToEndDataConsistency:
         db = app.db
 
         # Create cluster with 5 faces
-        cluster = db.clusters.create_cluster()
+        cluster = _create_cluster(db)
         face_ids = []
 
         for i in range(5):
-            face = db.faces.add_face(
-                photo_id=i,
-                face_bbox=[10, 10, 20, 20],
-                embedding=[0.1] * 512,
-                sharpness_score=0.8,
-            )
+            face = _add_face(db, photo_id=i, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
             face_ids.append(face)
-            db.clusters.add_face_to_cluster(cluster, face)
+            _add_face_to_cluster(db, cluster, face)
 
         # Verify count
         cluster_data = db.clusters.get_cluster_by_id(cluster)
@@ -346,29 +339,23 @@ class TestEndToEndDataConsistency:
         db = app.db
 
         # Create roster entry
-        db.context.set_game_context({
-            "team_name": "Team1",
-            "team_year": "2024"
-        })
+        db.context.set_game_context([
+            {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
+        ])
 
-        entry = db.roster.add_roster_entry(
-            team_name="Team1",
-            team_year="2024",
-            player_name="Player1",
-            jersey_number="1"
-        )
+        entry = _add_roster_entry(db, "Team1", 2024, "Player1", "1")
 
         # Create photo and assign
-        photo_id = db.photos.add_photo("/tmp/photo.jpg", "/tmp")
-        face = db.faces.add_face(
-            photo_id=photo_id,
-            face_bbox=[10, 10, 20, 20],
-            embedding=[0.1] * 512,
-            sharpness_score=0.8,
-        )
+        photo_dir = tmp_path / "photos"
+        photo_dir.mkdir()
+        photo_file = photo_dir / "photo.jpg"
+        photo_file.write_bytes(_make_jpeg_bytes())
+        photo_id = db.photos.add_photo(str(photo_file), source_folder=str(photo_dir))
 
-        cluster = db.clusters.create_cluster()
-        db.clusters.add_face_to_cluster(cluster, face)
+        face = _add_face(db, photo_id=photo_id, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
+
+        cluster = _create_cluster(db)
+        _add_face_to_cluster(db, cluster, face)
         db.clusters.assign_cluster_to_player(cluster, "Player1", "1", entry["id"])
 
         # Get roster entry photos

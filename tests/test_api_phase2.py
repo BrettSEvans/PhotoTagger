@@ -265,7 +265,8 @@ def test_roster_import_file_inserts_entries(client, app_with_roster):
 
     roster = client.get("/api/roster")
     entries = json.loads(roster.data)["entries"]
-    assert any(e["jersey_number"] == "06" and e["player_name"] == "Will Troop" for e in entries)
+    # jersey_number is stored as INTEGER in DB; "06" → 6
+    assert any(str(e["jersey_number"]) in ("06", "6") and e["player_name"] == "Will Troop" for e in entries)
 
 
 def test_roster_import_skip_preserves_existing_entry(client, app_with_roster):
@@ -358,7 +359,8 @@ def test_roster_response_includes_assigned_thumbnail_face(client, app_with_roste
 
     assert response.status_code == 200
     entries = json.loads(response.data)["entries"]
-    match = next(e for e in entries if e["jersey_number"] == "06")
+    # jersey_number stored as INTEGER; "06" → 6
+    match = next(e for e in entries if str(e["jersey_number"]) in ("06", "6"))
     assert match["thumbnail_face_id"] == face_id
 
 

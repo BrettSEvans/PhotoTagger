@@ -104,7 +104,7 @@ def cmd_ocr(args):
         photo_ids = [args.photo_id]
         results = ocr_engine.process_batch(photo_ids)
     else:
-        photos = db.get_all_photos()
+        photos = db.photos.get_all_photos()
         photo_ids = [p["id"] for p in photos]
 
         if args.parallel:
@@ -136,7 +136,7 @@ def cmd_search(args):
     jersey = args.jersey.strip()
     print(f"🔎 Searching for jersey: {jersey}")
 
-    results = db.get_photo_by_jersey(jersey)
+    results = db.photos.get_photo_by_jersey(jersey)
 
     if not results:
         print(f"❌ No photos found with jersey {jersey}")
@@ -157,13 +157,13 @@ def cmd_info(args):
     db = Database(args.db)
     db.init_schema()
 
-    photos = db.get_all_photos()
+    photos = db.photos.get_all_photos()
 
     print(f"📊 Database: {args.db}")
     print(f"📸 Total photos: {len(photos)}")
 
     if photos:
-        total_size = sum(p["file_size"] for p in photos if p["file_size"])
+        total_size = sum(p.get("file_size") or 0 for p in photos)
         print(f"💾 Total size: {format_size(total_size)}")
 
     db.close()

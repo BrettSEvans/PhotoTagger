@@ -97,8 +97,10 @@ def test_detection_status_returns_correct_counts(client, app, tmp_path):
     img = tmp_path / "det.jpg"
     img.write_bytes(_make_jpeg_bytes())
     photo_id = app.db.photos.add_photo(str(img))
-    app.db.faces.add_face(photo_id=photo_id, embedding=[0.1] * 512, bbox=[0, 0, 10, 10], confidence=0.9)
-    app.db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=None)
+    face_id = app.db.faces.add_face(photo_id=photo_id, embedding=[0.1] * 512, bbox=[0, 0, 10, 10], confidence=0.9)
+    # Cluster must have at least one face assigned so the live-count filter passes.
+    cluster_id = app.db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
+    app.db.clusters.assign_face_to_cluster(face_id=face_id, cluster_id=cluster_id)
 
     resp = client.get("/api/detection-status")
     assert resp.status_code == 200

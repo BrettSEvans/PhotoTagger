@@ -107,13 +107,41 @@ export const PlayersPage: React.FC = () => {
     const extra = autoTagged.size > 0 ? ` · also tagged ${autoTagged.size} more from other photos` : '';
     setAssignMsg(`Tagged as ${info.playerName} #${info.jerseyNumber}${extra}`);
 
-    // Fire-and-forget: consolidate clusters with the same player_name
+    // Fire-and-forget: consolidate clusters with the same player_name.
+    // Pass the tagged cluster as the preferred primary so it survives the merge
+    // (keeps the URL / selectedPlayer valid even if another cluster was larger).
     (async () => {
       try {
-        const result = await photoTaggerClient.consolidatePlayerClusters(info.playerName);
+        const result = await photoTaggerClient.consolidatePlayerClusters(info.playerName, clusterId);
         if (result.merged && result.merged_count && result.merged_count > 0) {
           setAssignMsg(prev => (prev ? `${prev} · consolidated ${result.merged_count} duplicate cluster${result.merged_count !== 1 ? 's' : ''}` : ''));
-          await loadPlayers();
+
+          // The surviving cluster is the tagged one (preferred), falling back to
+          // whatever the backend reports as primary if it differs.
+          const survivingId = result.primary_id ?? clusterId;
+
+          // Reload players and sync selectedPlayer with the merged counts.
+          try {
+            const updatedPlayers = await photoTaggerClient.getPlayers();
+            setPlayers(updatedPlayers.players);
+
+            if (selectedPlayer) {
+              const updated = updatedPlayers.players.find(p => p.id === survivingId)
+                ?? updatedPlayers.players.find(p => p.id === selectedPlayer.id);
+              if (updated) {
+                setSelectedPlayer(updated);
+                // Refresh the detail photo grid so newly-merged photos appear.
+                try {
+                  const photos = await photoTaggerClient.getPlayerPhotos(updated.id);
+                  setPlayerPhotos(photos.photos);
+                } catch (err) {
+                  console.warn(`Failed to reload player photos after consolidation: ${err}`);
+                }
+              }
+            }
+          } catch (err) {
+            console.warn(`Failed to reload players after consolidation: ${err}`);
+          }
         }
       } catch (err) {
         console.warn(`Failed to consolidate clusters: ${err}`);
@@ -684,7 +712,17 @@ export const PlayersPage: React.FC = () => {
         <>
           <p className="font-jakarta text-sm text-muted-fg">{players.length} unique players identified</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {players.map((player, i) => (
+            {(() => {
+              // Sort players: tagged first (alphabetically by first name), then untagged by cluster ID
+              const tagged = players.filter(p => p.player_name).sort((a, b) => {
+                const aFirst = (a.player_name || '').split(' ')[0];
+                const bFirst = (b.player_name || '').split(' ')[0];
+                return aFirst.localeCompare(bFirst);
+              });
+              const untagged = players.filter(p => !p.player_name).sort((a, b) => a.id - b.id);
+              const sorted = [...tagged, ...untagged];
+
+              return sorted.map((player, i) => (
               <div
                 key={player.id}
                 className={`group sticker-card bg-white border-2 border-foreground rounded-2xl ${ACCENT_SHADOWS[i % ACCENT_SHADOWS.length]} p-3 flex flex-col items-center gap-2 text-center`}
@@ -732,7 +770,8 @@ export const PlayersPage: React.FC = () => {
                   {player.player_name ? '✎ Re-tag' : '+ Tag'}
                 </button>
               </div>
-            ))}
+              ));
+            })()}
           </div>
         </>
       ) : clusterCount === 0 && faceCount === 0 ? (

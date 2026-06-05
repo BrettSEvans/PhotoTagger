@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import photoTaggerClient from '../api/photoTaggerClient';
-import SelectPhotosCard from '../components/SelectPhotosCard';
+import SelectPhotosCard, { type UploadMode } from '../components/SelectPhotosCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import { SidebarLayout } from '../components/SidebarLayout';
 import { HierarchicalSidebar } from '../components/HierarchicalSidebar';
@@ -36,7 +36,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
   // Photo selection state (lifted from PhotoUpload)
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [photoDirectory, setPhotoDirectory] = useState('');
-  const [uploadMode, setUploadMode] = useState<'files' | 'directory'>('files');
+  const [uploadMode, setUploadMode] = useState<UploadMode>('files');
   const [isDragging, setIsDragging] = useState(false);
   const [uploadMessage, setUploadMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [isSavingGame, setIsSavingGame] = useState(false);
@@ -416,6 +416,7 @@ export const UploadPage: React.FC<{ onOpenWorkspace?: () => void; onGoToRoster?:
           setSelectedFiles([]);
           setUploadMessage(null);
         }}
+        onError={(msg) => setUploadMessage({ type: 'error', text: msg })}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

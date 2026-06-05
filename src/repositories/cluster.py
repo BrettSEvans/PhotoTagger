@@ -51,15 +51,21 @@ class ClusterRepository(BaseRepository):
         with self._lock:
             cursor = self._conn.cursor()
             from src.config import CLOSE_UP_PROMINENCE
+            # face_count / photo_count are computed LIVE from the faces table
+            # (not the denormalized columns) so they never drift after faces are
+            # moved by consolidation, assignment, or photo removal.
             cursor.execute("""
-                SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
+                SELECT id,
+                       (SELECT COUNT(*) FROM faces f WHERE f.cluster_id = pc.id) as live_face_count,
+                       (SELECT COUNT(DISTINCT f.photo_id) FROM faces f WHERE f.cluster_id = pc.id) as live_photo_count,
+                       thumbnail_face_id, created_at,
                        player_name, jersey_number, roster_entry_id,
                        (SELECT MAX(f.face_size_ratio) FROM faces f WHERE f.cluster_id = pc.id) as max_face_size,
                        (SELECT COUNT(*) FROM faces f WHERE f.cluster_id = pc.id
                         AND f.jersey_color IS NOT NULL AND f.jersey_color != 'black'
                         AND (f.jersey_color_conf IS NULL OR f.jersey_color_conf >= 0.45)) as team_jersey_faces
                 FROM player_clusters pc
-                ORDER BY photo_count DESC
+                ORDER BY live_photo_count DESC
             """)
             result = []
             for row in cursor.fetchall():
@@ -123,10 +129,14 @@ class ClusterRepository(BaseRepository):
         """Get a single player cluster by ID."""
         with self._lock:
             cursor = self._conn.cursor()
+            # Live counts from faces table — never trust the denormalized columns.
             cursor.execute("""
-                SELECT id, face_count, photo_count, thumbnail_face_id, created_at,
+                SELECT id,
+                       (SELECT COUNT(*) FROM faces f WHERE f.cluster_id = pc.id) as live_face_count,
+                       (SELECT COUNT(DISTINCT f.photo_id) FROM faces f WHERE f.cluster_id = pc.id) as live_photo_count,
+                       thumbnail_face_id, created_at,
                        player_name, jersey_number, roster_entry_id
-                FROM player_clusters WHERE id = ?
+                FROM player_clusters pc WHERE id = ?
             """, (cluster_id,))
             row = cursor.fetchone()
             if not row:
@@ -188,9 +198,15 @@ class ClusterRepository(BaseRepository):
             """, (player_name, jersey_number, roster_entry_id, cluster_id))
             self._conn.commit()
 
-    def consolidate_player_clusters(self, player_name: str) -> Dict:
+    def consolidate_player_clusters(self, player_name: str, prefer_cluster_id: int = None) -> Dict:
         """Merge all clusters with the same player_name into one primary cluster.
-        Keeps the cluster with most faces, merges others into it, deletes secondaries."""
+        Merges secondaries into the primary, deletes them, and recalculates the
+        primary's face_count and photo_count.
+
+        The primary is the cluster with the most faces, UNLESS prefer_cluster_id is
+        supplied and matches one of the same-name clusters — in which case it is kept
+        as primary. This lets the cluster a user is actively viewing/tagging survive
+        the merge (so its URL/selection stays valid) instead of being deleted."""
         if not player_name:
             return {"merged": False, "reason": "No player_name provided"}
 
@@ -207,15 +223,36 @@ class ClusterRepository(BaseRepository):
             if len(clusters) <= 1:
                 return {"merged": False, "reason": "Only one or zero clusters found"}
 
-            # Primary cluster is the one with most faces
-            primary_id = clusters[0][0]
-            secondary_ids = [c[0] for c in clusters[1:]]
+            cluster_ids = [c[0] for c in clusters]
+            # Prefer the explicitly-requested cluster (e.g. the one the user is on);
+            # otherwise fall back to the largest (first, since ordered by face_count DESC).
+            if prefer_cluster_id is not None and prefer_cluster_id in cluster_ids:
+                primary_id = prefer_cluster_id
+            else:
+                primary_id = cluster_ids[0]
+            secondary_ids = [cid for cid in cluster_ids if cid != primary_id]
 
             # Move all faces from secondary clusters to primary
             for secondary_id in secondary_ids:
                 cursor.execute("""
                     UPDATE faces SET cluster_id = ? WHERE cluster_id = ?
                 """, (primary_id, secondary_id))
+
+            # Recalculate face_count and photo_count for primary cluster
+            cursor.execute("""
+                SELECT COUNT(*) FROM faces WHERE cluster_id = ?
+            """, (primary_id,))
+            new_face_count = cursor.fetchone()[0]
+
+            cursor.execute("""
+                SELECT COUNT(DISTINCT photo_id) FROM faces WHERE cluster_id = ?
+            """, (primary_id,))
+            new_photo_count = cursor.fetchone()[0]
+
+            # Update primary cluster with new counts
+            cursor.execute("""
+                UPDATE player_clusters SET face_count = ?, photo_count = ? WHERE id = ?
+            """, (new_face_count, new_photo_count, primary_id))
 
             # Delete secondary clusters
             placeholders = ','.join('?' * len(secondary_ids))
@@ -226,5 +263,7 @@ class ClusterRepository(BaseRepository):
                 "merged": True,
                 "primary_id": primary_id,
                 "merged_count": len(secondary_ids),
-                "secondary_ids": secondary_ids
+                "secondary_ids": secondary_ids,
+                "new_face_count": new_face_count,
+                "new_photo_count": new_photo_count
             }

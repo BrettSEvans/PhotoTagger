@@ -79,16 +79,49 @@ def test_assign_face_to_cluster(conn_and_repos):
 
 
 def test_get_all_player_clusters(conn_and_repos):
-    """Test retrieving all player clusters."""
-    cluster_repo, _, _ = conn_and_repos
+    """Test retrieving all player clusters.
 
-    c1 = cluster_repo.add_player_cluster(face_count=5, photo_count=3, thumbnail_face_id=1)
-    c2 = cluster_repo.add_player_cluster(face_count=3, photo_count=2, thumbnail_face_id=2)
+    Counts are computed LIVE from the faces table, so we must insert real face
+    rows (and photo rows) to get non-zero photo_count / face_count values.
+    """
+    cluster_repo, face_repo, conn = conn_and_repos
+
+    # Insert backing photos
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO photos (file_path, file_hash) VALUES (?, ?)", ("photo1.jpg", "h1"))
+    photo1 = cursor.lastrowid
+    cursor.execute("INSERT INTO photos (file_path, file_hash) VALUES (?, ?)", ("photo2.jpg", "h2"))
+    photo2 = cursor.lastrowid
+    cursor.execute("INSERT INTO photos (file_path, file_hash) VALUES (?, ?)", ("photo3.jpg", "h3"))
+    photo3 = cursor.lastrowid
+    conn.commit()
+
+    emb = [0.1] * 384
+    bbox = [10, 20, 100, 150]
+
+    # c1: 3 faces in 3 different photos → live_face_count=3, live_photo_count=3
+    f1 = face_repo.add_face(photo_id=photo1, embedding=emb, bbox=bbox, confidence=0.95)
+    f2 = face_repo.add_face(photo_id=photo2, embedding=emb, bbox=bbox, confidence=0.95)
+    f3 = face_repo.add_face(photo_id=photo3, embedding=emb, bbox=bbox, confidence=0.95)
+
+    # c2: 2 faces in 2 different photos → live_face_count=2, live_photo_count=2
+    f4 = face_repo.add_face(photo_id=photo1, embedding=emb, bbox=bbox, confidence=0.90)
+    f5 = face_repo.add_face(photo_id=photo2, embedding=emb, bbox=bbox, confidence=0.90)
+
+    c1 = cluster_repo.add_player_cluster(face_count=3, photo_count=3, thumbnail_face_id=f1)
+    c2 = cluster_repo.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=f4)
+
+    cluster_repo.assign_face_to_cluster(face_id=f1, cluster_id=c1)
+    cluster_repo.assign_face_to_cluster(face_id=f2, cluster_id=c1)
+    cluster_repo.assign_face_to_cluster(face_id=f3, cluster_id=c1)
+    cluster_repo.assign_face_to_cluster(face_id=f4, cluster_id=c2)
+    cluster_repo.assign_face_to_cluster(face_id=f5, cluster_id=c2)
 
     clusters = cluster_repo.get_all_player_clusters()
 
     assert len(clusters) == 2
-    assert clusters[0]["face_count"] >= clusters[1]["face_count"]  # Ordered by photo_count DESC
+    # Ordered by live_photo_count DESC: c1 (3 photos) before c2 (2 photos)
+    assert clusters[0]["face_count"] >= clusters[1]["face_count"]
 
 
 def test_get_photos_by_cluster(conn_and_repos):
@@ -116,17 +149,39 @@ def test_get_photos_by_cluster(conn_and_repos):
 
 
 def test_get_cluster_by_id(conn_and_repos):
-    """Test retrieving a single cluster."""
-    cluster_repo, _, _ = conn_and_repos
+    """Test retrieving a single cluster.
 
-    cluster_id = cluster_repo.add_player_cluster(face_count=5, photo_count=3, thumbnail_face_id=10)
+    Counts are computed LIVE from the faces table, so we must insert real face
+    rows (and photo rows) to get non-zero photo_count / face_count values.
+    """
+    cluster_repo, face_repo, conn = conn_and_repos
+
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO photos (file_path, file_hash) VALUES (?, ?)", ("photo1.jpg", "h1"))
+    photo1 = cursor.lastrowid
+    cursor.execute("INSERT INTO photos (file_path, file_hash) VALUES (?, ?)", ("photo2.jpg", "h2"))
+    photo2 = cursor.lastrowid
+    conn.commit()
+
+    emb = [0.1] * 384
+    bbox = [10, 20, 100, 150]
+    # 5 faces spread across 2 photos
+    f1 = face_repo.add_face(photo_id=photo1, embedding=emb, bbox=bbox, confidence=0.95)
+    f2 = face_repo.add_face(photo_id=photo2, embedding=emb, bbox=bbox, confidence=0.95)
+    f3 = face_repo.add_face(photo_id=photo1, embedding=emb, bbox=bbox, confidence=0.90)
+    f4 = face_repo.add_face(photo_id=photo2, embedding=emb, bbox=bbox, confidence=0.90)
+    f5 = face_repo.add_face(photo_id=photo1, embedding=emb, bbox=bbox, confidence=0.85)
+
+    cluster_id = cluster_repo.add_player_cluster(face_count=5, photo_count=2, thumbnail_face_id=f1)
+    for fid in (f1, f2, f3, f4, f5):
+        cluster_repo.assign_face_to_cluster(face_id=fid, cluster_id=cluster_id)
 
     cluster = cluster_repo.get_cluster_by_id(cluster_id)
 
     assert cluster is not None
     assert cluster["id"] == cluster_id
-    assert cluster["face_count"] == 5
-    assert cluster["photo_count"] == 3
+    assert cluster["face_count"] == 5   # live count from faces table
+    assert cluster["photo_count"] == 2  # 2 distinct photos
 
 
 def test_get_cluster_face_embeddings(conn_and_repos):
