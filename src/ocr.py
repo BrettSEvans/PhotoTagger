@@ -91,7 +91,8 @@ class OCREngine:
                 logger.error(f"Failed to preprocess image: {photo_path}")
                 return None
 
-            # Run OCR — digits only, no paragraph merging
+            # paragraph=False keeps each text region as a separate detection, preventing
+            # EasyOCR from merging nearby digit tokens (e.g. two players' numbers) into one.
             results = self.reader.readtext(preprocessed, allowlist='0123456789', paragraph=False)
 
             # Combine all detected text

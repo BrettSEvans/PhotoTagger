@@ -125,7 +125,8 @@ def infer_team_and_year(filename: str) -> tuple[str | None, int | None]:
 
 # Cloud metadata endpoints (AWS/Azure IMDS, ECS task metadata, GCP).
 _METADATA_HOSTNAMES = {"metadata.google.internal"}
-_METADATA_IPS = {"169.254.169.254", "169.254.170.2"}
+# Cloud IMDS endpoints use link-local IPs that won't resolve via DNS — must be blocked by IP.
+_METADATA_IPS = {"169.254.169.254", "169.254.170.2"}  # AWS/GCP IMDS; Azure ECS task metadata
 _LOCALHOST_HOSTNAMES = {"localhost", "ip6-localhost"}
 _MAX_REDIRECTS = 5
 
@@ -263,6 +264,8 @@ class RosterImporter:
     @staticmethod
     def fetch_url(url: str) -> List[RosterRow]:
         # Follow redirects manually so each hop is re-validated against SSRF rules.
+        # Using allow_redirects=True would validate only the initial URL — an attacker
+        # could use a public redirect service that points at 169.254.169.254 or localhost.
         current = url
         for _ in range(_MAX_REDIRECTS + 1):
             _validate_public_url(current)

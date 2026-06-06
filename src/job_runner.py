@@ -14,6 +14,8 @@ class LocalJobRunner:
     def __init__(self, db: Database):
         self.db = db
         self._tasks: "queue.Queue[tuple[int, Callable[[], Dict]]]" = queue.Queue()
+        # daemon=True: thread exits automatically when the main Flask process dies,
+        # so we never need an explicit shutdown hook or join call.
         self._thread = threading.Thread(target=self._work_loop, daemon=True)
         self._thread.start()
 
@@ -30,6 +32,7 @@ class LocalJobRunner:
         while True:
             job_id, task = self._tasks.get()
             try:
+                # progress=5 signals "started" to the UI before the task does any real work.
                 self.db.jobs.update_processing_job(job_id, status="running", progress=5)
                 result = task(job_id)  # Pass job_id to task so it can update progress
                 self.db.jobs.update_processing_job(job_id, status="succeeded", progress=100, result=result)

@@ -83,7 +83,9 @@ def detect_faces_endpoint():
                     continue
                 try:
                     faces = detector.detect_faces(file_path)
-                    # Load the image once (BGR) so we can sample each face's torso color
+                    # Load the image once per photo (BGR); cv2.imread is the bottleneck,
+                    # so reusing the array across all faces in the same photo avoids
+                    # re-reading the file for every face bbox sample call.
                     img_bgr = cv2.imread(file_path) if faces else None
                     for face in faces:
                         emb_list = face["embedding"].tolist() if hasattr(face["embedding"], "tolist") else face["embedding"]

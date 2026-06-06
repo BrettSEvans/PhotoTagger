@@ -106,6 +106,7 @@ def _merge_bag(parent: ET.Element, tag: str, values: list[str]) -> None:
         bag = ET.SubElement(element, f"{{{RDF_NS}}}Bag")
 
     existing = [li.text for li in bag.findall(f"{{{RDF_NS}}}li") if li.text]
+    # casefold dedup so "Carleton CUT" and "carleton cut" are treated as the same entry.
     existing_keys = {value.casefold() for value in existing}
     for value in values:
         cleaned = str(value).strip()

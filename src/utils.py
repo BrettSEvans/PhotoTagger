@@ -51,9 +51,12 @@ def is_allowed_photo_path(photo_path: str) -> bool:
     """Check if a photo path is within allowed roots."""
     path = Path(photo_path).expanduser().resolve()
     if ".git" in path.parts:
+        # Prevent XMP sidecar writes into git object files if a photo root overlaps
+        # with a repo directory (e.g. someone pointed the app at ~/Code by mistake).
         return False
     roots = configured_photo_roots()
     if not roots:
+        # No allowlist configured: permit all paths (local single-user mode).
         return True
     return any(path == root or root in path.parents for root in roots)
 

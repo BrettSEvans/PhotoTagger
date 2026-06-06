@@ -96,7 +96,9 @@ class PlayerDetector:
 
                 bbox_expanded = [expanded_x0, expanded_y0, expanded_x1, expanded_y1]
 
-                # Classify location based on vertical position
+                # Classify location based on vertical position.
+                # Thresholds (0.70 / 0.85) were calibrated for field-level Ultimate
+                # Frisbee tournament photos where the playing field fills the upper ~70%.
                 location, location_conf = self._classify_location(relative_y, height)
 
                 player_info = {

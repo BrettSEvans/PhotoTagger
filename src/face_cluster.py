@@ -13,7 +13,12 @@ logger = logging.getLogger(__name__)
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
-    """Cosine similarity between two vectors. Returns -1 to 1."""
+    """Cosine similarity between two vectors. Returns -1 to 1.
+
+    Cosine is preferred over L2 here because InsightFace embeddings vary in
+    magnitude with detection confidence — cosine normalizes that away so
+    low-confidence faces still compare fairly against high-confidence ones.
+    """
     norm_a = np.linalg.norm(a)
     norm_b = np.linalg.norm(b)
     if norm_a == 0 or norm_b == 0:
@@ -204,7 +209,8 @@ class FaceClusterer:
                     best_idx = i
 
             if best_idx >= 0:
-                # Join existing cluster, update centroid (running average)
+                # Join existing cluster, update centroid (online running average).
+                # This is O(1) per face; re-centering from scratch would be O(n).
                 centroid, face_list, photo_ids = clusters[best_idx]
                 face_list.append(face)
                 photo_ids.add(face["photo_id"])

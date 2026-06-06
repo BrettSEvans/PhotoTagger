@@ -30,6 +30,8 @@ class FaceDetector:
             providers=['CPUExecutionProvider'],  # Use CPU for compatibility
             allowed_modules=allowed_modules
         )
+        # det_size=(640, 640) is the resolution used during buffalo_l training; going
+        # smaller misses faces in crowd shots, going larger adds latency with no gain.
         self.app.prepare(ctx_id=0, det_size=(640, 640))
         self.model = self.app
 
@@ -76,7 +78,8 @@ class FaceDetector:
             for face in faces:
                 # Extract bounding box and confidence
                 bbox = face.bbox.astype(int).tolist()  # [x0, y0, x1, y1]
-                embedding = face.embedding  # 384-dim vector
+                # InsightFace buffalo_l outputs 512-dim embeddings, already L2-normalized.
+                embedding = face.embedding
                 confidence = face.det_score  # Detection confidence
 
                 # Sharpness: Laplacian variance on the face crop (higher = sharper)

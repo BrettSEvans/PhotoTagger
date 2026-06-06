@@ -119,6 +119,8 @@ def match_similar_clusters(cluster_id: int):
 
     # Calibrated for InsightFace buffalo_l (same-person mean ≈ 0.40,
     # cross-cluster p90 ≈ 0.39, cluster-build threshold = 0.40).
+    # AUTO_TAG is set higher (0.60) than the cluster-build threshold so that only
+    # very confident matches are applied without user confirmation.
     AUTO_TAG_THRESHOLD = 0.60
     SUGGEST_THRESHOLD  = 0.40
 

@@ -15,7 +15,9 @@ class ClusterRepository(BaseRepository):
             cursor = self._conn.cursor()
             cursor.execute("UPDATE faces SET cluster_id = NULL")
             cursor.execute("DELETE FROM player_clusters")
-            # Reset auto-increment so next cluster starts at ID 1 (fresh session)
+            # Reset the auto-increment counter so clusters restart from ID 1 after a
+            # full re-cluster. Without this, IDs would grow unboundedly across sessions,
+            # and the UI's cluster URLs would change between runs for the same player.
             cursor.execute("DELETE FROM sqlite_sequence WHERE name='player_clusters'")
             self._conn.commit()
 
@@ -51,9 +53,10 @@ class ClusterRepository(BaseRepository):
         with self._lock:
             cursor = self._conn.cursor()
             from src.config import CLOSE_UP_PROMINENCE
-            # face_count / photo_count are computed LIVE from the faces table
-            # (not the denormalized columns) so they never drift after faces are
-            # moved by consolidation, assignment, or photo removal.
+            # face_count / photo_count are computed LIVE from the faces table rather
+            # than from the denormalized columns because deassign_faces, consolidation,
+            # and photo removal all update faces.cluster_id without touching the
+            # player_clusters aggregate columns — reading live avoids stale counts.
             cursor.execute("""
                 SELECT id,
                        (SELECT COUNT(*) FROM faces f WHERE f.cluster_id = pc.id) as live_face_count,

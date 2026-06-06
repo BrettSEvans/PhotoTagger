@@ -114,7 +114,8 @@ def init_schema(conn: sqlite3.Connection) -> None:
         )
     """)
 
-    # Add cluster_id column to faces if it doesn't exist yet
+    # SQLite has no "ALTER TABLE … ADD COLUMN IF NOT EXISTS", so we attempt each
+    # ADD COLUMN and swallow the error when the column already exists (live DB upgrade).
     try:
         cursor.execute("ALTER TABLE faces ADD COLUMN cluster_id INTEGER REFERENCES player_clusters(id)")
     except Exception:
@@ -206,6 +207,7 @@ def init_schema(conn: sqlite3.Connection) -> None:
 
     # Migrate rosters.jersey_number from TEXT NOT NULL to INTEGER (nullable).
     # Check if the column is still NOT NULL (old schema) by inspecting table_info.
+    # SQLite cannot ALTER COLUMN type/constraints, so we recreate the table.
     cursor.execute("PRAGMA table_info(rosters)")
     cols = {row[1]: row for row in cursor.fetchall()}  # name -> (cid, name, type, notnull, dflt, pk)
     jersey_col = cols.get("jersey_number")
