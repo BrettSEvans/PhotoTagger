@@ -285,47 +285,53 @@ class RosterRepository(BaseRepository):
         Pass a pre-fetched ``context`` (from ``get_game_context()``) when calling this in a loop
         to avoid re-querying the game context for every row.
         """
-        cursor = self._conn.cursor()
         if context is None:
             # Need to get context from somewhere — for now, return empty list
             # In practice, ReviewService will always pass context
             context = []
 
-        if context:
-            candidates = []
-            for team in context:
+        # The connection is shared across threads (check_same_thread=False), so every
+        # statement must run under the lock. Without it, the review endpoints — which
+        # call this on every dashboard poll — prepare statements concurrently with
+        # other threads and corrupt the connection (SIGSEGV in libsqlite3, and writes
+        # failing with "database is locked" / "disk I/O error").
+        with self._lock:
+            cursor = self._conn.cursor()
+            if context:
+                candidates = []
+                for team in context:
+                    cursor.execute("""
+                        SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
+                        FROM rosters
+                        WHERE team_name = ? AND team_year = ? AND jersey_number = ?
+                    """, (team["team_name"], team["team_year"], str(jersey_number)))
+                    for row in cursor.fetchall():
+                        roster_color = team.get("uniform_color") or row[5]
+                        candidates.append({
+                            "id": row[0],
+                            "team_name": row[1],
+                            "team_year": row[2],
+                            "jersey_number": row[3],
+                            "player_name": row[4],
+                            "uniform_color": roster_color,
+                        })
+            else:
                 cursor.execute("""
                     SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
                     FROM rosters
-                    WHERE team_name = ? AND team_year = ? AND jersey_number = ?
-                """, (team["team_name"], team["team_year"], str(jersey_number)))
-                for row in cursor.fetchall():
-                    roster_color = team.get("uniform_color") or row[5]
-                    candidates.append({
+                    WHERE jersey_number = ?
+                """, (str(jersey_number),))
+                candidates = [
+                    {
                         "id": row[0],
                         "team_name": row[1],
                         "team_year": row[2],
                         "jersey_number": row[3],
                         "player_name": row[4],
-                        "uniform_color": roster_color,
-                    })
-        else:
-            cursor.execute("""
-                SELECT id, team_name, team_year, jersey_number, player_name, uniform_color
-                FROM rosters
-                WHERE jersey_number = ?
-            """, (str(jersey_number),))
-            candidates = [
-                {
-                    "id": row[0],
-                    "team_name": row[1],
-                    "team_year": row[2],
-                    "jersey_number": row[3],
-                    "player_name": row[4],
-                    "uniform_color": row[5],
-                }
-                for row in cursor.fetchall()
-            ]
+                        "uniform_color": row[5],
+                    }
+                    for row in cursor.fetchall()
+                ]
 
         if not uniform_color:
             return candidates

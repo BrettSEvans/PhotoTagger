@@ -226,8 +226,25 @@ without real face rows see zero counts (a known footgun).
 ## 7. Concurrency & threading model
 
 - **One SQLite connection**, `check_same_thread=False`, guarded by a single
-  `threading.RLock` shared by every repository (`src/db.py`). All writes serialize
-  on that lock.
+  `threading.RLock` shared by every repository (`src/db.py`). **Every** statement
+  serializes on that lock — reads included, not just writes.
+
+  `check_same_thread=False` disables Python's own thread guard, which makes the
+  lock the *only* thing serializing access. Read-path query methods are therefore
+  just as obligated to hold it: two threads inside `sqlite3_prepare` on the same
+  connection corrupt SQLite's per-connection heap, because statement preparation
+  allocates from a per-connection arena that has no mutex of its own here. The
+  damage does not stay contained to the racing reader — it surfaces as a failed
+  `COMMIT` ("database is locked"), then a write transaction wedged open, then
+  "disk I/O error" on every later statement, then a SIGSEGV inside libsqlite3.
+  Writes appear to succeed in the UI while nothing reaches disk.
+
+  This is not hypothetical: `resolve_roster_candidates()` and the `ReviewService`
+  query methods once omitted the lock, and because they back the endpoints the
+  dashboard polls continuously, roster import failed every row whenever the
+  dashboard was open. `tests/test_db_connection_locking.py` now enforces the
+  invariant structurally — any method touching the connection outside the lock
+  fails the suite.
 - **Flask dev server runs `threaded=True`.** Rationale (documented in `api.py`):
   the dashboard polls many lightweight endpoints (health, summaries, job status)
   *while* a long multi-file upload is in flight. Single-threaded Werkzeug
