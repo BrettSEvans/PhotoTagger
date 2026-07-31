@@ -55,6 +55,14 @@ Parents and grandparents at Ultimate Frisbee tournaments want to find photos of 
 - **Batch Assignment** - Select and assign multiple photos at once
 - **Real-time Status** - Monitor detection and clustering progress
 
+### Phase 2C: Photo Viewing & Metadata ✅
+- **Full-Screen Lightbox** - Click a photo to view at full size with metadata panel
+- **Photo Metadata Panel** - Displays image properties (dimensions, format, file size), game data (teams, year, tournament), face assignments
+- **Adaptive Label Placement** - Player names positioned adaptively: full labels where space permits, numbered pins with leader lines in crowds
+- **IPTC Metadata Embedding** - Embed player names into JPEG files via `exiftool`; names persist when photos are shared
+- **Toggle Visibility** - Independent toggle buttons for player names and bounding boxes on full-size photos
+- **Batch Game Context** - Set team and tournament data at upload; metadata auto-applies to entire batch
+
 ---
 
 ## 🚀 Quick Start

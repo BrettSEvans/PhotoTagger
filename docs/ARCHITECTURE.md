@@ -351,6 +351,123 @@ Vite/preview ports) — never `*`, so a random site can't drive the loopback age
 
 ---
 
+## 13. Implementation-level design rationale
+
+Decisions that are subtle enough to warrant explanation but live at the
+implementation level rather than the architectural level. These mirror the
+inline comments in the source so engineers can find the *why* without needing
+to read every file.
+
+### ML pipeline
+
+| Decision | Location | Rationale |
+|----------|----------|-----------|
+| **Cosine similarity over L2** | `face_cluster.py` | InsightFace embeddings vary in magnitude with detection confidence. Cosine normalizes magnitude away so low-confidence faces compare fairly against high-confidence ones. L2 would penalize uncertain detections even when the direction (identity) matches. |
+| **Running-average centroid updates** | `face_cluster.py` | Updating a centroid online is O(1) per face. Re-computing from all members each time would be O(n) and dominate runtime on large clusters. |
+| **`det_size=(640, 640)` for InsightFace** | `face_detector.py` | 640×640 is the resolution buffalo_l was trained on. Smaller crops miss faces in crowd shots; larger sizes add latency with no accuracy gain. |
+| **Per-photo image load (shared across faces)** | `face_detector.py` | `cv2.imread` is the bottleneck in the detection loop. Loading the image once per photo and reusing the array across all face bbox samples avoids redundant file I/O. |
+| **`AUTO_TAG` threshold > cluster-build threshold** | `face_cluster.py` | Auto-tagging is applied without user confirmation, so the bar is higher (0.60 vs 0.40). This keeps automatic writes conservative while still clustering loosely enough to group the same player across varied poses. |
+| **`paragraph=False` for EasyOCR** | `ocr.py` | Keeps each text region as a separate detection. Without this, EasyOCR merges nearby digit tokens — e.g., two adjacent jersey numbers become one string, breaking roster matching. |
+| **Vertical thresholds 0.70 / 0.85 for location** | `player_detector.py` | Calibrated empirically for field-level Ultimate Frisbee tournament photos where the playing field fills the upper ~70% of the frame. |
+
+### Data layer
+
+| Decision | Location | Rationale |
+|----------|----------|-----------|
+| **Live cluster counts (not denormalized columns)** | `repositories/cluster.py` | `deassign_faces`, consolidation, and photo removal all update `faces.cluster_id` directly without touching the `player_clusters` aggregate columns. Reading counts live via subqueries keeps them correct after any of those operations; stale denormalized values were a recurring source of UI inconsistency. |
+| **Additive `ALTER TABLE` via try/except** | `schema.py` | SQLite has no `ADD COLUMN IF NOT EXISTS`. Attempting each column addition and swallowing `OperationalError` (already exists) is the standard idiomatic pattern — safe for re-runs, no migration framework needed. |
+| **Table rebuild for type changes** | `schema.py` | SQLite cannot alter column types or constraints in place. When the `rosters.jersey_number` column needed to change from TEXT to INTEGER, the only correct path was to create a new table, copy rows, drop the old table, and rename. |
+| **Auto-increment reset after full re-cluster** | `repositories/cluster.py` | Without resetting the sequence, cluster IDs grow unboundedly across sessions. UI routes embed cluster IDs, so the same player would get a different URL between runs — breaking bookmarks and making the review state hard to reason about. |
+| **casefold dedup on roster import** | `roster_import.py` | Prevents duplicate entries when the same team name is imported twice with different case (e.g., "Carleton CUT" vs "carleton cut"). casefold is more aggressive than lower() for non-ASCII characters. |
+
+### Security & resilience
+
+| Decision | Location | Rationale |
+|----------|----------|-----------|
+| **Per-hop SSRF redirect validation** | `utils.py` | `allow_redirects=True` validates only the initial URL. An attacker can use a public redirect service that resolves to `169.254.169.254` or `localhost`. Validating each hop in the chain closes that bypass. |
+| **Block cloud IMDS IPs by address, not DNS** | `utils.py` | Cloud metadata endpoints (`169.254.169.254`, `169.254.170.2`) use link-local addresses that won't appear in a DNS lookup — they must be blocked by IP directly. |
+| **Git directory exclusion for XMP writes** | `metadata_sidecar.py` | If a user points the crawler at a directory that contains a `.git` folder (e.g., `~/Code`), sidecar writes would corrupt git object files. Detecting `.git` presence and skipping those paths prevents silent repository damage. |
+
+### Job runner & API
+
+| Decision | Location | Rationale |
+|----------|----------|-----------|
+| **`daemon=True` on the job runner thread** | `job_runner.py` | A daemon thread exits automatically when the main Flask process dies. This avoids needing an explicit `shutdown()` hook or `join()` call and prevents the process from hanging on Ctrl-C. |
+| **`progress=5` emitted before first real work** | `blueprints/detection.py` | The UI shows a spinner as soon as a job is enqueued. Without an early progress signal, the job sits at 0% until the first heavy stage completes, making the UI appear frozen during startup. |
+
+---
+
+## 14. Photo viewing, metadata, and adaptive labeling (Phase 2C)
+
+### IPTC metadata embedding
+
+Player names assigned to faces are embedded into the original JPEG files via
+`exiftool`, stored as repeating `XMP-iptcExt:PersonInImage` fields. This allows
+photos to carry player identity information even when shared outside PhotoTagger.
+
+**Strategy:**
+- One-time backup of `uploads/` before the first embedded write in a session
+- Atomic writes: temp file + verification + rename (no truncation on failure)
+- Called on assign/unassign via `PUT /api/photos/<id>/assign-face` and 
+  `PUT /api/photos/<id>/unassign-face`
+- Graceful degradation: if exiftool is missing or a write fails, the request
+  succeeds (metadata write skipped silently); features #1, #3, #4 still work
+
+**Implementation:**
+- `src/iptc_writer.py` — wraps `exiftool` subprocess
+- Entry point: `write_iptc(filepath, names_to_add=[], names_to_remove=[])`
+- Backed by `src/metadata_sidecar.py` (also reads IPTC metadata)
+
+### Label placement algorithm
+
+Feature #3 displays player names on full-size photos using an adaptive placement
+algorithm that prioritizes never covering a face:
+
+1. **Full-name labels** — placed in the nearest cardinal position (below → above → right → left) that clears all face boxes and placed labels
+2. **Numbered pins** — if a full-name label doesn't fit, emit a small numbered circle in the nearest unoccupied space beside the face
+3. **Leader lines** — drawn from pin to face when adjacency is ambiguous (pin not clearly closer to its own face than a neighbour's)
+4. **Color** — consistent with existing face box coloring (purple `#9333EA` with orange `#FF6600` fallback on low-contrast backgrounds)
+
+**Implementation:**
+- `web/src/utils/labelPlacement.ts` — pure function, unit-testable
+- Input: face bboxes, cluster IDs, assigned player names, image dimensions
+- Output: positioned labels, pins, and leader lines (SVG-ready)
+- Used by `PhotoLightbox.tsx` to render the overlay
+
+### Metadata panel and photo lightbox
+
+**Feature #1:** Full-screen lightbox viewer with metadata panel.
+
+**Layout:** Two-column grid (image left, metadata right; stacks on mobile)
+
+**Metadata sections** (omitted if empty):
+- **Toggles** — "Names" and "Boxes" buttons (Features #4)
+- **File** — filename
+- **Image** — dimensions, file size, format, color mode
+- **EXIF** — omitted (all photos are web derivatives with zero EXIF data)
+- **Jersey/OCR** — detected jersey numbers and confidence
+- **Library** — ingest date and batch name
+- **Game** — team A, team B, year, tournament; "\+ Add teams & tournament" button if missing
+- **People** — "X of Y identified"; list all faces with cluster number, assigned player name (or "Unassigned"), and "Assign" link
+
+**Implementation:**
+- `web/src/components/PhotoLightbox.tsx` — lightbox container and SVG overlay
+- `web/src/components/MetadataPanel.tsx` — right-side panel (scrollable, 300px)
+- Calls `GET /api/photos/<id>/metadata` for sparse metadata dict
+- Calls `PUT /api/batches/<id>/game` to set team/tournament
+- Calls `PUT /api/photos/<id>/assign-face` to assign clusters to players
+
+### New API endpoints
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/api/photos/<id>/metadata` | Return sparse dict of populated metadata fields (image, file, jersey, library, game, people) |
+| `PUT` | `/api/batches/<id>/game` | Set `team_a`, `team_b`, `year`, `tournament` for a batch (applies to all photos in batch) |
+| (modified) | `PUT /api/photos/<id>/assign-face` | On success, call `iptc_writer.write_iptc(…, names_to_add=[player_name])` |
+| (modified) | `PUT /api/photos/<id>/unassign-face` | On success, call `iptc_writer.write_iptc(…, names_to_remove=[player_name])` |
+
+---
+
 ## See also
 
 - [User Guide](USER_GUIDE.md) — end-user workflow with screenshots

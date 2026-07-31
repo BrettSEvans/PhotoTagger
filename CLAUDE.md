@@ -12,11 +12,23 @@ pip install -r requirements.txt
 
 ## Project Structure
 
+**Core Backend**
 - `src/db.py` — SQLite schema and queries
 - `src/crawler.py` — Ingest photos from local directory
 - `src/ocr.py` — Jersey number extraction
 - `src/api.py` — Flask REST API
+- `src/photo_metadata.py` — Read and return sparse photo metadata (image properties, game data, people)
+- `src/iptc_writer.py` — Embed/remove player names in JPEG IPTC metadata via exiftool
+- `src/metadata_sidecar.py` — XMP sidecar writes (non-destructive metadata)
+
+**Frontend**
+- `web/src/utils/labelPlacement.ts` — Adaptive label placement solver (full names, numbered pins, leader lines)
+- `web/src/components/MetadataPanel.tsx` — Right-side metadata panel for lightbox (file, image, game, people sections)
+- `web/src/components/PhotoLightbox.tsx` — Full-screen photo viewer with overlay and toggle controls
+
+**Testing & Documentation**
 - `tests/` — Pytest tests
+- `docs/superpowers/specs/` — Feature specification documents
 - `photos/` — Local test photos (user-created)
 - `rosters/` — JSON team/roster data
 
