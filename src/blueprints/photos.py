@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 from flask import Blueprint, request, jsonify, send_file, send_from_directory, current_app
 from werkzeug.utils import secure_filename
+from src import photo_metadata
 from src.utils import parse_float, parse_int_arg, configured_photo_roots, is_allowed_photo_path, is_allowed_photo_directory
 
 logger = logging.getLogger(__name__)
@@ -365,6 +366,20 @@ def get_photos():
         logger.error(f"Error getting photos: {e}")
         import traceback
         logger.error(traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+
+@bp.route("/api/photos/<int:photo_id>/metadata", methods=["GET"])
+def get_photo_metadata(photo_id: int):
+    """Sparse metadata for feature #1's lightbox panel — only populated sections."""
+    db = current_app.db
+    try:
+        result = photo_metadata.read(db, photo_id)
+        if result is None:
+            return jsonify({"error": "Photo not found"}), 404
+        return jsonify(result), 200
+    except Exception as e:
+        logger.error(f"Error getting metadata for photo {photo_id}: {e}")
         return jsonify({"error": str(e)}), 500
 
 

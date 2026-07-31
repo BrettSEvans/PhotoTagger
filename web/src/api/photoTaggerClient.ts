@@ -38,6 +38,7 @@ import {
   GameContextTeam,
   PhotoBatch,
   BatchesResponse,
+  PhotoMetadata,
 } from '../types/index';
 
 const LOCAL_AGENT_URL_KEY = 'phototagger.localAgentUrl';
@@ -499,6 +500,16 @@ class PhotoTaggerClient {
     return response.data.detections;
   }
 
+  /**
+   * Sparse metadata for the lightbox's metadata panel (feature #1) — only
+   * populated sections are present in the response.
+   * GET /api/photos/:id/metadata
+   */
+  async getPhotoMetadata(photoId: number): Promise<PhotoMetadata> {
+    const response = await this.client.get<PhotoMetadata>(`/api/photos/${photoId}/metadata`);
+    return response.data;
+  }
+
   // ── Processing summary ────────────────────────────────────────────────────
 
   async getProcessingSummary(): Promise<ProcessingSummary> {
@@ -520,18 +531,22 @@ class PhotoTaggerClient {
     return response.data.photos;
   }
 
+  /**
+   * Assign a player to a cluster. IPTC embedding into the assigned photos'
+   * JPEG files happens automatically, unconditionally, server-side — there
+   * is no opt-in flag; it's non-fatal to this request if it fails.
+   */
   async assignCluster(
     clusterId: number,
     playerName: string,
     jerseyNumber: string,
     rosterEntryId?: number,
-    options: { writeMetadata?: boolean; faceIds?: number[] } = {},
+    options: { faceIds?: number[] } = {},
   ): Promise<AssignClusterResponse> {
     const response = await this.client.post<AssignClusterResponse>(`/api/players/${clusterId}/assign`, {
       player_name: playerName,
       jersey_number: jerseyNumber,
       roster_entry_id: rosterEntryId,
-      write_metadata: options.writeMetadata ?? false,
       face_ids: options.faceIds ?? [],
     });
     return response.data;

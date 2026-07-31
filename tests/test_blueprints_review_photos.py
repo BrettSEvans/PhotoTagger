@@ -145,22 +145,26 @@ class TestAssignCluster:
         data = r.get_json()
         assert data["success"] is True
 
-    def test_write_metadata_without_roster_entry(self, ctx, tmp_path):
-        """write_metadata=True without roster_entry_id should still succeed (with warning)."""
+    def test_assign_embeds_iptc_unconditionally_without_roster_entry(self, ctx, tmp_path, monkeypatch):
+        """IPTC embedding needs no roster_entry_id (unlike the old opt-in XMP
+        path) — it's unconditional and driven directly by player_name."""
+        from src import iptc_writer
+
+        monkeypatch.setattr("src.blueprints.review.is_backup_ready", lambda: True)
         client, db, _ = ctx
-        _, face_id = _insert_photo_face(db, tmp_path)
+        photo_id, face_id = _insert_photo_face(db, tmp_path)
+        photo_path = db.photos.get_photo_by_id(photo_id)["file_path"]
         cluster_id = db.clusters.add_player_cluster(1, 1, thumbnail_face_id=face_id)
         db.clusters.assign_face_to_cluster(face_id, cluster_id)
 
         r = client.post(f"/api/players/{cluster_id}/assign", json={
             "player_name": "Bob",
-            "write_metadata": True,
             "face_ids": [face_id],
         })
         assert r.status_code == 200
         data = r.get_json()
         assert data["success"] is True
-        assert data["metadata"]["requested"] is True
+        assert iptc_writer.read_person_in_image(photo_path) == ["Bob"]
 
 
 # ---------------------------------------------------------------------------

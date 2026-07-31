@@ -117,19 +117,21 @@ class TestXMPMetadataWriteFailure:
     """Test XMP metadata write error handling."""
 
     def test_write_metadata_permission_error(self, tmp_path, monkeypatch):
-        """Permission error when writing XMP sidecars."""
+        """An IPTC embed failure (e.g. permission error) must not fail the
+        assign request — embedding is best-effort per the design spec."""
         app = create_app(db_path=":memory:")
         app.config["TESTING"] = True
         client = app.test_client()
         db = app.db
 
-        # Create test data
+        photo = tmp_path / "photo.jpg"
+        photo.write_bytes(_make_jpeg_bytes())
+        photo_id = db.photos.add_photo(str(photo))
+        face_id = db.faces.add_face(photo_id, [0.1] * 512, [10, 10, 20, 20], 0.9)
         cluster_id = _create_cluster(db)
-        face_id = _add_face(db, photo_id=1, bbox=[10, 10, 20, 20], embedding=[0.1] * 512)
         _add_face_to_cluster(db, cluster_id, face_id)
         db.clusters.assign_cluster_to_player(cluster_id, "Player1", "1", None)
 
-        # Create roster entry
         db.context.set_game_context([
             {"team_name": "Team1", "team_year": 2024, "uniform_color": "red"},
         ])
@@ -137,9 +139,10 @@ class TestXMPMetadataWriteFailure:
         entries = db.roster.get_all_roster_entries()
         entry = entries[0]
 
-        # Simulate XMP write failure
-        with patch("src.metadata_sidecar.write_xmp_sidecar") as mock_write:
-            mock_write.side_effect = PermissionError("Permission denied")
+        monkeypatch.setattr("src.blueprints.review.is_backup_ready", lambda: True)
+        with patch("src.blueprints.review.write_iptc") as mock_write:
+            from src.iptc_writer import IptcWriteError
+            mock_write.side_effect = IptcWriteError("Permission denied")
 
             response = client.post(
                 f"/api/players/{cluster_id}/assign",
@@ -147,17 +150,13 @@ class TestXMPMetadataWriteFailure:
                     "player_name": "Player1",
                     "jersey_number": "1",
                     "roster_entry_id": entry["id"],
-                    "write_metadata": True,
                     "face_ids": [face_id]
                 }
             )
 
-            # Should fail gracefully, not crash
-            assert response.status_code in {200, 400, 500}
-            if response.status_code == 200:
-                # Metadata result should show failure
-                data = response.json.get("metadata", {})
-                assert data.get("failed", 0) > 0 or data.get("errors")
+            assert response.status_code == 200
+            assert response.json["success"] is True
+            mock_write.assert_called_once()
 
     def test_write_metadata_missing_photo(self, tmp_path):
         """Write metadata when photo file not found."""

@@ -1,0 +1,129 @@
+{
+  "schemaVersion": 1,
+  "track": {
+    "type": "product",
+    "name": "PhotoTagger",
+    "slug": null,
+    "productType": "web app",
+    "scopeMode": "conform"
+  },
+  "currentStage": "engineer",
+  "stages": {
+    "kickoff": {
+      "status": "approved-complete",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": "",
+      "artifactHash": null
+    },
+    "pm": {
+      "status": "skipped",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    },
+    "ux": {
+      "status": "skipped",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    },
+    "ui": {
+      "status": "skipped",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    },
+    "architect": {
+      "status": "approved-complete",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": "docs/product/04-architecture.md",
+      "artifactHash": "d0a4c6b906df791bcc9e0ffe2bc6aaa3205aca50aa0047057abefb60821e9290"
+    },
+    "engineer": {
+      "status": "in-progress",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    },
+    "qa": {
+      "status": "not-started",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    },
+    "qc": {
+      "status": "not-started",
+      "revisions": 0,
+      "criticPasses": 0,
+      "checkpoint": null,
+      "artifactPath": null,
+      "artifactHash": null
+    }
+  },
+  "pendingFeedback": {
+    "stage": "engineer",
+    "source": "user",
+    "text": "Critic findings from architect review (docs/product/critic-reports/2026-07-31-architect-p1.md) to apply during implementation:\n\n1. [APPLY] Serialize iptc_writer.write_iptc() calls per-file (or globally) with a lock independent of the DB RLock — two rapid assign/unassign actions on the same multi-face photo can otherwise race two exiftool subprocesses against the same JPEG (lost update or temp-file collision). Also use a unique/random temp filename per write.\n\n2. [APPLY] Run the one-time uploads_backup/ copy (~47MB/435 files) through the existing async job_runner pattern (see src/blueprints/photos.py's app_job_runner.submit usage for crawl/upload/OCR) — NOT synchronously inline inside the first assign/deassign request. Either trigger it at local-agent startup, or as a background job the first assign call waits on.\n\nSee the critic report for full rationale and the 3 deferred (backlog) findings.",
+    "reportPath": null
+  },
+  "backlog": [
+    {
+      "id": "29c266b1-fe9a-4f29-8486-be09ba558442",
+      "stage": "architect",
+      "text": "Extend GET /health's ocr_ok self-test pattern with an analogous iptc_ok flag (exiftool -ver check at startup) so a missing exiftool install is visible immediately instead of manifesting as silently-skipped IPTC writes.",
+      "severity": "low",
+      "status": "open",
+      "createdAt": "2026-07-31T04:03:39.247Z"
+    },
+    {
+      "id": "3c58fa60-25c0-47c1-80bc-8799f3553d59",
+      "stage": "architect",
+      "text": "If silent server-side-only IPTC write failure logging proves too invisible in practice, surface a soft warning in the assign/deassign response so the user can tell whether the embed actually happened.",
+      "severity": "low",
+      "status": "open",
+      "createdAt": "2026-07-31T04:03:40.338Z"
+    },
+    {
+      "id": "99599a23-d7ba-403b-8e3d-1336dd0fb64e",
+      "stage": "engineer",
+      "text": "Critic (architect p1): guard the in-memory \"backup already done\" flag with the same lock used for iptc write serialization, so two near-simultaneous first-writes under Flask's threaded=True don't both trigger a redundant uploads_backup/ copy.",
+      "severity": "low",
+      "status": "wontfix",
+      "createdAt": "2026-07-31T04:05:35.855Z",
+      "resolvedAt": "2026-07-31T04:43:49.462Z"
+    },
+    {
+      "id": "c83f8b27-1bbe-4a83-a945-e753cb8b7380",
+      "stage": "engineer",
+      "text": "Critic (architect p1): remove the now-vestigial write_metadata param construction from web/src/api/photoTaggerClient.ts's assign call once the server-side flag is removed — dead code cleanup, not a functional break.",
+      "severity": "low",
+      "status": "done",
+      "createdAt": "2026-07-31T04:05:36.024Z",
+      "resolvedAt": "2026-07-31T04:43:49.143Z"
+    },
+    {
+      "id": "46adc536-0372-48d9-bfb9-1946ac304aaa",
+      "stage": "engineer",
+      "text": "Critic (architect p1): the GET /api/photos/<id>/metadata \"people\" array's per-face shape ({id, name, cluster_id, assigned}) is specified in the design spec but not co-located with the endpoint contract in 04-architecture.md §6 — cross-reference spec §2.1 directly when implementing photo_metadata.py and the two consuming components to avoid a shape mismatch.",
+      "severity": "low",
+      "status": "open",
+      "createdAt": "2026-07-31T04:05:36.278Z"
+    }
+  ],
+  "beastMode": null,
+  "updatedAt": "2026-07-31T04:05:45.568Z"
+}

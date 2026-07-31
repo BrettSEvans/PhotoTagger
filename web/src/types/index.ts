@@ -364,18 +364,36 @@ export interface DeassignFacesResponse {
   deleted_cluster_ids: number[];
 }
 
-export interface MetadataWriteSummary {
-  requested: boolean;
-  written: number;
-  skipped: number;
-  failed: number;
-  opponent_omitted: boolean;
-  errors: string[];
-}
-
 export interface AssignClusterResponse {
   success: boolean;
-  metadata: MetadataWriteSummary;
+}
+
+/**
+ * Sparse metadata for the lightbox's metadata panel (feature #1).
+ * GET /api/photos/:id/metadata — every top-level key is optional except
+ * `file`/`library`/`people`, which are always present. An absent key means
+ * "no data for this section", never a null/empty placeholder.
+ */
+export interface PhotoMetadataPerson {
+  id: number;
+  cluster_id: number | null;
+  name: string | null;
+  assigned: boolean;
+}
+
+export interface PhotoMetadata {
+  file: { filename: string };
+  image?: {
+    width: number;
+    height: number;
+    size_bytes: number | null;
+    format: string;
+    mode: string;
+  };
+  library: { ingested?: string; batch?: string; batch_id?: number };
+  jersey_ocr?: { detected_numbers: string[]; confidence?: number };
+  game?: { team_a?: string; team_b?: string; year?: number; tournament?: string };
+  people: PhotoMetadataPerson[];
 }
 
 /**

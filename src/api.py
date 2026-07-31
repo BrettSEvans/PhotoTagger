@@ -12,7 +12,6 @@ import numpy as np
 import requests
 from src.db import Database
 from src.roster_import import RosterImportError, RosterImporter, parse_roster_file
-from src.metadata_sidecar import PhotoMetadata, write_xmp_sidecar
 from src.utils import parse_float, parse_int_arg, configured_photo_roots, is_allowed_photo_path, is_allowed_photo_directory
 
 # ── In-memory ring-buffer log handler (last 3000 lines) ──────────────────────
@@ -76,60 +75,6 @@ def get_server_bind() -> tuple[str, int]:
     host = "0.0.0.0" if os.environ.get("PORT") or get_runtime_mode() == "cloud-ui" else "127.0.0.1"
     return host, port
 
-def write_assignment_metadata(db: Database, cluster_id: int, roster_entry_id: int, face_ids: list[int]) -> dict:
-    """Write assignment metadata to photo XMP sidecars."""
-    roster_entry = db.roster.get_roster_entry_by_id(roster_entry_id)
-    if not roster_entry:
-        return {
-            "requested": True,
-            "written": 0,
-            "skipped": len(face_ids),
-            "failed": 0,
-            "opponent_omitted": True,
-            "errors": ["Roster entry not found"],
-        }
-
-    context = db.context.get_game_context()
-    opponents = [
-        team for team in context
-        if team["team_name"] != roster_entry["team_name"] or int(team["team_year"]) != int(roster_entry["team_year"])
-    ]
-    opponent_name = opponents[0]["team_name"] if len(opponents) == 1 else None
-    photo_rows = db.get_photos_by_face_ids(cluster_id, face_ids)
-    found_face_ids = {row["face_id"] for row in photo_rows}
-    missing_face_ids = [face_id for face_id in face_ids if face_id not in found_face_ids]
-    errors = [f"Face {face_id} is not assigned to cluster {cluster_id}" for face_id in missing_face_ids]
-    written = 0
-    failed = len(missing_face_ids)
-
-    metadata = PhotoMetadata(
-        player_name=roster_entry["player_name"],
-        team_name=roster_entry["team_name"],
-        team_year=int(roster_entry["team_year"]),
-        jersey_number=roster_entry["jersey_number"],
-        opponent_name=opponent_name,
-    )
-    for row in photo_rows:
-        if not is_allowed_photo_path(row["file_path"]):
-            failed += 1
-            errors.append(f"Photo path is outside allowed photo roots: {row['file_path']}")
-            continue
-        result = write_xmp_sidecar(row["file_path"], metadata)
-        if result.written:
-            written += 1
-        else:
-            failed += 1
-            errors.append(result.error or f"Could not write metadata for face {row['face_id']}")
-
-    return {
-        "requested": True,
-        "written": written,
-        "skipped": 0,
-        "failed": failed,
-        "opponent_omitted": opponent_name is None,
-        "errors": errors,
-    }
-
 def create_app(db_path: str = "photo_catalog.db") -> Flask:
     """Create and configure Flask app."""
     app = Flask(__name__)
@@ -155,6 +100,19 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         app.crawler = PhotoCrawler(db)
         app.ocr_engine = OCREngine(db)
         app.job_runner = LocalJobRunner(db)
+
+        # One-time backup of uploads/ before any IPTC embed can ever run —
+        # dispatched as an async job (not run inline in a request handler) so
+        # it never blocks the first assign/deassign call. review.py's
+        # _embed_names() checks is_backup_ready() and skips the embed
+        # (non-fatal) if this hasn't finished yet.
+        from src.iptc_writer import backup_directory
+        if os.path.isdir("uploads"):
+            app.job_runner.submit(
+                "backup_uploads",
+                {"source": "uploads", "dest": "uploads_backup"},
+                lambda job_id: backup_directory("uploads", "uploads_backup"),
+            )
 
     def enqueue_job(job_type: str, payload: dict, task):
         job_id = app.job_runner.submit(job_type, payload, task)
@@ -182,59 +140,6 @@ def create_app(db_path: str = "photo_catalog.db") -> Flask:
         if os.environ.get("PHOTOTAGGER_AGENT_TOKEN") and request.path.startswith("/api/") and not valid_agent_token():
             return jsonify({"error": "local agent token required"}), 401
         return None
-
-    def write_assignment_metadata(cluster_id: int, roster_entry_id: int, face_ids: list[int]):
-        roster_entry = db.roster.get_roster_entry_by_id(roster_entry_id)
-        if not roster_entry:
-            return {
-                "requested": True,
-                "written": 0,
-                "skipped": len(face_ids),
-                "failed": 0,
-                "opponent_omitted": True,
-                "errors": ["Roster entry not found"],
-            }
-
-        context = db.context.get_game_context()
-        opponents = [
-            team for team in context
-            if team["team_name"] != roster_entry["team_name"] or int(team["team_year"]) != int(roster_entry["team_year"])
-        ]
-        opponent_name = opponents[0]["team_name"] if len(opponents) == 1 else None
-        photo_rows = db.get_photos_by_face_ids(cluster_id, face_ids)
-        found_face_ids = {row["face_id"] for row in photo_rows}
-        missing_face_ids = [face_id for face_id in face_ids if face_id not in found_face_ids]
-        errors = [f"Face {face_id} is not assigned to cluster {cluster_id}" for face_id in missing_face_ids]
-        written = 0
-        failed = len(missing_face_ids)
-
-        metadata = PhotoMetadata(
-            player_name=roster_entry["player_name"],
-            team_name=roster_entry["team_name"],
-            team_year=int(roster_entry["team_year"]),
-            jersey_number=roster_entry["jersey_number"],
-            opponent_name=opponent_name,
-        )
-        for row in photo_rows:
-            if not is_allowed_photo_path(row["file_path"]):
-                failed += 1
-                errors.append(f"Photo path is outside allowed photo roots: {row['file_path']}")
-                continue
-            result = write_xmp_sidecar(row["file_path"], metadata)
-            if result.written:
-                written += 1
-            else:
-                failed += 1
-                errors.append(result.error or f"Could not write metadata for face {row['face_id']}")
-
-        return {
-            "requested": True,
-            "written": written,
-            "skipped": 0,
-            "failed": failed,
-            "opponent_omitted": opponent_name is None,
-            "errors": errors,
-        }
 
     # Add CORS support — restrict to an allowlist instead of "*" so arbitrary
     # websites cannot drive the local agent on 127.0.0.1.

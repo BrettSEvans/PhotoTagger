@@ -11,5 +11,11 @@ export default defineConfig({
         changeOrigin: true,
       }
     }
-  }
+  },
+  test: {
+    // Scoped to src/ only — e2e/ (Playwright) and tests/ (node:test) belong
+    // to the other two test runners (npm run test:e2e / test:frontend) and
+    // must not be picked up here.
+    include: ['src/**/*.{test,spec}.{ts,tsx}'],
+  },
 })

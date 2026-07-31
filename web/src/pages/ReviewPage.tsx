@@ -56,7 +56,6 @@ export const ReviewPage: React.FC = () => {
   const [assignSuccess, setAssignSuccess] = useState<string | null>(null);
   const [error,         setError]         = useState<string | null>(null);
   const [isAssigning,   setIsAssigning]   = useState(false);
-  const [writeMetadata, setWriteMetadata] = useState(() => window.localStorage.getItem('phototagger.writeMetadata') === 'true');
 
   // ── Post-assign similarity matches ───────────────────────────────────────
   const [matchResults,      setMatchResults]      = useState<MatchSimilarResponse | null>(null);
@@ -269,12 +268,12 @@ export const ReviewPage: React.FC = () => {
     setMatchResults(null);
     setDismissedSuggestions(new Set());
     try {
-      const assignResult = await photoTaggerClient.assignCluster(
+      await photoTaggerClient.assignCluster(
         selectedCluster.id,
         result.player_name,
         result.jersey_number,
         result.id,
-        { writeMetadata, faceIds: selectedFaceIds },
+        { faceIds: selectedFaceIds },
       );
       if (excluded.length > 0) await photoTaggerClient.deassignFaces(excluded);
 
@@ -286,11 +285,7 @@ export const ReviewPage: React.FC = () => {
       };
       setSelectedCluster(updated);
       setClusters(prev => prev.map(c => c.id === selectedCluster.id ? updated : c));
-      const metadata = assignResult.metadata;
-      const metadataText = metadata.requested
-        ? ` · sidecars: ${metadata.written} written, ${metadata.skipped} skipped, ${metadata.failed} failed${metadata.opponent_omitted ? ' · opponent omitted' : ''}`
-        : '';
-      setAssignSuccess(`${selected.size} photo${selected.size !== 1 ? 's' : ''} assigned to ${result.player_name} #${result.jersey_number}${metadataText}`);
+      setAssignSuccess(`${selected.size} photo${selected.size !== 1 ? 's' : ''} assigned to ${result.player_name} #${result.jersey_number}`);
       setSearchQuery('');
       setSearchResults([]);
 
@@ -347,11 +342,6 @@ export const ReviewPage: React.FC = () => {
     if (e.key === 'Escape') { setSearchQuery(''); setSearchResults([]); }
   };
 
-  const handleWriteMetadataChange = (checked: boolean) => {
-    setWriteMetadata(checked);
-    window.localStorage.setItem('phototagger.writeMetadata', checked ? 'true' : 'false');
-  };
-
   // Batch stats
   const currentBatch = batches.find(b => b.id === selectedBatchId);
   const unassignedClusters = clusters.filter(c => !c.player_name);
@@ -402,35 +392,6 @@ export const ReviewPage: React.FC = () => {
             )}
           </div>
         </div>
-
-        {/* Global metadata writing setting */}
-        <label className="flex items-center gap-2 rounded border-2 border-frame bg-muted/20 px-3 py-2 w-fit group relative">
-          <input
-            type="checkbox"
-            checked={writeMetadata}
-            onChange={e => handleWriteMetadataChange(e.target.checked)}
-            className="h-3 w-3 accent-accent"
-          />
-          <span>
-            <span className="block font-jakarta text-xs font-bold text-foreground">Write clear data back to photo</span>
-          </span>
-          <button
-            type="button"
-            className="ml-2 flex-shrink-0 text-muted-fg hover:text-foreground transition-colors flex items-center justify-center"
-            aria-label="What gets written back to photos"
-            title="Player name, jersey number, and confidence metadata written to XMP sidecars"
-          >
-            <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-              <circle cx="12" cy="12" r="10" />
-              <path d="M12 16v-4" />
-              <circle cx="12" cy="8" r="0.5" fill="currentColor" />
-            </svg>
-          </button>
-          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 bg-foreground text-white text-xs rounded opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity whitespace-nowrap font-jakarta">
-            Writes player name, jersey, and confidence to XMP sidecars
-            <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-foreground" />
-          </div>
-        </label>
       </header>
 
       {/* Main content area */}

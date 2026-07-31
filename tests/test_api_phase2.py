@@ -1,10 +1,13 @@
 import pytest
 import json
 import io
-import xml.etree.ElementTree as ET
+import shutil
+from pathlib import Path
 from src.api import create_app
 from src.roster import RosterManager
 import tempfile
+
+FIXTURE_PHOTO = Path(__file__).resolve().parent.parent / "uploads" / "DSC_3890-sm.JPG"
 
 @pytest.fixture
 def app_with_roster():
@@ -85,22 +88,22 @@ def test_player_photos_support_min_face_confidence_filter(client, app_with_roste
     assert data["photos"][0]["face_id"] == high_face_id
 
 
-def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_with_roster, tmp_path):
-    """Review metadata export should write sidecars only for explicitly selected faces."""
+def test_assign_cluster_embeds_iptc_for_selected_faces_only(client, app_with_roster, tmp_path, monkeypatch):
+    """Assigning a cluster embeds the player name via IPTC (unconditional, no
+    write_metadata flag) into only the explicitly selected faces' photos."""
+    from src import iptc_writer
+
+    monkeypatch.setattr("src.blueprints.review.is_backup_ready", lambda: True)
     db = app_with_roster.db
     db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
     roster_entry = db.roster.search_roster("Thomas")[0]
-    db.context.set_game_context([
-        {"team_name": "Carleton CUT", "team_year": 2026, "uniform_color": "red"},
-        {"team_name": "Pittsburgh En Sabah Nur", "team_year": 2026, "uniform_color": "white"},
-    ])
 
     selected_photo = tmp_path / "selected.jpg"
     excluded_photo = tmp_path / "excluded.jpg"
-    selected_photo.write_bytes(b"selected")
-    excluded_photo.write_bytes(b"excluded")
-    selected_photo_id = db.photos.add_photo(str(selected_photo))
-    excluded_photo_id = db.photos.add_photo(str(excluded_photo))
+    shutil.copy2(FIXTURE_PHOTO, selected_photo)
+    shutil.copy2(FIXTURE_PHOTO, excluded_photo)
+    selected_photo_id = db.photos.add_photo(str(selected_photo), file_hash="selected_hash")
+    excluded_photo_id = db.photos.add_photo(str(excluded_photo), file_hash="excluded_hash")
     selected_face_id = db.faces.add_face(selected_photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
     excluded_face_id = db.faces.add_face(excluded_photo_id, [0.2] * 384, [1, 2, 3, 4], 0.95)
     cluster_id = db.clusters.add_player_cluster(face_count=2, photo_count=2, thumbnail_face_id=selected_face_id)
@@ -113,30 +116,23 @@ def test_assign_cluster_writes_xmp_sidecars_for_selected_faces_only(client, app_
             "player_name": "Thomas Shope",
             "jersey_number": "12",
             "roster_entry_id": roster_entry["id"],
-            "write_metadata": True,
             "face_ids": [selected_face_id],
         },
     )
 
     assert response.status_code == 200
-    data = json.loads(response.data)
-    assert data["metadata"] == {
-        "requested": True,
-        "written": 1,
-        "skipped": 0,
-        "failed": 0,
-        "opponent_omitted": False,
-        "errors": [],
-    }
-    assert selected_photo.with_suffix(".xmp").exists()
-    assert not excluded_photo.with_suffix(".xmp").exists()
+    assert json.loads(response.data)["success"] is True
+    assert "metadata" not in json.loads(response.data)  # no opt-in flag/result shape anymore
 
-    root = ET.parse(selected_photo.with_suffix(".xmp")).getroot()
-    assert root.find(".//{http://iptc.org/std/Iptc4xmpExt/2008-02-29/}Event").text == "Carleton CUT vs Pittsburgh En Sabah Nur (2026)"
+    assert iptc_writer.read_person_in_image(str(selected_photo)) == ["Thomas Shope"]
+    assert iptc_writer.read_person_in_image(str(excluded_photo)) == []
 
 
-def test_assign_cluster_metadata_missing_photo_reports_failure(client, app_with_roster, tmp_path):
-    """Missing files should not block assignment, but they should be reported."""
+def test_assign_cluster_skips_embed_silently_for_missing_photo(client, app_with_roster, tmp_path, monkeypatch):
+    """A missing photo file must not fail the assign request — embed is best-effort."""
+    from src import iptc_writer
+
+    monkeypatch.setattr("src.blueprints.review.is_backup_ready", lambda: True)
     db = app_with_roster.db
     db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
     roster_entry = db.roster.search_roster("Thomas")[0]
@@ -154,20 +150,19 @@ def test_assign_cluster_metadata_missing_photo_reports_failure(client, app_with_
             "player_name": "Thomas Shope",
             "jersey_number": "12",
             "roster_entry_id": roster_entry["id"],
-            "write_metadata": True,
             "face_ids": [face_id],
         },
     )
 
     assert response.status_code == 200
-    data = json.loads(response.data)
-    assert data["success"] is True
-    assert data["metadata"]["failed"] == 1
-    assert "Photo not found" in data["metadata"]["errors"][0]
+    assert json.loads(response.data)["success"] is True
 
 
-def test_assign_cluster_metadata_rejects_outside_allowed_roots(client, app_with_roster, tmp_path, monkeypatch):
-    """Metadata writes should honor the local agent photo root allowlist."""
+def test_assign_cluster_skips_embed_outside_allowed_roots(client, app_with_roster, tmp_path, monkeypatch):
+    """IPTC embeds must honor the local agent photo root allowlist, silently."""
+    from src import iptc_writer
+
+    monkeypatch.setattr("src.blueprints.review.is_backup_ready", lambda: True)
     db = app_with_roster.db
     allowed = tmp_path / "allowed"
     outside = tmp_path / "outside"
@@ -177,7 +172,7 @@ def test_assign_cluster_metadata_rejects_outside_allowed_roots(client, app_with_
     db.roster.add_roster_entry("Carleton CUT", 2026, "12", "Thomas Shope", uniform_color="red")
     roster_entry = db.roster.search_roster("Thomas")[0]
     photo = outside / "outside.jpg"
-    photo.write_bytes(b"outside")
+    shutil.copy2(FIXTURE_PHOTO, photo)
     photo_id = db.photos.add_photo(str(photo))
     face_id = db.faces.add_face(photo_id, [0.1] * 384, [1, 2, 3, 4], 0.95)
     cluster_id = db.clusters.add_player_cluster(face_count=1, photo_count=1, thumbnail_face_id=face_id)
@@ -189,16 +184,13 @@ def test_assign_cluster_metadata_rejects_outside_allowed_roots(client, app_with_
             "player_name": "Thomas Shope",
             "jersey_number": "12",
             "roster_entry_id": roster_entry["id"],
-            "write_metadata": True,
             "face_ids": [face_id],
         },
     )
 
     assert response.status_code == 200
-    data = json.loads(response.data)
-    assert data["metadata"]["failed"] == 1
-    assert "outside allowed photo roots" in data["metadata"]["errors"][0]
-    assert not photo.with_suffix(".xmp").exists()
+    assert json.loads(response.data)["success"] is True
+    assert iptc_writer.read_person_in_image(str(photo)) == []
 
 def test_search_returns_player_name(client, app_with_roster):
     """Test that search returns player names via roster lookup."""

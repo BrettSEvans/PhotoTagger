@@ -80,6 +80,30 @@ class FaceRepository(BaseRepository):
                 })
             return results
 
+    def get_faces_with_player_info_by_photo(self, photo_id: int) -> List[Dict]:
+        """Get faces for a photo joined with their cluster's player assignment, if any."""
+        with self._lock:
+            cursor = self._conn.cursor()
+            cursor.execute("""
+                SELECT f.id, f.cluster_id, f.quality_score, f.jersey_color, f.jersey_color_conf,
+                       pc.player_name
+                FROM faces f
+                LEFT JOIN player_clusters pc ON f.cluster_id = pc.id
+                WHERE f.photo_id = ?
+                ORDER BY f.id
+            """, (photo_id,))
+            return [
+                {
+                    "face_id": row[0],
+                    "cluster_id": row[1],
+                    "quality_score": row[2],
+                    "jersey_color": row[3],
+                    "jersey_color_conf": row[4],
+                    "player_name": row[5],
+                }
+                for row in cursor.fetchall()
+            ]
+
     def photo_has_faces(self, photo_id: int) -> bool:
         """Return whether a photo already has stored face detections."""
         with self._lock:

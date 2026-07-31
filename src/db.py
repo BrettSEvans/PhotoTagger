@@ -81,6 +81,29 @@ class Database:
                 for row in cursor.fetchall()
             ]
 
+    def get_player_names_and_paths_for_faces(self, face_ids: List[int]) -> List[Dict]:
+        """Resolve each face's current player_name (via cluster) and photo file_path.
+
+        Call this BEFORE deassigning — the cluster link (and thus the player
+        name) is gone once faces.cluster_id is cleared.
+        """
+        if not face_ids:
+            return []
+        with self._lock:
+            cursor = self.conn.cursor()
+            placeholders = ",".join("?" for _ in face_ids)
+            cursor.execute(f"""
+                SELECT f.id as face_id, p.file_path, pc.player_name
+                FROM faces f
+                JOIN photos p ON p.id = f.photo_id
+                LEFT JOIN player_clusters pc ON f.cluster_id = pc.id
+                WHERE f.id IN ({placeholders})
+            """, face_ids)
+            return [
+                {"face_id": row[0], "file_path": row[1], "player_name": row[2]}
+                for row in cursor.fetchall()
+            ]
+
     def reset_all_data(self) -> Dict:
         """Delete every row from all user-data tables.
 

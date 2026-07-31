@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AssignPlayerPanel, { AssignedInfo } from '../components/AssignPlayerPanel';
+import PhotoLightbox from '../components/PhotoLightbox';
 import photoTaggerClient from '../api/photoTaggerClient';
 import { bboxStyle } from '../utils/bboxUtils';
 import type { ImgDim } from '../utils/bboxUtils';
@@ -45,6 +46,9 @@ export const PlayersPage: React.FC = () => {
   // ── HITL player matching modal ─────────────────────────────────────────
   const [matchModalPhoto, setMatchModalPhoto] = useState<PlayerPhotoItem | null>(null);
   const [isMatchingClusters, setIsMatchingClusters] = useState(false);
+
+  // ── Full-size lightbox (feature #1) ──────────────────────────────────────
+  const [lightboxPhotoId, setLightboxPhotoId] = useState<number | null>(null);
 
   const handleImgLoad = useCallback((e: React.SyntheticEvent<HTMLImageElement>, photoId: number) => {
     const img = e.currentTarget;
@@ -485,9 +489,10 @@ export const PlayersPage: React.FC = () => {
                     <img
                       src={photoTaggerClient.getPhotoUrl(photo.id)}
                       alt={photo.filename}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer"
                       onLoad={(e) => handleImgLoad(e, photo.id)}
                       onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      onClick={() => setLightboxPhotoId(photo.id)}
                     />
                     {/* Purple face bbox overlay */}
                     {showBbox && dim && photo.face_bbox && (
@@ -499,8 +504,10 @@ export const PlayersPage: React.FC = () => {
                     <span className="absolute top-1.5 right-1.5 bg-foreground text-white font-jakarta text-xs font-bold px-1.5 py-0.5 rounded-full">
                       {Math.round(photo.face_confidence * 100)}%
                     </span>
-                    {/* Action buttons — appear on hover */}
-                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end gap-1.5 p-1.5 bg-gradient-to-b from-transparent via-transparent to-foreground/10 pointer-events-auto">
+                    {/* Action buttons — appear on hover. pointer-events-none on the
+                        wrapper (not -auto) so clicks on the empty area still reach the
+                        image beneath and open the lightbox; each button opts back in. */}
+                    <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity flex items-end gap-1.5 p-1.5 bg-gradient-to-b from-transparent via-transparent to-foreground/10 pointer-events-none [&>*]:pointer-events-auto">
                       <button
                         onClick={() => setMatchModalPhoto(photo)}
                         className="flex-1 bg-accent text-white text-[10px] font-jakarta font-bold rounded-lg px-1.5 py-1 hover:bg-accent/90"
@@ -587,6 +594,10 @@ export const PlayersPage: React.FC = () => {
               </div>
             </div>
           </div>
+        )}
+
+        {lightboxPhotoId !== null && (
+          <PhotoLightbox photoId={lightboxPhotoId} onClose={() => setLightboxPhotoId(null)} />
         )}
       </div>
     );
