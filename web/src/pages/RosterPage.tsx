@@ -232,6 +232,11 @@ export const RosterPage: React.FC = () => {
       );
 
       await loadRoster();
+      // Clear the filter, URL params, and import message after deletion
+      setSelectedTeam('');
+      setSelectedYear(0);
+      setSearchParams({});
+      setImportMsg(null);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete roster');
